@@ -12,29 +12,14 @@ InputController.__index = InputController
 
 local PRIORITY = Enum.ContextActionPriority.High.Value + 50
 
--- Default bindings (shown in the in-game help).
-InputController.BINDINGS = {
-	{ "W / S", "Pitch down / up" },
-	{ "A / D", "Roll left / right" },
-	{ "Q / E", "Rudder + nose-wheel steering" },
-	{ "Shift / Ctrl", "Throttle up / down" },
-	{ "I", "Start / stop engines" },
-	{ "G", "Landing gear" },
-	{ "F / V", "Flaps down / up" },
-	{ "B", "Wheel brakes (hold)" },
-	{ "P", "Parking brake" },
-	{ "Z", "Reverse thrust (hold, on ground)" },
-	{ "X", "Speedbrake" },
-	{ "[ / ]", "Pitch trim (Simulation mode)" },
-	{ "T", "Assisted / Simulation" },
-	{ "C", "Camera: chase / cockpit / tower" },
-	{ "Right mouse drag", "Look around" },
-	{ "Mouse wheel", "Camera distance" },
-	{ "H", "Hide HUD" },
-	{ "F3", "Debug panel" },
-	{ "M", "Menu (aircraft, mode, spawn, weather, failures)" },
-	{ "R", "Reset / respawn" },
-}
+-- Bindings come from Shared.Controls (the single source for keys and the help popup).
+local Controls = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared").Controls)
+
+-- Legacy list for the menu: { keys, label }.
+InputController.BINDINGS = {}
+for _, r in Controls.rows() do
+	table.insert(InputController.BINDINGS, { r.keys, r.label })
+end
 
 export type Raw = {
 	pitch: number, roll: number, yaw: number, throttle: number,
@@ -56,33 +41,24 @@ function InputController.new(callbacks: { [string]: () -> () })
 	return self
 end
 
-local HOLD_KEYS = {
-	[Enum.KeyCode.W] = "pitchDown", [Enum.KeyCode.Up] = "pitchDown",
-	[Enum.KeyCode.S] = "pitchUp", [Enum.KeyCode.Down] = "pitchUp",
-	[Enum.KeyCode.A] = "rollLeft", [Enum.KeyCode.Left] = "rollLeft",
-	[Enum.KeyCode.D] = "rollRight", [Enum.KeyCode.Right] = "rollRight",
-	[Enum.KeyCode.Q] = "yawLeft", [Enum.KeyCode.E] = "yawRight",
-	[Enum.KeyCode.LeftShift] = "throttleUp", [Enum.KeyCode.LeftControl] = "throttleDown",
-	[Enum.KeyCode.B] = "brake", [Enum.KeyCode.Z] = "reverse",
-	[Enum.KeyCode.LeftBracket] = "trimDown", [Enum.KeyCode.RightBracket] = "trimUp",
-	[Enum.KeyCode.ButtonL1] = "yawLeft", [Enum.KeyCode.ButtonR1] = "yawRight",
-	[Enum.KeyCode.ButtonB] = "brake",
-}
-
-local PRESS_KEYS = {
-	[Enum.KeyCode.G] = "gear", [Enum.KeyCode.ButtonX] = "gear",
-	[Enum.KeyCode.F] = "flapsDown", [Enum.KeyCode.DPadDown] = "flapsDown",
-	[Enum.KeyCode.V] = "flapsUp", [Enum.KeyCode.DPadUp] = "flapsUp",
-	[Enum.KeyCode.P] = "parkingBrake", [Enum.KeyCode.DPadLeft] = "parkingBrake",
-	[Enum.KeyCode.X] = "speedbrake", [Enum.KeyCode.DPadRight] = "speedbrake",
-	[Enum.KeyCode.I] = "engines", [Enum.KeyCode.ButtonY] = "engines",
-	[Enum.KeyCode.T] = "assist",
-	[Enum.KeyCode.C] = "camera", [Enum.KeyCode.ButtonSelect] = "camera",
-	[Enum.KeyCode.H] = "hud",
-	[Enum.KeyCode.F3] = "debug",
-	[Enum.KeyCode.M] = "menu", [Enum.KeyCode.ButtonStart] = "menu",
-	[Enum.KeyCode.R] = "reset",
-}
+local HOLD_KEYS: { [Enum.KeyCode]: string } = {}
+local PRESS_KEYS: { [Enum.KeyCode]: string } = {}
+for _, b in Controls.KEYMAP do
+	for _, name in b.keys do
+		local ok, code = pcall(function()
+			return (Enum.KeyCode :: any)[name]
+		end)
+		if ok and code then
+			if b.kind == "hold" then
+				HOLD_KEYS[code] = b.action
+			else
+				PRESS_KEYS[code] = b.action
+			end
+		else
+			warn("[Controls] unknown key name: " .. name)
+		end
+	end
+end
 
 function InputController:_handle(_actionName: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 	local key = input.KeyCode

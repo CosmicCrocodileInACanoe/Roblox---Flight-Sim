@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
 local Registry = require(Shared.AircraftRegistry)
+local Controls = require(Shared.Controls)
 
 local Client = script.Parent
 local InputController = require(Client.InputController)
@@ -17,6 +18,7 @@ local CameraController = require(Client.CameraController)
 local Hud = require(Client.Hud)
 local Menu = require(Client.Menu)
 local WorldFx = require(Client.WorldFx)
+local ControlsPopup = require(Client.ControlsPopup)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -25,6 +27,7 @@ local fc: any = nil
 local destination: string? = nil
 local hud = Hud.new()
 local camera = CameraController.new()
+local controlsPopup = ControlsPopup.new()
 
 local function command(name: string)
 	return function()
@@ -54,6 +57,9 @@ local input = InputController.new({
 	end,
 	reset = function()
 		(remotes:WaitForChild("RequestReset") :: RemoteEvent):FireServer()
+	end,
+	controls = function()
+		controlsPopup:toggle()
 	end,
 	engines = command("engines"),
 	assist = command("assist"),
@@ -134,17 +140,36 @@ end)
 	end
 end)
 
--- M opens the menu even when not flying (flight keys are unbound then).
+-- The menu and controls keys work even when not flying (flight keys are unbound then).
+local function keysFor(action: string): { [Enum.KeyCode]: boolean }
+	local set = {}
+	for _, b in Controls.KEYMAP do
+		if b.action == action then
+			for _, name in b.keys do
+				local ok, code = pcall(function()
+					return (Enum.KeyCode :: any)[name]
+				end)
+				if ok and code then
+					set[code] = true
+				end
+			end
+		end
+	end
+	return set
+end
+local menuKeys, controlsKeys = keysFor("menu"), keysFor("controls")
 UserInputService.InputBegan:Connect(function(io, processed)
 	if processed or fc then
 		return
 	end
-	if io.KeyCode == Enum.KeyCode.M then
+	if menuKeys[io.KeyCode] then
 		if menu:isOpen() then
 			menu:hide()
 		else
 			menu:show()
 		end
+	elseif controlsKeys[io.KeyCode] then
+		controlsPopup:toggle()
 	end
 end)
 

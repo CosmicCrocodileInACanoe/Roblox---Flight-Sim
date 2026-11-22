@@ -165,7 +165,7 @@ function Menu.new(callbacks: any)
 	end, function()
 		cycle("spawnIndex", #self:spawnList(), 1)
 	end)
-	self.assistValue = row("Controls", function()
+	self.assistValue = row("Assistance", function()
 		sel.assist = if sel.assist == "assisted" then "simulation" else "assisted"
 	end, function()
 		sel.assist = if sel.assist == "assisted" then "simulation" else "assisted"

@@ -45,6 +45,7 @@ local suites = {
 	require("./test_damage"),
 	require("./test_world"),
 	require("./test_flight"),
+	require("./test_controls"),
 }
 
 for _, suite in suites do

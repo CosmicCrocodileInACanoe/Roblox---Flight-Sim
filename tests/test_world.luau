@@ -120,6 +120,7 @@ return { name = "World, airports, missions", run = function(T)
 				T.check(Airports.getSpawn(s.id) ~= nil)
 			end
 			T.check(kinds.gate and kinds.runway and kinds.approach)
+			T.check(Airports.spawnPoints(id)[1].kind == "runway", id .. ": default start is not a runway")
 		end
 	end)
 end }

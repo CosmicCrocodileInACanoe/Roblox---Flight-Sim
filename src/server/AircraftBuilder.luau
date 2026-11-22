@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Units = require(Shared.Units)
 local GameConfig = require(Shared.GameConfig)
+local TriMath = require(Shared.TriMath)
 
 local S = Units.STUDS_PER_METER
 
@@ -144,14 +145,128 @@ local function add(ctx: Ctx, comp: string, name: string, shape: string, sizeM: V
 end
 
 local ALONG_Z = CFrame.Angles(0, math.rad(90), 0) -- cylinder axis (X) -> body Z
+local FORWARD = Vector3.new(0, 0, -1)
+
+local function darker(c: Color3, k: number): Color3
+	return c:Lerp(Color3.new(0, 0, 0), k)
+end
+
+-- A smooth triangle from two WedgeParts (body metres). `opts.weldTo` welds the wedges to
+-- that part (used for moving control surfaces); otherwise they weld to the component root.
+local function tri(ctx: Ctx, comp: string, name: string, a: Vector3, b: Vector3, c: Vector3, thickness: number, color: Color3, opts: any?)
+	local o = opts or {}
+	local sol = TriMath.solve(a, b, c)
+	if not sol then
+		return
+	end
+	for _, w in sol do
+		local cf = CFrame.fromMatrix(w.pos, w.right, w.up, w.back)
+		local p = add(ctx, comp, name, "wedge", Vector3.new(thickness, w.height, w.length), cf, color, {
+			hull = o.hull, material = o.material, transparency = o.transparency, tag = o.tag, noWeld = o.weldTo ~= nil,
+		})
+		if o.weldTo then
+			weld(o.weldTo, p)
+		end
+	end
+end
+
+local function quad(ctx: Ctx, comp: string, name: string, p1: Vector3, p2: Vector3, p3: Vector3, p4: Vector3, thickness: number, color: Color3, opts: any?)
+	tri(ctx, comp, name, p1, p2, p3, thickness, color, opts)
+	tri(ctx, comp, name, p1, p3, p4, thickness, color, opts)
+end
+
+-- A cylinder from p0 to p1 (body metres).
+local function rod(ctx: Ctx, comp: string, name: string, p0: Vector3, p1: Vector3, diameter: number, color: Color3, opts: any?): BasePart?
+	local d = p1 - p0
+	if d.Magnitude < 0.02 then
+		return nil
+	end
+	local cf = CFrame.lookAt((p0 + p1) / 2, p1) * ALONG_Z
+	return add(ctx, comp, name, "cylinder", Vector3.new(d.Magnitude, diameter, diameter), cf, color, opts)
+end
+
+-- Fuselage cross-section: a "stadium" (two circles of radius r whose centres are `deck`
+-- apart vertically, joined by a block). deck = 0 is a plain circular barrel.
+local function station(ctx: Ctx, comp: string, name: string, z0: number, z1: number, r: number, yc: number, deck: number, color: Color3, opts: any?)
+	local len = math.abs(z1 - z0) + 0.04
+	local zm = (z0 + z1) / 2
+	if deck < 0.05 then
+		add(ctx, comp, name, "cylinder", Vector3.new(len, r * 2, r * 2), CFrame.new(0, yc, zm) * ALONG_Z, color, opts)
+		return
+	end
+	add(ctx, comp, name, "cylinder", Vector3.new(len, r * 2, r * 2), CFrame.new(0, yc - deck / 2, zm) * ALONG_Z, color, opts)
+	add(ctx, comp, name, "cylinder", Vector3.new(len, r * 2, r * 2), CFrame.new(0, yc + deck / 2, zm) * ALONG_Z, color, opts)
+	add(ctx, comp, name, "block", Vector3.new(r * 2 - 0.01, deck, len), CFrame.new(0, yc, zm), color, opts)
+end
+
+-- Row(s) of cabin windows and door outlines as a SurfaceGui on a transparent panel.
+local function windowStrip(ctx: Ctx, comp: string, sx: number, z0: number, z1: number, x: number, y: number, pitch: number, doorsAt: { number }, tag: string?)
+	local len = z1 - z0
+	if len < 1 then
+		return
+	end
+	local h = 0.62
+	local p = add(ctx, comp, "WindowStrip", "block", Vector3.new(0.02, h, len), CFrame.new(sx * x, y, (z0 + z1) / 2), Color3.new(1, 1, 1), { transparency = 1, tag = tag })
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = if sx > 0 then Enum.NormalId.Right else Enum.NormalId.Left
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 24
+	gui.LightInfluence = 1
+	gui.Parent = p
+	local n = math.floor(len / pitch)
+	local winW = 0.26 / len
+	for i = 0, n - 1 do
+		local u = (i + 0.5) / n
+		local zHere = z0 + u * len
+		local skip = false
+		for _, dz in doorsAt do
+			if math.abs(zHere - dz) < 0.75 then
+				skip = true
+			end
+		end
+		if not skip then
+			local f = Instance.new("Frame")
+			f.AnchorPoint = Vector2.new(0.5, 0.5)
+			-- seen from outside, the gui's x axis runs tail->nose on the right face, nose->tail on the left
+			f.Position = UDim2.fromScale(if sx > 0 then 1 - u else u, 0.42)
+			f.Size = UDim2.fromScale(winW, 0.5)
+			f.BackgroundColor3 = Color3.fromRGB(36, 44, 58)
+			f.BorderSizePixel = 0
+			local c = Instance.new("UICorner")
+			c.CornerRadius = UDim.new(0.5, 0)
+			c.Parent = f
+			f.Parent = gui
+		end
+	end
+	for _, dz in doorsAt do
+		local u = (dz - z0) / len
+		if u > 0 and u < 1 then
+			local f = Instance.new("Frame")
+			f.AnchorPoint = Vector2.new(0.5, 0.5)
+			f.Position = UDim2.fromScale(if sx > 0 then 1 - u else u, 0.5)
+			f.Size = UDim2.fromScale(0.95 / len, 1)
+			f.BackgroundTransparency = 1
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(150, 156, 166)
+			stroke.Thickness = 2
+			stroke.Parent = f
+			local c = Instance.new("UICorner")
+			c.CornerRadius = UDim.new(0.15, 0)
+			c.Parent = f
+			f.Parent = gui
+		end
+	end
+end
 
 -- Fuselage -------------------------------------------------------------------------
 local function buildFuselage(ctx: Ctx)
 	local g = ctx.cfg.geometry.fuselage
 	local liv = ctx.cfg.geometry.livery
-	local body, belly, stripe = rgb(liv.body), rgb(liv.belly), rgb(liv.stripe)
+	local body, stripe = rgb(liv.body), rgb(liv.stripe)
+	local belly = rgb(liv.belly)
 	local R = g.radius
-	local D = R * 2
+	local deck = g.deck or 0
+	local noseDrop = g.noseDrop or 0.35
 
 	-- Cabin barrel in three structural sections.
 	local sections = {
@@ -161,53 +276,175 @@ local function buildFuselage(ctx: Ctx)
 	}
 	for _, s in sections do
 		local comp, z0, z1 = s[1], s[2], s[3]
+		local hide = if comp == "ForwardFuselage" then "HideInCockpit" else nil
+		station(ctx, comp, "Barrel", z0, z1, R, 0, deck, body, { hull = true, tag = hide })
+		-- cheatline stripe and lower-body colour band
 		local len = z1 - z0
 		local mid = (z0 + z1) / 2
-		local hide = if comp == "ForwardFuselage" then "HideInCockpit" else nil
-		add(ctx, comp, "Barrel", "cylinder", Vector3.new(len + 0.02, D, D), CFrame.new(0, 0, mid) * ALONG_Z, body, { hull = true, tag = hide })
-		-- belly fairing
-		add(ctx, comp, "Belly", "cylinder", Vector3.new(len, D * 0.92, D * 0.96), CFrame.new(0, -0.14, mid) * ALONG_Z, belly, { tag = hide })
-		-- window band and cheatline stripe on both sides
+		local lowY = -deck / 2
 		for _, sx in { -1, 1 } do
-			add(ctx, comp, "Windows", "block", Vector3.new(0.04, 0.3, len * 0.96), CFrame.new(sx * (R - 0.005), 0.55, mid), Color3.fromRGB(40, 48, 60), { tag = hide })
-			add(ctx, comp, "Stripe", "block", Vector3.new(0.04, 0.22, len), CFrame.new(sx * (R - 0.12), -0.05, mid) * CFrame.Angles(0, 0, sx * math.rad(-8)), stripe, { tag = hide })
+			add(ctx, comp, "Stripe", "block", Vector3.new(0.03, 0.2, len), CFrame.new(sx * (R + 0.005) * math.cos(math.rad(12)), lowY - R * math.sin(math.rad(12)), mid) * CFrame.Angles(0, 0, sx * math.rad(12)), stripe, { tag = hide })
 		end
 	end
 
-	-- Nose: tapering stack + cockpit windows.
+	-- Windows (one row per deck) and doors.
+	local rows = g.windowRows or { 0.55 }
+	local doors = g.doors or { g.cabinStartZ + 1.2, g.cabinEndZ - 1.0 }
+	for ri, y in rows do
+		local yc = y + (if deck > 0 and ri == 2 then deck / 2 elseif deck > 0 then -deck / 2 else 0)
+		local x = math.sqrt(math.max(0.01, R * R - (y * y))) + 0.005
+		local z0 = if ri == 1 then g.cabinStartZ + 0.6 else (g.upperDeckStartZ or g.cabinStartZ + 0.6)
+		local z1 = g.cabinEndZ - 0.4
+		for _, sx in { -1, 1 } do
+			-- split at the structural joints so each strip belongs to one component
+			local cuts = { z0, g.forwardSplitZ, g.aftSplitZ, z1 }
+			local comps = { "ForwardFuselage", "Fuselage", "AftFuselage" }
+			for k = 1, 3 do
+				local a, b = math.max(z0, cuts[k]), math.min(z1, cuts[k + 1])
+				if b - a > 1 then
+					windowStrip(ctx, comps[k], sx, a, b, x, yc, g.windowPitch or 0.53, if ri == 1 then doors else {}, if k == 1 then "HideInCockpit" else nil)
+				end
+			end
+		end
+	end
+
+	-- Nose: many short stations along a smooth (elliptical) profile.
 	local noseLen = g.cabinStartZ - g.noseZ
-	local steps = 5
+	local steps = 14
+	local lastR, lastY = R, 0
 	for i = 1, steps do
 		local t0, t1 = (i - 1) / steps, i / steps
+		local tm = (t0 + t1) / 2
 		local z0 = g.cabinStartZ - noseLen * t0
 		local z1 = g.cabinStartZ - noseLen * t1
-		local f = math.cos(t1 * math.pi * 0.42) -- radius profile
-		local r = R * math.max(0.18, f)
-		local dropY = -0.35 * t1 * t1
-		add(ctx, "ForwardFuselage", "Nose" .. i, "cylinder", Vector3.new(math.abs(z1 - z0) + 0.05, r * 2, r * 2), CFrame.new(0, dropY, (z0 + z1) / 2) * ALONG_Z, body, { hull = true, tag = "HideInCockpit" })
+		local r = R * math.max(0.14, math.sqrt(1 - tm ^ 2.4))
+		local yc = -noseDrop * tm * tm
+		local d = deck * math.max(0, 1 - tm * 1.25)
+		-- with a double deck the top falls away faster than the chin
+		yc -= (deck - d) * 0.5
+		station(ctx, "ForwardFuselage", "Nose", z0, z1, r, yc, d, body, { hull = true, tag = "HideInCockpit" })
+		lastR, lastY = r, yc
 	end
-	add(ctx, "ForwardFuselage", "NoseTip", "ball", Vector3.new(R * 0.42, R * 0.42, R * 0.42), CFrame.new(0, -0.35, g.noseZ + 0.15), body, { hull = true, tag = "HideInCockpit" })
-	-- cockpit windscreen panels
+	add(ctx, "ForwardFuselage", "NoseTip", "ball", Vector3.one * (lastR * 2), CFrame.new(0, lastY, g.noseZ + lastR * 0.3), body, { hull = true, tag = "HideInCockpit" })
+
+	-- Cockpit windscreen: four panes sitting on the nose surface, tilted back.
+	-- Default: on the main nose at fraction `at` of its length. `windscreen = { z, cy, r }`
+	-- places them on another circle (for example the front of a jumbo's hump).
+	local ws = g.windscreen or {}
+	local wz, cy, wr
+	if ws.z then
+		wz, cy, wr = ws.z, ws.cy, ws.r
+	else
+		local tm = ws.at or 0.5
+		wz = g.cabinStartZ - noseLen * tm
+		wr = R * math.sqrt(1 - tm ^ 2.4)
+		local d = deck * math.max(0, 1 - tm * 1.25)
+		cy = -noseDrop * tm * tm - (deck - d) * 0.5 + d / 2
+	end
 	for _, sx in { -1, 1 } do
-		add(ctx, "ForwardFuselage", "Windscreen", "block", Vector3.new(0.9, 0.42, 0.05), CFrame.new(sx * 0.55, 0.95, g.cabinStartZ - noseLen * 0.38) * CFrame.Angles(math.rad(-38), sx * math.rad(-22), 0), Color3.fromRGB(25, 30, 40), { material = Enum.Material.Glass, reflectance = 0.3, tag = "HideInCockpit" })
+		for k = 1, 2 do
+			local x = sx * (0.3 + (k - 1) * 0.58)
+			local yRel = math.sqrt(math.max(0.01, wr * wr - x * x))
+			local radial = Vector3.new(x, yRel, 0).Unit
+			local n = (radial * math.cos(math.rad(38)) + FORWARD * math.sin(math.rad(38))).Unit
+			local pos = Vector3.new(x, cy + yRel * 0.93, wz + (k - 1) * 0.3) + n * 0.02
+			add(ctx, "ForwardFuselage", "Windscreen", "block", Vector3.new(0.52, 0.34, 0.04), CFrame.lookAt(pos, pos + n),
+				Color3.fromRGB(22, 28, 38), { material = Enum.Material.Glass, reflectance = 0.25, tag = "HideInCockpit" })
+		end
+	end
+
+	-- Upper-deck hump (jumbo style): flat-topped upper cylinder over the forward cabin,
+	-- tapering into the nose at the front and into the cabin roof at the back.
+	if g.hump then
+		local h = g.hump
+		local rh = h.radius
+		local topY = h.top
+		local flat0, flat1 = h.startZ + h.frontTaper, h.endZ - h.rearTaper
+		local function hstation(comp: string, z0: number, z1: number, top: number)
+			local r = math.min(rh, math.max(0.3, (top - (R - rh * 0.2)) * 0.5 + rh * 0.5))
+			add(ctx, comp, "Hump", "cylinder", Vector3.new(math.abs(z1 - z0) + 0.04, r * 2, r * 2), CFrame.new(0, top - r, (z0 + z1) / 2) * ALONG_Z, body, { hull = true, tag = "HideInCockpit" })
+		end
+		local function compAt(z: number): string
+			return if z < g.forwardSplitZ then "ForwardFuselage" elseif z < g.aftSplitZ then "Fuselage" else "AftFuselage"
+		end
+		local n = 6
+		for i = 1, n do
+			local z0 = h.startZ + (flat0 - h.startZ) * (i - 1) / n
+			local z1 = h.startZ + (flat0 - h.startZ) * i / n
+			local t = (i - 0.5) / n
+			local top = R + (topY - R) * math.sqrt(t)
+			hstation(compAt(z0), z0, z1, top)
+		end
+		-- flat part split at the joints
+		local cuts = { flat0, g.forwardSplitZ, g.aftSplitZ, flat1 }
+		for k = 1, 3 do
+			local a, b = math.max(flat0, cuts[k]), math.min(flat1, cuts[k + 1])
+			if b - a > 0.2 then
+				hstation(compAt(a + 0.01), a, b, topY)
+			end
+		end
+		for i = 1, n do
+			local z0 = flat1 + (h.endZ - flat1) * (i - 1) / n
+			local z1 = flat1 + (h.endZ - flat1) * i / n
+			local t = (i - 0.5) / n
+			local top = topY - (topY - R) * (t ^ 1.6)
+			hstation(compAt(z0), z0, z1, top)
+		end
+		-- upper-deck windows
+		for _, sx in { -1, 1 } do
+			local cuts2 = { flat0 + 1, g.forwardSplitZ, g.aftSplitZ, flat1 - 0.5 }
+			local comps = { "ForwardFuselage", "Fuselage", "AftFuselage" }
+			for k = 1, 3 do
+				local a, b = math.max(flat0 + 1, cuts2[k]), math.min(flat1 - 0.5, cuts2[k + 1])
+				if b - a > 1 then
+					windowStrip(ctx, comps[k], sx, a, b, rh * math.sqrt(1 - 0.25 ^ 2) + 0.01, topY - rh * 0.75, g.windowPitch or 0.53, {}, if k == 1 then "HideInCockpit" else nil)
+				end
+			end
+		end
 	end
 
 	-- Tail cone: tapering and sweeping upward.
 	local tailLen = g.tailEndZ - g.cabinEndZ
-	steps = 6
+	steps = 12
+	local tipR, tipY = R, 0
 	for i = 1, steps do
 		local t0, t1 = (i - 1) / steps, i / steps
+		local tm = (t0 + t1) / 2
 		local z0 = g.cabinEndZ + tailLen * t0
 		local z1 = g.cabinEndZ + tailLen * t1
-		local r = R * (1 - 0.78 * ((t0 + t1) / 2) ^ 1.2)
-		local y = g.tailUpsweep * ((t0 + t1) / 2) ^ 1.4
-		add(ctx, "AftFuselage", "TailCone" .. i, "cylinder", Vector3.new(z1 - z0 + 0.05, r * 2, r * 2), CFrame.new(0, y, (z0 + z1) / 2) * ALONG_Z, body, { hull = true })
+		local r = R * (1 - 0.8 * tm ^ 1.15)
+		local d = deck * (1 - tm) ^ 1.5
+		-- bottom sweeps up, top stays nearly level
+		local yc = g.tailUpsweep * tm ^ 1.3 + (deck - d) * 0.5 * 0
+		station(ctx, "AftFuselage", "TailCone", z0, z1, r, yc + (deck / 2 - d / 2), d, body, { hull = true })
+		tipR, tipY = r, yc + (deck / 2 - d / 2)
 	end
-	add(ctx, "AftFuselage", "APU", "cylinder", Vector3.new(0.6, 0.45, 0.45), CFrame.new(0, g.tailUpsweep, g.tailEndZ + 0.2) * ALONG_Z, Color3.fromRGB(90, 90, 95))
+	add(ctx, "AftFuselage", "APU", "cylinder", Vector3.new(0.6, tipR * 1.4, tipR * 1.4), CFrame.new(0, tipY, g.tailEndZ + 0.25) * ALONG_Z, Color3.fromRGB(110, 112, 118), { material = Enum.Material.Metal })
+
+	-- Belly fairing under the wing root (a long, shallow bulge).
+	local w = ctx.cfg.geometry.wing
+	if (w.mount or "low") == "low" then
+		local fz0, fz1 = w.rootLE[3] - 1.5, w.rootLE[3] + w.rootChord + 2.5
+		local fr = R * 0.78
+		local fy = -deck / 2 - R + fr * 0.82
+		local cuts = { fz0, g.forwardSplitZ, g.aftSplitZ, fz1 }
+		local comps = { "ForwardFuselage", "Fuselage", "AftFuselage" }
+		for k = 1, 3 do
+			local a, b = math.max(fz0, cuts[k]), math.min(fz1, cuts[k + 1])
+			if b - a > 0.2 then
+				add(ctx, comps[k], "BellyFairing", "cylinder", Vector3.new(b - a, fr * 2, fr * 2), CFrame.new(0, fy - 0.12, (a + b) / 2) * ALONG_Z, belly, { hull = true })
+			end
+		end
+		for _, z in { fz0, fz1 } do
+			add(ctx, if z == fz0 then (if fz0 < g.forwardSplitZ then "ForwardFuselage" else "Fuselage") else (if fz1 > g.aftSplitZ then "AftFuselage" else "Fuselage"), "BellyFairingEnd", "ball", Vector3.one * fr * 2, CFrame.new(0, fy - 0.12, z), belly)
+		end
+	end
 
 	-- Airline name (fictional) on both sides, via SurfaceGui on thin transparent panels.
+	local titleY = R * 0.62 + deck / 2
 	for _, sx in { -1, 1 } do
-		local p = add(ctx, "Fuselage", "Titles", "block", Vector3.new(0.02, 0.9, 9), CFrame.new(sx * (R + 0.01), 1.0, -1.5), body, { transparency = 1 })
+		local tx = math.sqrt(math.max(0.01, R * R - (R * 0.62) ^ 2)) + 0.02
+		local p = add(ctx, "Fuselage", "Titles", "block", Vector3.new(0.02, R * 0.42, math.min(10, (g.aftSplitZ - g.forwardSplitZ) * 0.8)), CFrame.new(sx * tx, titleY, (g.forwardSplitZ + g.aftSplitZ) / 2 - 1), body, { transparency = 1 })
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = if sx > 0 then Enum.NormalId.Right else Enum.NormalId.Left
 		gui.PixelsPerStud = 20
@@ -226,12 +463,44 @@ local function buildFuselage(ctx: Ctx)
 end
 
 -- Lifting surfaces --------------------------------------------------------------------
--- Builds one half-wing (or half-tailplane) as swept, tapered, dihedral segments.
+-- A moving control surface: an invisible hinge part on a Motor6D at the hinge line,
+-- with the surface's wedges welded to it. The hinge frame keeps the old conventions:
+-- X along the hinge (pointing to body +x, or up for the fin), Z aft, rotation about X.
+local function hinge(ctx: Ctx, comp: string, kind: string, h0: Vector3, h1: Vector3, yAxis: Vector3?, side: number?): BasePart
+	local mid = (h0 + h1) / 2
+	local dir = (h1 - h0).Unit
+	local up: Vector3
+	if yAxis then
+		up = yAxis
+	else
+		if dir.X < 0 then
+			dir = -dir
+		end
+		up = dir:Cross(FORWARD).Unit
+	end
+	local cf = CFrame.fromMatrix(mid, dir, up)
+	local anchor = add(ctx, comp, kind .. "Mount", "block", Vector3.new(0.1, 0.1, 0.1), cf, Color3.new(), { transparency = 1 })
+	local moving = add(ctx, comp, kind .. "Hinge", "block", Vector3.new(0.1, 0.1, 0.1), cf, Color3.new(), { transparency = 1, noWeld = true })
+	local m = Instance.new("Motor6D")
+	m.Name = kind .. "Hinge"
+	m.Part0 = anchor
+	m.Part1 = moving
+	m.C0 = CFrame.new()
+	m.C1 = CFrame.new()
+	m:SetAttribute("Surface", kind)
+	if side then
+		m:SetAttribute("Side", side)
+	end
+	m.Parent = anchor
+	return moving
+end
+
+-- One half-wing or half-tailplane as true tapered, swept, dihedral trapezoids, split
+-- spanwise at the flap/aileron breaks, with the control surfaces on hinges.
 local function buildHalfSurface(ctx: Ctx, comp: string, spec: any, sx: number, color: Color3, surfaceKind: string)
 	local rl = spec.rootLE
 	local tanSweep = math.tan(math.rad(spec.sweepDeg))
 	local tanDih = math.tan(math.rad(spec.dihedralDeg))
-	local segs = spec.segments or 2
 	local function le(s: number): Vector3
 		return Vector3.new(sx * (rl[1] + s), rl[2] + s * tanDih, rl[3] + s * tanSweep)
 	end
@@ -243,71 +512,59 @@ local function buildHalfSurface(ctx: Ctx, comp: string, spec: any, sx: number, c
 		local t1 = spec.tipThickness or spec.thickness * 0.6
 		return t0 + (t1 - t0) * s / spec.span
 	end
-	local aft = Vector3.new(0, 0, 1)
-	local segParts = {}
-	for k = 1, segs do
-		local s0, s1 = spec.span * (k - 1) / segs, spec.span * k / segs
-		local m0 = le(s0) + Vector3.new(0, 0, chord(s0) / 2)
-		local m1 = le(s1) + Vector3.new(0, 0, chord(s1) / 2)
-		local d = m1 - m0
-		local dir = d.Unit
-		if dir.X < 0 then
-			dir = -dir
+	local breaks: { number }
+	if surfaceKind == "wing" then
+		breaks = { 0, spec.flapEnd, spec.aileronStart, 0.97 }
+	else
+		breaks = { 0, 1 }
+	end
+	local cc = spec.controlChord
+	local ctlColor = darker(color, 0.1)
+	for k = 1, #breaks - 1 do
+		local f0, f1 = breaks[k], breaks[k + 1]
+		if f1 - f0 < 0.01 then
+			continue
 		end
-		local up = aft:Cross(dir).Unit
-		if up.Y < 0 then
-			up = -up
-		end
-		local cosL = math.abs(dir.X) / math.sqrt(dir.X * dir.X + dir.Z * dir.Z)
-		local c = (chord(s0) + chord(s1)) / 2
-		local width = c * cosL
-		local len = d.Magnitude + 0.08
+		local s0, s1 = f0 * spec.span, f1 * spec.span
+		local L0, L1 = le(s0), le(s1)
+		local c0, c1 = chord(s0), chord(s1)
 		local th = (thick(s0) + thick(s1)) / 2
-		local center = (m0 + m1) / 2
-		local cf = CFrame.fromMatrix(center, dir, up)
-		local seg = add(ctx, comp, "Panel" .. k, "block", Vector3.new(len, th, width), cf, color, { hull = true })
-		segParts[k] = seg
-
-		-- Control surface on this segment?
-		local sMid = (s0 + s1) / 2 / spec.span
+		local aft = Vector3.new(0, 0, 1)
 		local ctlKind: string? = nil
 		if surfaceKind == "wing" then
-			if sMid >= spec.aileronStart then
-				ctlKind = "Aileron"
-			elseif sMid <= spec.flapEnd then
+			if k == 1 then
 				ctlKind = "Flap"
+			elseif k == 3 then
+				ctlKind = "Aileron"
 			end
 		elseif surfaceKind == "hstab" then
 			ctlKind = "Elevator"
 		end
+		local fixedFrac = if ctlKind then 1 - cc else 1
+		local H0, H1 = L0 + aft * (c0 * fixedFrac), L1 + aft * (c1 * fixedFrac)
+		quad(ctx, comp, "Skin", L0, L1, H1, H0, th, color, { hull = true })
+		-- rounded leading edge
+		rod(ctx, comp, "LeadingEdge", L0 + aft * (th * 0.45), L1 + aft * (th * 0.45), th * 0.95, color, { hull = true })
 		if ctlKind then
-			local cw = width * spec.controlChord
-			local surf = add(ctx, comp, ctlKind, "block", Vector3.new(len * 0.94, th * 0.8, cw), cf * CFrame.new(0, 0, width / 2 - cw / 2), color:Lerp(Color3.new(0, 0, 0), 0.12), { noWeld = true })
-			local m = Instance.new("Motor6D")
-			m.Name = ctlKind .. "Hinge"
-			m.Part0 = seg
-			m.Part1 = surf
-			m.C0 = CFrame.new(0, 0, (width / 2 - cw) * S)
-			m.C1 = CFrame.new(0, 0, -cw / 2 * S)
-			m:SetAttribute("Surface", ctlKind)
-			m:SetAttribute("Side", sx)
-			m.Parent = seg
+			local T0, T1 = L0 + aft * c0, L1 + aft * c1
+			local hp = hinge(ctx, comp, ctlKind, H0, H1, nil, sx)
+			quad(ctx, comp, ctlKind, H0, H1, T1, T0, th * 0.6, ctlColor, { weldTo = hp })
 		end
-		if surfaceKind == "wing" and k == 2 then
-			-- spoiler panel on top of the second segment
-			local sp = add(ctx, comp, "Spoiler", "block", Vector3.new(len * 0.8, 0.05, width * 0.18), cf * CFrame.new(0, th / 2 + 0.02, width * 0.18), color:Lerp(Color3.new(0, 0, 0), 0.2), { noWeld = true })
-			local m = Instance.new("Motor6D")
-			m.Name = "SpoilerHinge"
-			m.Part0 = seg
-			m.Part1 = sp
-			m.C0 = CFrame.new(0, (th / 2 + 0.02) * S, (width * 0.09) * S)
-			m.C1 = CFrame.new(0, 0, -(width * 0.09) * S)
-			m:SetAttribute("Surface", "Spoiler")
-			m:SetAttribute("Side", sx)
-			m.Parent = seg
+		if surfaceKind == "wing" and k == 1 then
+			-- spoiler panels on the upper surface ahead of the flap
+			local sa, sb = 0.55, 0.7
+			local up = (L1 - L0):Cross(FORWARD).Unit * (if sx > 0 then 1 else -1)
+			if up.Y < 0 then
+				up = -up
+			end
+			local lift = up * (th / 2 + 0.03)
+			local S0a, S1a = L0 + aft * (c0 * sa) + lift, L1 + aft * (c1 * sa) + lift
+			local S0b, S1b = L0 + aft * (c0 * sb) + lift, L1 + aft * (c1 * sb) + lift
+			local hp = hinge(ctx, comp, "Spoiler", S0a, S1a, nil, sx)
+			quad(ctx, comp, "Spoiler", S0a, S1a, S1b, S0b, 0.05, darker(color, 0.2), { weldTo = hp })
 		end
 	end
-	return le, chord, segParts
+	return le, chord, thick
 end
 
 local function buildWings(ctx: Ctx)
@@ -316,16 +573,25 @@ local function buildWings(ctx: Ctx)
 	local wingColor = rgb(liv.wing)
 	for _, sx in { -1, 1 } do
 		local comp = if sx < 0 then "LeftWing" else "RightWing"
-		local le, chord = buildHalfSurface(ctx, comp, geo.wing, sx, wingColor, "wing")
 		local w = geo.wing
-		-- winglet
-		local tip = le(w.span)
-		local tc = chord(w.span)
-		add(ctx, comp, "Winglet", "block", Vector3.new(0.12, w.wingletHeight, tc * 0.9), CFrame.new(tip + Vector3.new(0, w.wingletHeight / 2, tc * 0.6)) * CFrame.Angles(math.rad(-25), 0, sx * math.rad(-12)), rgb(liv.tail), { hull = true })
+		local le, chord, thick = buildHalfSurface(ctx, comp, w, sx, wingColor, "wing")
+		local tip = le(w.span * 0.97)
+		local tc = chord(w.span * 0.97)
+		local tipEnd = le(w.span)
+		-- tip cap
+		quad(ctx, comp, "Skin", tip, tipEnd, tipEnd + Vector3.new(0, 0, chord(w.span)), tip + Vector3.new(0, 0, tc), thick(w.span), wingColor, { hull = true })
+		-- winglet: a swept, tapered vertical trapezoid
+		local wh = w.wingletHeight or 0
+		if wh > 0.1 then
+			local tcw = chord(w.span)
+			local base0 = tipEnd + Vector3.new(0, 0, tcw * 0.15)
+			local base1 = tipEnd + Vector3.new(0, 0, tcw * 0.95)
+			local top1 = base1 + Vector3.new(sx * wh * 0.25, wh, wh * 0.3)
+			local top0 = top1 - Vector3.new(0, 0, tcw * 0.4)
+			quad(ctx, comp, "Winglet", base0, base1, top1, top0, 0.1, rgb(liv.tail), { hull = true })
+		end
 		-- navigation lights: red left, green right
-		add(ctx, comp, "NavLight", "ball", Vector3.new(0.25, 0.25, 0.25), CFrame.new(tip + Vector3.new(0, 0.05, 0.25)), if sx < 0 then Color3.fromRGB(255, 40, 40) else Color3.fromRGB(40, 255, 80), { material = Enum.Material.Neon })
-		-- wing root fairing
-		add(ctx, comp, "RootFairing", "block", Vector3.new(1.6, 0.9, 7.2), CFrame.new(sx * 1.6, -1.35, w.rootLE[3] + 3.4), rgb(liv.belly), { hull = true })
+		add(ctx, comp, "NavLight", "ball", Vector3.new(0.25, 0.25, 0.25), CFrame.new(tipEnd + Vector3.new(0, 0.05, 0.25)), if sx < 0 then Color3.fromRGB(255, 40, 40) else Color3.fromRGB(40, 255, 80), { material = Enum.Material.Neon })
 	end
 end
 
@@ -334,85 +600,101 @@ local function buildTail(ctx: Ctx)
 	local liv = geo.livery
 	local tailColor = rgb(liv.tail)
 	for _, sx in { -1, 1 } do
-		local hs = table.clone(geo.hstab)
-		hs.segments = 2
-		buildHalfSurface(ctx, "HorizontalStab", hs, sx, rgb(liv.wing), "hstab")
+		buildHalfSurface(ctx, "HorizontalStab", geo.hstab, sx, rgb(liv.wing), "hstab")
 	end
-	-- Fin: segments up the height, rudder on each.
+	-- Fin: one tapered, swept trapezoid with the rudder on a hinge.
 	local v = geo.vstab
 	local tanSweep = math.tan(math.rad(v.sweepDeg))
-	local segs = 3
 	local function le(h: number): Vector3
 		return Vector3.new(0, v.rootLE[2] + h, v.rootLE[3] + h * tanSweep)
 	end
 	local function chord(h: number): number
 		return v.rootChord + (v.tipChord - v.rootChord) * h / v.height
 	end
-	for k = 1, segs do
-		local h0, h1 = v.height * (k - 1) / segs, v.height * k / segs
-		local m0 = le(h0) + Vector3.new(0, 0, chord(h0) / 2)
-		local m1 = le(h1) + Vector3.new(0, 0, chord(h1) / 2)
-		local d = m1 - m0
-		local dir = d.Unit
-		local left = Vector3.new(-1, 0, 0)
-		local c = (chord(h0) + chord(h1)) / 2
-		local width = c * math.abs(dir.Y)
-		local cf = CFrame.fromMatrix((m0 + m1) / 2, dir, left)
-		local seg = add(ctx, "VerticalStab", "Fin" .. k, "block", Vector3.new(d.Magnitude + 0.06, v.thickness, width), cf, tailColor, { hull = true })
-		local cw = width * v.controlChord
-		local surf = add(ctx, "VerticalStab", "Rudder", "block", Vector3.new(d.Magnitude * 0.94, v.thickness * 0.8, cw), cf * CFrame.new(0, 0, width / 2 - cw / 2), tailColor:Lerp(Color3.new(0, 0, 0), 0.12), { noWeld = true })
-		local m = Instance.new("Motor6D")
-		m.Name = "RudderHinge"
-		m.Part0 = seg
-		m.Part1 = surf
-		m.C0 = CFrame.new(0, 0, (width / 2 - cw) * S)
-		m.C1 = CFrame.new(0, 0, -cw / 2 * S)
-		m:SetAttribute("Surface", "Rudder")
-		m.Parent = seg
-		if k == 2 then
-			-- accent band (fictional airline logo stand-in)
-			add(ctx, "VerticalStab", "TailLogo", "block", Vector3.new(d.Magnitude * 0.7, v.thickness + 0.04, width * 0.25), cf * CFrame.new(0, 0, -width * 0.1), rgb(liv.accent))
-		end
+	local aft = Vector3.new(0, 0, 1)
+	local cc = v.controlChord
+	local L0, L1 = le(0), le(v.height)
+	local c0, c1 = chord(0), chord(v.height)
+	local H0, H1 = L0 + aft * (c0 * (1 - cc)), L1 + aft * (c1 * (1 - cc))
+	local T0, T1 = L0 + aft * c0, L1 + aft * c1
+	quad(ctx, "VerticalStab", "Fin", L0, L1, H1, H0, v.thickness, tailColor, { hull = true })
+	rod(ctx, "VerticalStab", "FinLeadingEdge", L0 + aft * (v.thickness * 0.45), L1 + aft * (v.thickness * 0.45), v.thickness * 0.95, tailColor, { hull = true })
+	-- dorsal fillet blending the fin into the fuselage
+	local fil0 = L0 + Vector3.new(0, -0.1, -c0 * 0.45)
+	quad(ctx, "VerticalStab", "Fin", fil0, L0 + Vector3.new(0, v.height * 0.18, v.height * 0.18 * tanSweep), L0 + aft * (c0 * 0.3), L0, v.thickness * 0.8, tailColor, { hull = true })
+	local hp = hinge(ctx, "VerticalStab", "Rudder", H0, H1, Vector3.new(-1, 0, 0), nil)
+	quad(ctx, "VerticalStab", "Rudder", H0, H1, T1, T0, v.thickness * 0.65, darker(tailColor, 0.1), { weldTo = hp })
+	-- tail logo: a fictional accent swoosh (two triangles)
+	local accent = rgb(liv.accent)
+	for _, sx in { -1, 1 } do
+		local off = Vector3.new(sx * (v.thickness / 2 + 0.02), 0, 0)
+		local a = le(v.height * 0.35) + aft * (chord(v.height * 0.35) * 0.15) + off
+		local b = le(v.height * 0.75) + aft * (chord(v.height * 0.75) * 0.1) + off
+		local c = le(v.height * 0.55) + aft * (chord(v.height * 0.55) * 0.6) + off
+		tri(ctx, "VerticalStab", "TailLogo", a, b, c, 0.03, accent)
 	end
-	-- tail light
+	-- tail light and beacon
 	add(ctx, "AftFuselage", "TailLight", "ball", Vector3.new(0.22, 0.22, 0.22), CFrame.new(0, geo.fuselage.tailUpsweep + 0.2, geo.fuselage.tailEndZ + 0.3), Color3.new(1, 1, 1), { material = Enum.Material.Neon })
-	-- beacon
-	add(ctx, "Fuselage", "Beacon", "ball", Vector3.new(0.3, 0.3, 0.3), CFrame.new(0, geo.fuselage.radius + 0.1, 2), Color3.fromRGB(255, 30, 30), { material = Enum.Material.Neon, tag = "Beacon" })
+	local topY = if geo.fuselage.hump then geo.fuselage.hump.top else geo.fuselage.radius + (geo.fuselage.deck or 0) / 2
+	add(ctx, "Fuselage", "Beacon", "ball", Vector3.new(0.3, 0.3, 0.3), CFrame.new(0, topY + 0.1, 2), Color3.fromRGB(255, 30, 30), { material = Enum.Material.Neon, tag = "Beacon" })
 end
 
 local function buildEngines(ctx: Ctx)
 	local geo = ctx.cfg.geometry
 	local liv = geo.livery
 	local eg = geo.engine
+	local metal = Color3.fromRGB(190, 192, 198)
 	for i, e in ctx.cfg.engines do
 		local comp = e.component
 		local p = v3(e.pos)
 		local L, R = eg.length, eg.radius
-		add(ctx, comp, "Nacelle", "cylinder", Vector3.new(L, R * 2, R * 2), CFrame.new(p) * ALONG_Z, rgb(liv.engine), { hull = true })
-		add(ctx, comp, "Intake", "cylinder", Vector3.new(0.35, R * 2.06, R * 2.06), CFrame.new(p + Vector3.new(0, 0, -L / 2 + 0.1)) * ALONG_Z, Color3.fromRGB(190, 192, 198))
-		add(ctx, comp, "FanFace", "cylinder", Vector3.new(0.05, R * 1.8, R * 1.8), CFrame.new(p + Vector3.new(0, 0, -L / 2 + 0.06)) * ALONG_Z, Color3.fromRGB(30, 32, 36))
-		-- spinning fan: hub + blades on a Motor6D
-		local hub = add(ctx, comp, "FanHub", "cylinder", Vector3.new(0.3, R * 0.5, R * 0.5), CFrame.new(p + Vector3.new(0, 0, -L / 2 + 0.02)) * ALONG_Z, Color3.fromRGB(200, 200, 205), { noWeld = true })
-		for b = 0, 2 do
-			local blade = add(ctx, comp, "FanBlade", "block", Vector3.new(0.12, R * 1.7, 0.04), CFrame.new(p + Vector3.new(0, 0, -L / 2 + 0.0)) * CFrame.Angles(0, 0, b * math.pi / 3), Color3.fromRGB(70, 72, 80), { noWeld = true })
+		local front = p + Vector3.new(0, 0, -L / 2)
+		local nac = rgb(liv.engine)
+		local prop = eg.kind == "turboprop"
+		-- nacelle body: lip, barrel, two tapering aft stations, exhaust
+		local nacelle = add(ctx, comp, "Nacelle", "cylinder", Vector3.new(L * 0.55, R * 2, R * 2), CFrame.new(p + Vector3.new(0, 0, -L * 0.1)) * ALONG_Z, nac, { hull = true })
+		if not prop then
+			add(ctx, comp, "Intake", "cylinder", Vector3.new(0.3, R * 2.04, R * 2.04), CFrame.new(front + Vector3.new(0, 0, 0.15)) * ALONG_Z, metal, { material = Enum.Material.Metal })
+			add(ctx, comp, "FanFace", "cylinder", Vector3.new(0.05, R * 1.75, R * 1.75), CFrame.new(front + Vector3.new(0, 0, 0.32)) * ALONG_Z, Color3.fromRGB(26, 28, 32))
+		end
+		add(ctx, comp, "NacelleAft", "cylinder", Vector3.new(L * 0.18, R * 1.8, R * 1.8), CFrame.new(p + Vector3.new(0, 0, L * 0.26)) * ALONG_Z, nac, { hull = true })
+		add(ctx, comp, "NacelleAft", "cylinder", Vector3.new(L * 0.12, R * 1.45, R * 1.45), CFrame.new(p + Vector3.new(0, 0, L * 0.4)) * ALONG_Z, nac)
+		add(ctx, comp, "Exhaust", "cylinder", Vector3.new(L * 0.14, R * 0.95, R * 0.95), CFrame.new(p + Vector3.new(0, 0, L * 0.52)) * ALONG_Z, Color3.fromRGB(110, 110, 118), { material = Enum.Material.Metal })
+		add(ctx, comp, "ExhaustCone", "ball", Vector3.one * R * 0.7, CFrame.new(p + Vector3.new(0, 0, L * 0.6)), Color3.fromRGB(80, 80, 86), { material = Enum.Material.Metal })
+		-- rotating fan or propeller: hub + blades on a Motor6D
+		local hubZ = if prop then -0.35 else 0.36
+		local hub = add(ctx, comp, "FanHub", "ball", Vector3.one * R * (if prop then 0.9 else 0.55), CFrame.new(front + Vector3.new(0, 0, hubZ)) * ALONG_Z, if prop then nac else metal, { noWeld = true })
+		-- each blade part runs through the hub, so it makes two tips
+		local bars = math.max(1, math.floor((if prop then (eg.blades or 6) else 8) / 2))
+		local bladeLen = if prop then (eg.propRadius or 1.9) * 2 else R * 1.65
+		for b = 0, bars - 1 do
+			local ang = b * math.pi / bars
+			local blade = add(ctx, comp, "FanBlade", "block", Vector3.new(if prop then 0.22 else 0.1, bladeLen, 0.04),
+				CFrame.new(front + Vector3.new(0, 0, hubZ + 0.05)) * CFrame.Angles(0, 0, ang) * CFrame.Angles(0, math.rad(if prop then 18 else 30), 0),
+				if prop then Color3.fromRGB(40, 40, 44) else Color3.fromRGB(70, 72, 80), { noWeld = true })
 			weld(hub, blade)
 		end
-		local nacelle = (ctx.comps[comp] :: any).Nacelle :: BasePart
 		local m = Instance.new("Motor6D")
 		m.Name = "FanMotor"
 		m.Part0 = nacelle
 		m.Part1 = hub
-		m.C0 = CFrame.new((L / 2 - 0.02) * S, 0, 0) -- nacelle local +X points forward (body -Z)
+		-- both frames have local +X pointing forward (body -Z); C0 is the hub position
+		m.C0 = CFrame.new((L * 0.4 - hubZ) * S, 0, 0)
 		m.C1 = CFrame.new()
 		m:SetAttribute("EngineIndex", i)
 		m.Parent = nacelle
-		-- exhaust and pylon
-		add(ctx, comp, "Exhaust", "cylinder", Vector3.new(1.0, R * 1.2, R * 1.2), CFrame.new(p + Vector3.new(0, 0, L / 2 + 0.4)) * ALONG_Z, Color3.fromRGB(120, 120, 128), { material = Enum.Material.Metal })
-		add(ctx, comp, "Pylon", "block", Vector3.new(0.35, 1.1, L * 0.9), CFrame.new(p + Vector3.new(0, R * 0.9, 0.6)), rgb(liv.engine), { hull = true })
+		-- pylon: a swept, thin trapezoid up to the wing
+		local w = geo.wing
+		if (w.mount or "low") == "low" then
+			local top = p + Vector3.new(0, R + 0.5, 0)
+			quad(ctx, comp, "Pylon", p + Vector3.new(0, R * 0.7, -L * 0.15), p + Vector3.new(0, R * 0.7, L * 0.42), top + Vector3.new(0, 0, L * 0.55), top + Vector3.new(0, 0, L * 0.05), 0.3, nac, { hull = true })
+		else
+			-- high wing: the nacelle hangs under the wing on a short fairing
+			add(ctx, comp, "Pylon", "block", Vector3.new(R * 1.2, 0.6, L * 0.6), CFrame.new(p + Vector3.new(0, R * 0.85, L * 0.05)), nac, { hull = true })
+		end
 		-- smoke emitter (enabled by the client when the engine is failed/on fire)
 		local att = Instance.new("Attachment")
 		att.Name = "SmokeAttachment"
-		att.Position = Vector3.new(0, 0, 0)
 		att.Parent = (ctx.comps[comp] :: any).Exhaust
 		local smoke = Instance.new("ParticleEmitter")
 		smoke.Name = "FailureSmoke"
@@ -437,7 +719,7 @@ local function buildGear(ctx: Ctx)
 		local attach = v3(u.pos)
 		local L = u.strutLength
 		-- leg: centred L/2 below the attach point
-		local leg = add(ctx, comp, "Leg", "cylinder", Vector3.new(L, 0.28, 0.28), CFrame.new(attach - Vector3.new(0, L / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)), strutColor, { noWeld = true, material = Enum.Material.Metal })
+		local leg = add(ctx, comp, "Leg", "cylinder", Vector3.new(L, 0.26, 0.26), CFrame.new(attach - Vector3.new(0, L / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)), strutColor, { noWeld = true, material = Enum.Material.Metal })
 		local m = Instance.new("Motor6D")
 		m.Name = "GearMotor"
 		m.Part0 = root
@@ -449,15 +731,33 @@ local function buildGear(ctx: Ctx)
 		m.C1 = CFrame.new(L / 2 * S, 0, 0) * CFrame.Angles(0, 0, -math.rad(90))
 		m:SetAttribute("GearName", u.name)
 		m.Parent = root
-		-- wheels: cylinders with axis along body X, welded to the leg
+		-- wheels: rows x across, axis along body X, on a bogie beam when there are two rows
 		local n = u.wheels or 2
-		for w = 1, n do
-			local off = (w - (n + 1) / 2) * (u.wheelSpacing or 0.6)
-			local wheel = add(ctx, comp, "Wheel", "cylinder", Vector3.new(0.38, u.wheelRadius * 2, u.wheelRadius * 2), CFrame.new(attach + Vector3.new(off, -L, 0)), tire, { noWeld = true })
-			weld(leg, wheel)
-			local hubcap = add(ctx, comp, "Hub", "cylinder", Vector3.new(0.4, u.wheelRadius * 0.9, u.wheelRadius * 0.9), CFrame.new(attach + Vector3.new(off, -L, 0)), strutColor, { noWeld = true })
-			weld(leg, hubcap)
+		local rows = u.rows or 1
+		local rowSpacing = u.rowSpacing or 1.4
+		local wr = u.wheelRadius
+		for row = 1, rows do
+			local dz = (row - (rows + 1) / 2) * rowSpacing
+			for w = 1, n do
+				local off = (w - (n + 1) / 2) * (u.wheelSpacing or 0.6)
+				local c = attach + Vector3.new(off, -L, dz)
+				local wheel = add(ctx, comp, "Wheel", "cylinder", Vector3.new(wr * 0.62, wr * 2, wr * 2), CFrame.new(c), tire, { noWeld = true })
+				weld(leg, wheel)
+				local hubcap = add(ctx, comp, "Hub", "cylinder", Vector3.new(wr * 0.66, wr * 1.05, wr * 1.05), CFrame.new(c), strutColor, { noWeld = true, material = Enum.Material.Metal })
+				weld(leg, hubcap)
+			end
+			if n > 1 then
+				local axle = add(ctx, comp, "Axle", "cylinder", Vector3.new((n - 1) * (u.wheelSpacing or 0.6), 0.14, 0.14), CFrame.new(attach + Vector3.new(0, -L, dz)), strutColor, { noWeld = true })
+				weld(leg, axle)
+			end
 		end
+		if rows > 1 then
+			local beam = add(ctx, comp, "Bogie", "block", Vector3.new(0.22, 0.22, rowSpacing * (rows - 1) + 0.3), CFrame.new(attach + Vector3.new(0, -L, 0)), strutColor, { noWeld = true, material = Enum.Material.Metal })
+			weld(leg, beam)
+		end
+		-- gear door
+		local door = add(ctx, comp, "GearDoor", "block", Vector3.new(0.05, L * 0.6, wr * 1.6), CFrame.new(attach + Vector3.new(if attach.X < 0 then -0.25 elseif attach.X > 0 then 0.25 else 0.3, -L * 0.35, 0)), rgb(ctx.cfg.geometry.livery.belly), { noWeld = true })
+		weld(leg, door)
 		if u.steerMaxDeg > 0 then
 			-- taxi/landing light on the nose gear
 			local lamp = add(ctx, comp, "LandingLamp", "block", Vector3.new(0.3, 0.2, 0.1), CFrame.new(attach + Vector3.new(0, -L * 0.45, -0.25)), Color3.new(1, 1, 0.9), { noWeld = true, material = Enum.Material.Neon })

@@ -21,6 +21,7 @@ GameConfig.Remotes = {
 	"LandingResult",
 	"Notify",
 	"CrashFx", -- (kind: "sparks"|"shards"|"dust", worldPos: Vector3, intensity, velocity: Vector3?)
+	"DentFx", -- (model, component, pointBodyM: Vector3, dirBody: Vector3, depthM, dv) -> mesh skins
 }
 
 GameConfig.CollisionGroups = {
@@ -49,6 +50,16 @@ GameConfig.crash = {
 	clientMaxShards = 60, -- client-only cosmetic shards alive at once
 	shardLifetime = 6, -- s
 	scuffDarken = 0.35, -- how much a fully dented part darkens
+	-- Client-side EditableMesh skins (BeamNG-style vertex dents). Needs "Allow Mesh / Image
+	-- APIs" in Game Settings > Security. Falls back to part dents and bending without it.
+	meshSkins = {
+		enabled = true,
+		maxSkins = 6, -- live skins per client (memory; some devices cap EditableMeshes at ~8)
+		newPerDent = 2, -- skins created per dent at most
+		grid = 4, -- subdivisions per face edge: 6*(n+1)^2 vertices (150 at 4)
+		maxOffsetFrac = 0.45, -- a vertex never moves more than this * the part's smallest size
+		radiusScale = 1.6, -- dent radius on the skin vs the profile's dentRadius
+	},
 }
 
 GameConfig.rateLimits = {

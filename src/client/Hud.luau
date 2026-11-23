@@ -86,7 +86,8 @@ function Hud.new()
 	local root = self.flight
 
 	-- Speed (left)
-	local sp = panel(root, UDim2.new(0.5, -300, 0.5, -70), UDim2.fromOffset(120, 140), Vector2.new(0.5, 0))
+	-- bottom row, either side of the attitude ball, above the engine/config panels
+	local sp = panel(root, UDim2.new(0.5, -100, 1, -146), UDim2.fromOffset(120, 140), Vector2.new(1, 1))
 	self.ias = label(sp, "---", UDim2.fromOffset(10, 8), UDim2.new(1, -20, 0, 40), MONO, WHITE, Enum.TextXAlignment.Right, 34)
 	label(sp, "KT IAS", UDim2.fromOffset(10, 46), UDim2.new(1, -20, 0, 16), FONT, DIM, Enum.TextXAlignment.Right, 12)
 	self.gs = label(sp, "GS ---", UDim2.fromOffset(10, 70), UDim2.new(1, -20, 0, 18), MONO, DIM, Enum.TextXAlignment.Right, 15)
@@ -94,7 +95,7 @@ function Hud.new()
 	self.speedHint.TextWrapped = true
 
 	-- Altitude (right)
-	local al = panel(root, UDim2.new(0.5, 300, 0.5, -70), UDim2.fromOffset(140, 140), Vector2.new(0.5, 0))
+	local al = panel(root, UDim2.new(0.5, 104, 1, -146), UDim2.fromOffset(140, 140), Vector2.new(0, 1))
 	self.alt = label(al, "---", UDim2.fromOffset(10, 8), UDim2.new(1, -20, 0, 40), MONO, WHITE, Enum.TextXAlignment.Left, 30)
 	label(al, "FT MSL", UDim2.fromOffset(10, 46), UDim2.new(1, -20, 0, 16), FONT, DIM, Enum.TextXAlignment.Left, 12)
 	self.vs = label(al, "", UDim2.fromOffset(10, 70), UDim2.new(1, -20, 0, 18), MONO, WHITE, Enum.TextXAlignment.Left, 15)
@@ -102,7 +103,7 @@ function Hud.new()
 
 	-- Attitude indicator (centre-bottom so it never hides the runway)
 	local adi = make("CanvasGroup", {
-		Parent = root, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -118),
+		Parent = root, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -150),
 		Size = UDim2.fromOffset(150, 150), BackgroundColor3 = Color3.fromRGB(20, 20, 20), BackgroundTransparency = 0.2,
 	}, { corner(75) })
 	self.adiHorizon = make("Frame", {
@@ -123,10 +124,10 @@ function Hud.new()
 	make("Frame", { Parent = adi, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(6, 6), BackgroundColor3 = Color3.fromRGB(255, 210, 0), BorderSizePixel = 0, ZIndex = 3 })
 	self.adi = adi
 	-- approach deviation bars (localizer below, glideslope right of the ADI)
-	self.loc = make("Frame", { Parent = root, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -100), Size = UDim2.fromOffset(150, 12), BackgroundTransparency = 1, Visible = false })
+	self.loc = make("Frame", { Parent = root, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -134), Size = UDim2.fromOffset(150, 12), BackgroundTransparency = 1, Visible = false })
 	make("Frame", { Parent = self.loc, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = DIM, BorderSizePixel = 0 })
 	self.locDot = make("Frame", { Parent = self.loc, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(10, 10), BackgroundColor3 = Color3.fromRGB(230, 90, 230), BorderSizePixel = 0, Rotation = 45 })
-	self.gsBar = make("Frame", { Parent = root, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0.5, 84, 1, -118), Size = UDim2.fromOffset(12, 150), BackgroundTransparency = 1, Visible = false })
+	self.gsBar = make("Frame", { Parent = root, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0.5, 84, 1, -150), Size = UDim2.fromOffset(12, 150), BackgroundTransparency = 1, Visible = false })
 	make("Frame", { Parent = self.gsBar, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = DIM, BorderSizePixel = 0 })
 	self.gsDot = make("Frame", { Parent = self.gsBar, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(10, 10), BackgroundColor3 = Color3.fromRGB(230, 90, 230), BorderSizePixel = 0, Rotation = 45 })
 

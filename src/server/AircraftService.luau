@@ -120,7 +120,7 @@ local function sanitizeOptions(raw: any): any?
 			mode = m.id
 		end
 	end
-	local assist = if raw.assist == "simulation" then "simulation" else "assisted"
+	local assist = if raw.assist == "simulation" or raw.assist == "assisted" then raw.assist else "easy"
 	local destination = nil
 	if type(raw.destination) == "string" and Airports.list[raw.destination] then
 		destination = raw.destination

@@ -412,7 +412,7 @@ function Hud:update(t: any, destId: string?)
 	self.brakes.Text = brakeTxt
 	self.brakes.TextColor3 = if t.parkingBrake then AMBER else WHITE
 	self.trim.Text = string.format("TRIM %+.2f   G %.2f", t.trim, t.gLoad)
-	self.mode.Text = if t.assist == "assisted" then "ASSISTED (T to switch)" else "SIMULATION (T to switch)"
+	self.mode.Text = `{string.upper(t.assist or "easy")} (T to switch)`
 
 	-- damage
 	local lines = {}

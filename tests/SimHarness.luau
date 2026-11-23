@@ -64,7 +64,7 @@ Sim.mulMtV = mulMtV
 function Sim.new(cfg, opts)
 	local self = setmetatable({}, Sim)
 	self.cfg = cfg
-	self.model = FlightModel.new(cfg, { enginesRunning = opts.enginesRunning, gearDown = opts.gearDown, flaps = opts.flaps })
+	self.model = FlightModel.new(cfg, { enginesRunning = opts.enginesRunning, gearDown = opts.gearDown, flaps = opts.flaps, toughness = opts.toughness })
 	self.env = FlightModel.newEnv(cfg)
 	self.ctl = FlightModel.newControls()
 	self.ctl.flaps = opts.flaps or 1

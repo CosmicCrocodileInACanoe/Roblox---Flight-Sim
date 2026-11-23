@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Airports = require(Shared.Airports)
 local GameConfig = require(Shared.GameConfig)
 local Registry = require(Shared.AircraftRegistry)
+local Assist = require(Shared.Assist)
 local InputController = require(script.Parent.InputController)
 
 local Menu = {}
@@ -47,7 +48,7 @@ function Menu.new(callbacks: any)
 		mode = "airline",
 		routeIndex = 1,
 		spawnIndex = 1,
-		assist = "assisted",
+		assist = "easy",
 		weatherIndex = 1,
 		timeIndex = 2,
 		failures = {} :: { [string]: boolean },
@@ -166,9 +167,9 @@ function Menu.new(callbacks: any)
 		cycle("spawnIndex", #self:spawnList(), 1)
 	end)
 	self.assistValue = row("Assistance", function()
-		sel.assist = if sel.assist == "assisted" then "simulation" else "assisted"
+		sel.assist = Assist.nextMode(Assist.nextMode(sel.assist))
 	end, function()
-		sel.assist = if sel.assist == "assisted" then "simulation" else "assisted"
+		sel.assist = Assist.nextMode(sel.assist)
 	end)
 	self.weatherValue = row("Weather", function()
 		cycle("weatherIndex", #GameConfig.weather, -1)
@@ -320,7 +321,7 @@ function Menu:refresh()
 	local spawns = self:spawnList()
 	sel.spawnIndex = math.clamp(sel.spawnIndex, 1, #spawns)
 	self.spawnValue.Text = spawns[sel.spawnIndex].label
-	self.assistValue.Text = if sel.assist == "assisted" then "Assisted (auto-trim, protections)" else "Simulation (direct, manual trim)"
+	self.assistValue.Text = Assist.LABELS[sel.assist] or sel.assist
 	self.weatherValue.Text = GameConfig.weather[sel.weatherIndex].label
 	self.timeValue.Text = GameConfig.timeOfDay[sel.timeIndex].label
 	self.failFrame.Visible = sel.mode == "sandbox"

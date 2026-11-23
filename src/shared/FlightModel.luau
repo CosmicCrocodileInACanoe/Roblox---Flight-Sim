@@ -107,7 +107,26 @@ function FlightModel.new(cfg: any, opts: any?)
 	self.elevator = 0
 	self.aileron = 0
 	self.rudder = 0
-	self.damage = Damage.new(cfg.components)
+	-- toughness > 1 (easy mode) raises every damage limit without touching the shared config
+	local tough = o.toughness or 1
+	local comps = cfg.components
+	self.gearLimits, self.gLimit = cfg.gearLimits, cfg.gLimit
+	if tough ~= 1 then
+		comps = {}
+		for name, c in cfg.components do
+			local copy = table.clone(c)
+			copy.impactThreshold = c.impactThreshold * tough
+			copy.impactDestroy = c.impactDestroy * (1 + (tough - 1) * 0.6)
+			comps[name] = copy
+		end
+		local gl = cfg.gearLimits
+		self.gearLimits = {
+			sinkDegrade = gl.sinkDegrade * tough, sinkFail = gl.sinkFail * tough,
+			sinkDetach = gl.sinkDetach * tough, sideSpeedFail = gl.sideSpeedFail * tough,
+		}
+		self.gLimit = cfg.gLimit * (1 + (tough - 1) * 0.5)
+	end
+	self.damage = Damage.new(comps)
 	self.failures = {} :: { [string]: any }
 	self.mass = cfg.mass
 	self.airborneTime = 0
@@ -439,7 +458,7 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 			my += g.cpz * g.fx - g.cpx * g.fz
 			mz += g.cpx * g.fy - g.cpy * g.fx
 			if not g.wasOnGround then
-				local outcome = Damage.applyGearTouchdown(dmg, u.component, g.touchdownSink, g.touchdownSide, cfg.gearLimits)
+				local outcome = Damage.applyGearTouchdown(dmg, u.component, g.touchdownSink, g.touchdownSide, self.gearLimits)
 				if self.airborneTime > 1.0 then
 					touchdownNow = true
 				end
@@ -529,7 +548,7 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 	local gLoad = fy / (mass * Units.G)
 	r.gLoad = gLoad
 	if not r.onGround then
-		Damage.applyOverG(dmg, abs(gLoad), cfg.gLimit, dt)
+		Damage.applyOverG(dmg, abs(gLoad), self.gLimit, dt)
 	end
 
 	r.lift, r.drag = totalLift, totalDrag

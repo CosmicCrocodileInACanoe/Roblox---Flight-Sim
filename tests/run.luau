@@ -46,6 +46,7 @@ local suites = {
 	require("./test_world"),
 	require("./test_flight"),
 	require("./test_fleet"),
+	require("./test_easy"),
 	require("./test_controls"),
 	require("./test_geometry"),
 	require("./test_builder"),

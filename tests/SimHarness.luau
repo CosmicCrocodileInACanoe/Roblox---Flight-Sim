@@ -85,14 +85,16 @@ function Sim.new(cfg, opts)
 	local m = cfg.mass
 	self.I = { cfg.inertia.pitch, cfg.inertia.yaw, cfg.inertia.roll } -- about body x, y, z
 	self.maxG = 0
-	-- belly height below the CoM (lowest fuselage hull point)
-	local floor = 1.9
+	-- belly height below the CoM (lowest centreline hull point; 1.9 m if none)
+	local floor = nil
 	for _, hp in cfg.hullPoints do
 		if hp[1] == 0 then
-			floor = math.max(floor, -hp[2])
+			floor = math.max(floor or 0, -hp[2])
 		end
 	end
-	self.hullFloor = floor
+	self.hullFloor = floor or 1.9
+	-- opts.water: the surface at y = 0 is the sea (no ground under the gear)
+	self.water = opts.water == true
 	return self
 end
 
@@ -116,6 +118,16 @@ function Sim:prepareEnv()
 	env.altitude = self.py
 	-- height of the wheels above ground, approximated as CoM height minus static gear height
 	env.agl = self.py - self.groundY - Sim.restHeight(cfg) + 0.2
+	if self.water then
+		for i, hp in cfg.hullPoints do
+			local _, oy = mulMV(R, hp[1], hp[2], hp[3])
+			env.hullDepth[i] = -(self.py + oy)
+		end
+		for _, h in env.gearHits do
+			h.hit = false
+		end
+		return
+	end
 	local dxw, dyw, dzw = mulMV(R, 0, -1, 0)
 	local nbx, nby, nbz = mulMtV(R, 0, 1, 0)
 	for i, u in cfg.gear.units do
@@ -172,7 +184,7 @@ function Sim:frame()
 	end
 	-- crude hard ground for the fuselage so a collapsed gear doesn't fall through
 	local floor = self.hullFloor
-	if self.py < self.groundY + floor then
+	if not self.water and self.py < self.groundY + floor then
 		self.py = self.groundY + floor
 		if self.vy < 0 then
 			self.vy = 0

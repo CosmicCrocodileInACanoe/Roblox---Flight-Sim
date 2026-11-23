@@ -264,7 +264,8 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 	end
 	-- Gear (weight-on-wheels interlock prevents retraction on the ground)
 	local gearCmd = ctl.gearDown
-	if anyGround then
+	if anyGround or cfg.gear.fixed then
+		-- weight on wheels, or fixed (non-retracting) gear
 		gearCmd = true
 	end
 	self.gearCommand = gearCmd
@@ -494,16 +495,62 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 		self.groundTime = 0
 	end
 
-	-- Water (ditching) -------------------------------------------------------------
-	local inWater = false
+	-- Water (ditching, or floats on a seaplane) ----------------------------------------
+	-- Hull points marked "float" (5th field) are planing float bottoms: strong buoyancy,
+	-- little drag along the keel (less as the floats rise onto the step), firm sideways
+	-- grip, and only a hard vertical arrival hurts. Any other point in the water is a
+	-- ditching.
+	local inWater, onFloats = false, false
 	local hull = cfg.hullPoints
 	local mass = self:currentMass()
 	local buoyPerMetre = mass * Units.G / (#hull * 1.3)
+	local wf = cfg.water
+	local nFloat = 0
+	for _, hp in hull do
+		if hp[5] == "float" then
+			nFloat += 1
+		end
+	end
+	local floatBuoy = if nFloat > 0 then mass * Units.G / (nFloat * ((wf and wf.restDepth) or 0.35)) else 0
 	r.waterImpact = 0
 	for i, hp in hull do
 		local depth = env.hullDepth[i]
 		local px, py, pz = hp[1], hp[2], hp[3]
-		if depth and depth > 0 then
+		local isFloat = hp[5] == "float"
+		if depth and depth > 0 and isFloat then
+			onFloats = true
+			local pvx = env.vgx + (wy * pz - wz * py)
+			local pvy = env.vgy + (wz * px - wx * pz)
+			local pvz = env.vgz + (wx * py - wy * px)
+			local d = math.min(depth, 1.5)
+			local b = floatBuoy * d
+			local bx, by, bz = env.ux * b, env.uy * b, env.uz * b
+			local keel = (wf and wf.keelDrag) or 0.05
+			local side = (wf and wf.sideDrag) or 1.2
+			local heave = (wf and wf.heaveDamping) or 0.8
+			local speed = sqrt(pvx * pvx + pvy * pvy + pvz * pvz)
+			-- planing: past the hump speed the floats ride on the step and drag falls away
+			local plane = 1 / (1 + (abs(pvz) / ((wf and wf.humpSpeed) or 9)) ^ 2)
+			local q = 0.5 * 1000 * speed * math.min(d, 1)
+			bx -= q * side * pvx
+			by -= q * heave * pvy
+			bz -= q * keel * (0.35 + plane) * pvz
+			fx += bx
+			fy += by
+			fz += bz
+			mx += py * bz - pz * by
+			my += pz * bx - px * bz
+			mz += px * by - py * bx
+			if not self.wasInWater[i] then
+				local vDown = -(pvx * env.ux + pvy * env.uy + pvz * env.uz)
+				local severity = math.max(0, vDown - ((wf and wf.safeSink) or 2.5)) * 1.6
+				r.waterImpact = math.max(r.waterImpact, math.max(0, vDown) * 0.6)
+				if hp[4] and severity > 0 then
+					Damage.applyImpact(dmg, hp[4], severity)
+				end
+			end
+			self.wasInWater[i] = true
+		elseif depth and depth > 0 then
 			inWater = true
 			local pvx = env.vgx + (wy * pz - wz * py)
 			local pvy = env.vgy + (wz * px - wx * pz)
@@ -545,6 +592,7 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 		end
 	end
 	r.inWater = inWater
+	r.onFloats = onFloats
 
 	-- Load factor along body up (aero + thrust + gear, i.e. what the airframe feels)
 	local gLoad = fy / (mass * Units.G)

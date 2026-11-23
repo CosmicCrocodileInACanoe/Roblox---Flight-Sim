@@ -298,8 +298,12 @@ function FlightController:step(dt: number)
 	-- Height above ground
 	local down = -Vector3.yAxis * 6000
 	local hit = Workspace:Raycast(cf.Position, down, self.rayParams)
-	local restH = 3.9
+	-- CoM height above the wheels' contact points at rest (the main gear)
+	local mainGear = cfg.gear.units[2] or cfg.gear.units[1]
+	local restH = -(mainGear.pos[2] - mainGear.strutLength - mainGear.wheelRadius)
 	env.agl = if hit then (cf.Position.Y - hit.Position.Y) * MPS - restH else 1e4
+	-- over the sea the water surface counts as the ground (seaplanes, ditching)
+	env.agl = math.min(env.agl, (cf.Position.Y - WorldGen.SEA_LEVEL) * MPS - restH)
 
 	-- Gear struts
 	local strutDir = -cf.UpVector

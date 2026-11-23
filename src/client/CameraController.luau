@@ -102,7 +102,9 @@ function CameraController:applyCockpitVisibility(inCockpit: boolean)
 			if d:GetAttribute("HideInCockpit") then
 				d.LocalTransparencyModifier = if inCockpit then 1 else 0
 			elseif d:GetAttribute("CockpitOnly") then
-				d.Transparency = if inCockpit then 0 else 1
+				-- glass keeps some transparency inside (CockpitTransparency attribute)
+				local inside = d:GetAttribute("CockpitTransparency")
+				d.Transparency = if inCockpit then (if type(inside) == "number" then inside else 0) else 1
 			end
 		end
 	end

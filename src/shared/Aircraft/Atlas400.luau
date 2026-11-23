@@ -205,7 +205,7 @@ local config = {
 			windowRows = { 0.9 }, windowPitch = 0.55,
 			doors = { -27.0, -16.0, -2.0, 9.0, 15.5 },
 			hump = { startZ = -34.5, endZ = -6.0, baseY = 1.45, halfWidth = 2.7, top = 4.95, frontTaper = 4.0, rearTaper = 6.0 },
-			windscreen = { z = -32.8, cy = 2.3, r = 2.25 },
+			windscreen = { surface = "hump" },
 		},
 		wing = {
 			rootLE = { 3.2, -1.8, -10.4 }, rootChord = 14.5, tipChord = 4.0, span = 29.0,

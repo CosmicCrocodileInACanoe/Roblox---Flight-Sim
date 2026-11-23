@@ -7,6 +7,7 @@
 --   * Every "Start at" list puts runways first, so the default is always a runway.
 --   * An aircraft is only offered runways long enough and gates wide enough for it.
 --   * Airline mode only offers routes that leave from the chosen airport.
+--   * Stunts mode has one start: in the air, lined up with the first ring.
 
 local function req(name: string): any
 	if script then
@@ -16,6 +17,7 @@ local function req(name: string): any
 end
 local Airports = req("Airports")
 local Units = req("Units")
+local Stunts = req("Stunts")
 
 local Selection = {}
 
@@ -106,6 +108,9 @@ end
 -- route exists). Free flight / sandbox: the same airports plus `false` = no destination.
 function Selection.destinations(airportId: string, mode: string): { any }
 	local out: { any } = {}
+	if mode == Stunts.MODE then
+		return { false } -- the ring course is the objective
+	end
 	for _, r in Selection.routesFrom(airportId) do
 		table.insert(out, r.to)
 	end
@@ -121,6 +126,9 @@ end
 -- approach into the destination; otherwise it is the approach into this airport.
 -- Never empty: if no runway is long enough, the runways are still offered.
 function Selection.spawnList(airportId: string, cfg: any, mode: string, destination: string?): { any }
+	if mode == Stunts.MODE then
+		return { Stunts.spawn() } -- always the air start lined up with ring 1
+	end
 	if not Airports.list[airportId] then
 		airportId = Airports.order[1]
 	end

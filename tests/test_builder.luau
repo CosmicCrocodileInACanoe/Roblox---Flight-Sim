@@ -29,7 +29,12 @@ return { name = "Aircraft builder (mock Roblox)", run = function(T)
 	if not ok then
 		return
 	end
-	for _, id in Registry.order do
+	-- every menu aircraft, plus the Stunts plane when it is not one of them
+	local ids = table.clone(Registry.order)
+	if not table.find(ids, Registry.stuntAircraftId) then
+		table.insert(ids, Registry.stuntAircraftId)
+	end
+	for _, id in ids do
 		local cfg = Registry.get(id)
 		local name = cfg.displayName
 		local built, model = pcall(Builder.build, cfg, Mock.CFrame.new(0, 100, 0))

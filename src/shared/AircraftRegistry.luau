@@ -27,6 +27,7 @@ Registry.types = {
 	atlas400 = req("Atlas400"),
 	arrowstar = req("Arrowstar"),
 	celestia800 = req("Celestia800"),
+	-- Stunts-mode placeholder; not in `order`, so the airliner fleet checks skip it.
 }
 
 -- Smallest to largest; the menu shows them in this order.
@@ -36,6 +37,10 @@ Registry.planned = {
 	{ id = "regionaljet", label = "Regional twinjet", milestone = 3 },
 	{ id = "widebodytwin", label = "Wide-body twinjet", milestone = 3 },
 }
+
+-- The aircraft Stunts mode always uses: the fleet's own aerobatic plane when it is
+-- registered, otherwise the placeholder racer.
+Registry.stuntAircraftId = "sprite"
 
 function Registry.get(id: string): any
 	return Registry.types[id]

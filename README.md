@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 420 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 430 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy mode) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -88,6 +88,29 @@ A typical first flight: spawn at an HBR runway threshold, press I and wait for t
 set flaps 2 (press F twice), hold Shift for full throttle, pull back gently at about 145 kt,
 press G after a positive climb, then press V to bring the flaps up above 180 kt.
 
+## Stunts mode
+
+Pick **Stunts: Ring Race** in the menu's Mode row. You start in the air over Harbor City's
+runway 09 end in a tiny aerobatic racer, lined up with a course of 12 neon rings that sit
+high and low over the open farmland just east of the airport (all inside a 1 km square).
+Fly through them in order from START to FINISH:
+
+- The clock starts at the START ring. The next ring glows green and shows through hills,
+  the one after is yellow, and a big arrow (or a circle marker when it is on screen) points
+  at the next ring with its distance.
+- Missing a ring adds 3 seconds and moves you on to the next one. Touching the ground or
+  breaking the plane ends the run.
+- The results card shows your time, medal (gold under 0:36, silver under 0:45, bronze under
+  1:00), rings hit and your best time (saved with your progress). FLY AGAIN or R restarts
+  instantly; M opens the menu.
+- Easy assist is tuned for racing in this mode: up to 70 degrees of bank and quicker pulls,
+  so the tight turns are possible with the stick held over.
+- Racers are ghosts to each other, since everyone starts at the same gate.
+
+The course, race rules and medal times live in `src/shared/Stunts.luau`; the server times
+the race (`MissionService`), and `client/StuntsHud.luau` draws it. The offline tests fly the
+whole course with the Easy assist and check every ring clears the ground.
+
 ## Sound
 
 All audio is set up in `src/shared/AudioConfig.luau`. Each slot has an `id`; paste a Creator
@@ -123,6 +146,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Grading, Mission        landing score, gate-to-gate mission state machine
   Airports, WorldGen      airport layouts, deterministic terrain height field
   Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
+  Stunts                  Stunts ring course, race rules (passes, misses, penalties, medals), race tune
   GameConfig, AircraftRegistry, Aircraft/*  one data file per aircraft; Aircraft/Kit has shared helpers
   AudioConfig, AudioMix   every sound asset ID in one file; pure loop/one-shot mixing
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build

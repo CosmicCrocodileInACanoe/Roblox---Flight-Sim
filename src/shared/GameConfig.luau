@@ -22,6 +22,7 @@ GameConfig.Remotes = {
 	"Notify",
 	"CrashFx", -- (kind: "sparks"|"shards"|"dust", worldPos: Vector3, intensity, velocity: Vector3?)
 	"DentFx", -- (model, component, pointBodyM: Vector3, dirBody: Vector3, depthM, dv) -> mesh skins
+	"StuntsUpdate", -- (data) Stunts race state: next ring, times, events, results
 }
 
 GameConfig.CollisionGroups = {
@@ -83,6 +84,7 @@ GameConfig.modes = {
 	{ id = "free", label = "Free Flight" },
 	{ id = "airline", label = "Airline Flight" },
 	{ id = "sandbox", label = "Crash / Test Sandbox" },
+	{ id = "stunts", label = "Stunts: Ring Race" },
 }
 
 GameConfig.weather = {

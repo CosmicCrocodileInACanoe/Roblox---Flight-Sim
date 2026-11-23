@@ -12,6 +12,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local WorldGen = require(Shared.WorldGen)
 local Airports = require(Shared.Airports)
 local DetailTiles = require(Shared.DetailTiles)
+local Stunts = require(Shared.Stunts)
 local Geometry = require(script.Parent.Geometry)
 
 local CityBuilder = {}
@@ -342,6 +343,10 @@ local function buildForests(worldFolder: Instance)
 					local tx = x + (WorldGen.rand(x, z, 40 + t) - 0.5) * 700
 					local tz = z + (WorldGen.rand(x, z, 50 + t) - 0.5) * 700
 					if inAirport(tx, tz, 0) then
+						continue
+					end
+					-- the Stunts ring course is kept open so its low rings are clear of trees
+					if Stunts.inCourseArea(tx, tz, 150) then
 						continue
 					end
 					local near = false

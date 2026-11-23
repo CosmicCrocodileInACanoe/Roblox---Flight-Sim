@@ -24,6 +24,7 @@ local Crash = require(Shared.Crash)
 local GameConfig = require(Shared.GameConfig)
 local Registry = require(Shared.AircraftRegistry)
 local WorldGen = require(Shared.WorldGen)
+local Stunts = require(Shared.Stunts)
 local Effects = require(script.Parent.Effects)
 
 local MPS = Units.METERS_PER_STUD
@@ -39,6 +40,10 @@ end
 function FlightController.new(model: Model, options: any, spawnPoint: any, remotes: Folder, input: any)
 	local self = setmetatable({}, FlightController) :: any
 	local cfg = Registry.get(model:GetAttribute("AircraftId") :: string)
+	if options.mode == Stunts.MODE then
+		-- racing: steeper banks and quicker pulls in Easy (a copy; the registry is untouched)
+		cfg = Stunts.raceTune(cfg)
+	end
 	self.cfg = cfg
 	self.model = model
 	self.remotes = remotes

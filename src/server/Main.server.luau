@@ -66,11 +66,12 @@ Lighting.Brightness = 2.6
 Lighting.EnvironmentDiffuseScale = 0.6
 Lighting.EnvironmentSpecularScale = 0.6
 Lighting.OutdoorAmbient = Color3.fromRGB(128, 132, 140)
+local WorldGen = require(Shared.WorldGen)
 local atmosphere = Instance.new("Atmosphere")
-atmosphere.Density = 0.28
-atmosphere.Offset = 0.12
-atmosphere.Haze = 1.3
-atmosphere.Glare = 0.25
+atmosphere.Density = WorldGen.atmosphere.density
+atmosphere.Offset = WorldGen.atmosphere.offset
+atmosphere.Haze = WorldGen.atmosphere.haze
+atmosphere.Glare = WorldGen.atmosphere.glare
 atmosphere.Color = Color3.fromRGB(199, 214, 230)
 atmosphere.Decay = Color3.fromRGB(106, 120, 140)
 atmosphere.Parent = Lighting
@@ -111,7 +112,7 @@ end
 local scenery = Instance.new("Folder")
 scenery.Name = "Scenery"
 scenery.Parent = world
-local sceneryParts = CityBuilder.build(scenery, world)
+local sceneryParts, detailParts, detailTiles = CityBuilder.build(scenery, world)
 
 local total = 0
 for _, d in world:GetDescendants() do
@@ -119,6 +120,9 @@ for _, d in world:GetDescendants() do
 		total += 1
 	end
 end
-print(string.format("[World] built %d parts (terrain %d, scenery %d) in %.1fs", total, terrainParts, sceneryParts, os.clock() - t0))
+print(string.format(
+	"[World] built %d visible parts (terrain %d, scenery %d) + %d up-close detail parts in %d tiles, in %.1fs",
+	total, terrainParts, sceneryParts - (detailParts or 0), detailParts or 0, detailTiles or 0, os.clock() - t0
+))
 ReplicatedStorage:SetAttribute("WorldReady", true)
 ReplicatedStorage:SetAttribute("GameVersion", GameConfig.VERSION)

@@ -1,12 +1,17 @@
 --!strict
 -- Procedural cities, suburbs, the highway between them, and forests.
 -- Everything is deterministic (seeded) so every server builds the same world.
+-- Two layers: the silhouette (streets, building boxes, crowns, spire, roads) lives in
+-- Workspace and is always drawn; up-close detail (windows, plots, parks, roof clutter,
+-- houses, trees, road dashes) is filed into DetailTiles under ReplicatedStorage.WorldDetail,
+-- and the client's DetailStreamer shows only the tiles near the camera.
 
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local WorldGen = require(Shared.WorldGen)
 local Airports = require(Shared.Airports)
+local DetailTiles = require(Shared.DetailTiles)
 local Geometry = require(script.Parent.Geometry)
 
 local CityBuilder = {}
@@ -21,12 +26,71 @@ local LOW_COLORS = {
 }
 local ROOF_COLORS = { Color3.fromRGB(150, 70, 60), Color3.fromRGB(90, 90, 96), Color3.fromRGB(120, 90, 70) }
 
+local WINDOW_DARK = Color3.fromRGB(46, 62, 82)
+local WINDOW_LOW = Color3.fromRGB(92, 108, 124)
+
+-- Detail tiles ------------------------------------------------------------------------
+local detailRoot: Folder? = nil
+local tiles: { [string]: Model } = {}
+
+local function detailFolder(): Folder
+	if not detailRoot then
+		local f = ReplicatedStorage:FindFirstChild("WorldDetail") :: Folder?
+		if not f then
+			local nf = Instance.new("Folder")
+			nf.Name = "WorldDetail"
+			nf.Parent = ReplicatedStorage
+			f = nf
+		end
+		detailRoot = f
+	end
+	return detailRoot :: Folder
+end
+
+-- The tile Model that holds detail at (x, z); groundY seeds the tile's reference height.
+local function tileAt(x: number, z: number, groundY: number): Model
+	local key = DetailTiles.tileKey(x, z)
+	local m = tiles[key]
+	if not m then
+		local cx, cz = DetailTiles.tileCenter(key)
+		local nm = Instance.new("Model")
+		nm.Name = "Tile_" .. key
+		nm:SetAttribute("TileKey", key)
+		nm:SetAttribute("CenterX", cx)
+		nm:SetAttribute("CenterZ", cz)
+		nm:SetAttribute("CenterY", groundY)
+		nm.Parent = detailFolder()
+		tiles[key] = nm
+		m = nm
+	end
+	return m
+end
+CityBuilder.tileAt = tileAt
+
+-- Horizontal window bands: one part per band, a little wider than the building so it
+-- shows as a stripe on all four faces.
+local function windowBands(bx: number, bz: number, y0: number, fw: number, fd: number, h: number, tall: boolean, tile: Model): number
+	local bands = math.clamp(math.floor(h / (if tall then 90 else 45)), 1, 6)
+	local bandH = if tall then 14 else 7
+	local gap = h / (bands + 1)
+	for k = 1, bands do
+		Geometry.decal({
+			Name = "Windows", Size = Vector3.new(fw + 0.8, bandH, fd + 0.8),
+			CFrame = CFrame.new(bx, y0 + gap * k, bz),
+			Color = if tall then WINDOW_DARK else WINDOW_LOW,
+			Material = if tall then Enum.Material.Glass else Enum.Material.SmoothPlastic,
+			Reflectance = if tall then 0.25 else 0, Parent = tile,
+		})
+	end
+	return bands
+end
+
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Include
 
 local function groundY(x: number, z: number, worldFolder: Instance): number?
 	rayParams.FilterDescendantsInstances = { worldFolder }
-	local r = Workspace:Raycast(Vector3.new(x, 6000, z), Vector3.new(0, -7000, 0), rayParams)
+	local r = Workspace:Raycast(Vector3.new(x, 9000, z), Vector3.new(0, -10000, 0), rayParams)
 	return if r then r.Position.Y else nil
 end
 
@@ -60,7 +124,7 @@ local function buildCity(c: any, parent: Instance)
 	Geometry.tiledRect(frame, -n * pitch - street, n * pitch + street, -n * pitch - street, n * pitch + street, 0.6, 2, {
 		Name = "Streets", Color = Color3.fromRGB(70, 72, 76), Material = Enum.Material.Asphalt,
 	}, model)
-	local count = 0
+	local count, detailCount = 0, 0
 	for i = -n, n do
 		for j = -n, n do
 			local bx, bz = c.x + i * pitch, c.z + j * pitch
@@ -69,17 +133,30 @@ local function buildCity(c: any, parent: Instance)
 				continue
 			end
 			local rnd = WorldGen.rand(bx, bz, 21)
-			-- sidewalk / plot
+			local tile = tileAt(bx, bz, c.base)
+			-- sidewalk / plot (detail)
 			Geometry.part({
 				Name = "Plot", Size = Vector3.new(block, 1, block), CFrame = CFrame.new(bx, c.base + 1.1, bz),
-				Color = Color3.fromRGB(150, 150, 146), Material = Enum.Material.Concrete, CastShadow = false, Parent = model,
+				Color = Color3.fromRGB(150, 150, 146), Material = Enum.Material.Concrete, CastShadow = false, Parent = tile,
 			})
+			detailCount += 1
 			if rnd < 0.08 and d > r * 0.25 then
-				-- park
+				-- park: a green patch stays in the silhouette so it reads from altitude
 				Geometry.part({
 					Name = "Park", Size = Vector3.new(block - 20, 1, block - 20), CFrame = CFrame.new(bx, c.base + 1.6, bz),
 					Color = Color3.fromRGB(96, 150, 80), Material = Enum.Material.Grass, CastShadow = false, Parent = model,
 				})
+				count += 1
+				for t = 1, 4 do
+					local tx = bx + (WorldGen.rand(bx, bz, 70 + t) - 0.5) * (block - 60)
+					local tz = bz + (WorldGen.rand(bx, bz, 80 + t) - 0.5) * (block - 60)
+					Geometry.part({
+						Name = "Canopy", Shape = Enum.PartType.Ball, Size = Vector3.one * 22,
+						CFrame = CFrame.new(tx, c.base + 14, tz), Color = Color3.fromRGB(66, 118, 56),
+						Material = Enum.Material.Grass, Parent = tile,
+					})
+					detailCount += 1
+				end
 				continue
 			end
 			local falloff = math.exp(-((d / r) ^ 2) * 2.8)
@@ -99,6 +176,7 @@ local function buildCity(c: any, parent: Instance)
 				Reflectance = if tall then 0.12 else 0, Parent = model,
 			})
 			count += 1
+			detailCount += windowBands(bx, bz, y0, fw, fd, h, tall, tile)
 			if tall and WorldGen.rand(bx, bz, 26) > 0.4 then
 				-- setback crown
 				local h2 = h * (0.12 + 0.18 * WorldGen.rand(bx, bz, 27))
@@ -118,8 +196,17 @@ local function buildCity(c: any, parent: Instance)
 			elseif not tall and WorldGen.rand(bx, bz, 28) > 0.5 then
 				Geometry.part({
 					Name = "RoofUnit", Size = Vector3.new(30, 12, 24), CFrame = CFrame.new(bx + 20, y0 + h + 6, bz - 15),
-					Color = Color3.fromRGB(120, 120, 124), Material = Enum.Material.Metal, Parent = model,
+					Color = Color3.fromRGB(120, 120, 124), Material = Enum.Material.Metal, Parent = tile,
 				})
+				detailCount += 1
+			end
+			-- entrance awning (detail)
+			if WorldGen.rand(bx, bz, 29) > 0.5 then
+				Geometry.part({
+					Name = "Awning", Size = Vector3.new(math.min(60, fw * 0.4), 3, 14), CFrame = CFrame.new(bx, y0 + 22, bz - fd / 2 - 7),
+					Color = Color3.fromRGB(150, 60, 50), Material = Enum.Material.Fabric, CastShadow = false, Parent = tile,
+				})
+				detailCount += 1
 			end
 		end
 	end
@@ -143,13 +230,11 @@ local function buildCity(c: any, parent: Instance)
 			Color = Color3.fromRGB(255, 30, 30), Material = Enum.Material.Neon, Parent = model,
 		})
 	end
-	return model, count
+	return model, count, detailCount
 end
 
-local function buildSuburbs(c: any, parent: Instance, worldFolder: Instance)
-	local model = Instance.new("Model")
-	model.Name = "Suburbs_" .. c.id
-	model.Parent = parent
+-- Suburb houses are all detail (filed into tiles).
+local function buildSuburbs(c: any, worldFolder: Instance)
 	local inner, outer = c.radius * 1.15, c.radius * 2.3
 	local stepSize = 170
 	local count = 0
@@ -168,10 +253,11 @@ local function buildSuburbs(c: any, parent: Instance, worldFolder: Instance)
 					local h = 18 + 10 * WorldGen.rand(x, z, 36)
 					local rot = CFrame.Angles(0, math.floor(WorldGen.rand(x, z, 37) * 4) * math.pi / 2, 0)
 					local base = CFrame.new(jx, gy, jz) * rot
+					local tile = tileAt(jx, jz, gy)
 					Geometry.part({
 						Name = "House", Size = Vector3.new(w, h, dpt), CFrame = base * CFrame.new(0, h / 2, 0),
 						Color = LOW_COLORS[1 + math.floor(WorldGen.rand(x, z, 38) * #LOW_COLORS) % #LOW_COLORS],
-						Material = Enum.Material.SmoothPlastic, Parent = model,
+						Material = Enum.Material.SmoothPlastic, Parent = tile,
 					})
 					-- pitched roof from two wedges
 					local roofColor = ROOF_COLORS[1 + math.floor(WorldGen.rand(x, z, 39) * #ROOF_COLORS) % #ROOF_COLORS]
@@ -180,7 +266,7 @@ local function buildSuburbs(c: any, parent: Instance, worldFolder: Instance)
 						Geometry.part({
 							ClassName = "WedgePart", Name = "Roof", Size = Vector3.new(w + 2, rh, dpt / 2 + 1),
 							CFrame = base * CFrame.new(0, h + rh / 2, s * (dpt / 4)) * CFrame.Angles(0, if s > 0 then 0 else math.pi, 0),
-							Color = roofColor, Parent = model,
+							Color = roofColor, Parent = tile,
 						})
 					end
 					count += 3
@@ -191,7 +277,7 @@ local function buildSuburbs(c: any, parent: Instance, worldFolder: Instance)
 		x += stepSize
 		task.wait()
 	end
-	return model, count
+	return count
 end
 
 local HIGHWAY = {
@@ -230,7 +316,7 @@ local function buildHighway(parent: Instance, worldFolder: Instance)
 			if prev then
 				Geometry.segment(prev, q, 64, 2.4, { Name = "Road", Color = Color3.fromRGB(60, 62, 66), Material = Enum.Material.Asphalt, CastShadow = false }, model)
 				local mid = (prev + q) / 2 + Vector3.new(0, 1.25, 0)
-				Geometry.segment(mid - (q - prev) * 0.2, mid + (q - prev) * 0.2, 1.4, 0.1, { Name = "Dash", Color = Color3.fromRGB(235, 235, 235), CanCollide = false, CanQuery = false, CastShadow = false }, model)
+				Geometry.segment(mid - (q - prev) * 0.2, mid + (q - prev) * 0.2, 1.4, 0.1, { Name = "Dash", Color = Color3.fromRGB(235, 235, 235), CanCollide = false, CanQuery = false, CastShadow = false }, tileAt(mid.X, mid.Z, mid.Y))
 				count += 2
 			end
 			prev = q
@@ -239,18 +325,16 @@ local function buildHighway(parent: Instance, worldFolder: Instance)
 	return model, count
 end
 
-local function buildForests(parent: Instance, worldFolder: Instance)
-	local model = Instance.new("Model")
-	model.Name = "Forests"
-	model.Parent = parent
+-- Trees are all detail (filed into tiles); the terrain's forest colour carries them from afar.
+local function buildForests(worldFolder: Instance)
 	local b = WorldGen.BOUNDS
 	local count = 0
-	local maxTrees = 1200
-	local spacing = 1800
+	local maxTrees = 3500
+	local spacing = 2200
 	local x = b.minX + 2000
 	while x < b.maxX - 2000 and count < maxTrees * 2 do
 		local z = b.minZ + 2000
-		while z < b.maxZ - 2000 do
+		while z < b.maxZ - 2000 and count < maxTrees * 2 do
 			local forest = WorldGen.fbm(x / 5000, z / 5000, 2, 77)
 			if forest > 0.18 then
 				-- a small clump of 3 trees
@@ -277,6 +361,7 @@ local function buildForests(parent: Instance, worldFolder: Instance)
 					if not gy then
 						continue
 					end
+					local model = tileAt(tx, tz, gy)
 					local scale = 0.8 + WorldGen.rand(tx, tz, 60) * 0.8
 					local trunkH = 16 * scale
 					Geometry.part({
@@ -300,22 +385,31 @@ local function buildForests(parent: Instance, worldFolder: Instance)
 		x += spacing
 		task.wait()
 	end
-	return model, count
+	return count
 end
 
-function CityBuilder.build(parent: Instance, worldFolder: Instance): number
-	local total = 0
+-- Returns (silhouette + detail part count, detail part count, detail tile count).
+function CityBuilder.build(parent: Instance, worldFolder: Instance): (number, number, number)
+	local total, detail = 0, 0
 	for _, c in WorldGen.cities do
-		local _, n = buildCity(c, parent)
-		total += n
-		local _, s = buildSuburbs(c, parent, worldFolder)
+		local _, n, dn = buildCity(c, parent)
+		total += n + dn
+		detail += dn
+		local s = buildSuburbs(c, worldFolder)
 		total += s
+		detail += s
 	end
 	local _, hw = buildHighway(parent, worldFolder)
 	total += hw
-	local _, f = buildForests(parent, worldFolder)
+	detail += hw // 2
+	local f = buildForests(worldFolder)
 	total += f
-	return total
+	detail += f
+	local nTiles = 0
+	for _ in tiles do
+		nTiles += 1
+	end
+	return total, detail, nTiles
 end
 
 return CityBuilder

@@ -53,6 +53,7 @@ local suites = {
 	require("./test_builder"),
 	require("./test_minimap"),
 	require("./test_selection"),
+	require("./test_detail"),
 }
 
 for _, suite in suites do

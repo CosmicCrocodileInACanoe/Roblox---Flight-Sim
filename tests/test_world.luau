@@ -112,6 +112,53 @@ return { name = "World, airports, missions", run = function(T)
 		tel.crashed = true
 		T.check(Mission.update(m2, tel) == "failed")
 	end)
+	T.test("the map is about 70 x 45 km and every edge runs down into the sea", function()
+		local b = WorldGen.BOUNDS
+		local wKm = (b.maxX - b.minX) * Units.METERS_PER_STUD / 1000
+		local dKm = (b.maxZ - b.minZ) * Units.METERS_PER_STUD / 1000
+		T.check(wKm > 65 and dKm > 40, string.format("map is %.0f x %.0f km", wKm, dKm))
+		for t = 0, 1, 0.01 do
+			local x = b.minX + (b.maxX - b.minX) * t
+			local z = b.minZ + (b.maxZ - b.minZ) * t
+			for _, p in { { x, b.minZ }, { x, b.maxZ }, { b.minX, z }, { b.maxX, z } } do
+				T.check(WorldGen.meshHeight(p[1], p[2]) < -5, string.format("land at the map edge (%d, %d)", p[1], p[2]))
+			end
+		end
+		T.check(WorldGen.meshHeight(b.maxX + 50000, 0) < 0, "open sea past the edge")
+	end)
+	T.test("no cracks where the fine core meets the coarse outer ring", function()
+		local inner = WorldGen.INNER
+		local worst = 0
+		local e = 0.001
+		for x = inner.minX, inner.maxX, 53 do
+			worst = math.max(worst, math.abs(WorldGen.meshHeight(x, inner.minZ + e) - WorldGen.meshHeight(x, inner.minZ - e)))
+			worst = math.max(worst, math.abs(WorldGen.meshHeight(x, inner.maxZ - e) - WorldGen.meshHeight(x, inner.maxZ + e)))
+		end
+		for z = inner.minZ, inner.maxZ, 53 do
+			worst = math.max(worst, math.abs(WorldGen.meshHeight(inner.minX + e, z) - WorldGen.meshHeight(inner.minX - e, z)))
+			worst = math.max(worst, math.abs(WorldGen.meshHeight(inner.maxX - e, z) - WorldGen.meshHeight(inner.maxX + e, z)))
+		end
+		T.check(worst < 0.1, "seam step " .. worst)
+	end)
+	T.test("coarse mesh is continuous across its own cells", function()
+		local b, cell = WorldGen.BOUNDS, WorldGen.COARSE
+		local worst = 0
+		for k = 1, 400 do
+			local x = b.minX + cell * (1 + (k * 7) % 80)
+			local z = b.minZ + cell * 3 + (k * 977) % (cell * 10)
+			worst = math.max(worst, math.abs(WorldGen.meshHeight(x - 0.001, z) - WorldGen.meshHeight(x + 0.001, z)))
+		end
+		T.check(worst < 0.1, "cell step " .. worst)
+	end)
+	T.test("every town sits on flat ground above the sea", function()
+		for _, c in WorldGen.cities do
+			T.check(c.base > 5, c.id .. " base below sea")
+			for _, o in { { 0, 0 }, { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } } do
+				local h = WorldGen.meshHeight(c.x + o[1] * c.radius, c.z + o[2] * c.radius)
+				T.near(h, c.base, 1, c.id .. " ground")
+			end
+		end
+	end)
 	T.test("spawn points exist for every airport and kind", function()
 		for _, id in Airports.order do
 			local kinds = {}

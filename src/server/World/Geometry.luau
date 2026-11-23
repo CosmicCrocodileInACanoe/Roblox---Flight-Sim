@@ -59,9 +59,13 @@ function Geometry.tiledRect(frame: CFrame, a0: number, a1: number, l0: number, l
 	return parts
 end
 
+local WEDGE_MAX = 2040 -- Roblox clamps parts at 2048 studs per axis
+
 -- Draw a 3D triangle with two WedgeParts (well-known technique), extruded `thickness`
--- studs downward (away from the side whose normal points up).
-function Geometry.triangle(a: Vector3, b: Vector3, c: Vector3, thickness: number, props: { [string]: any }, parent: Instance)
+-- studs downward (away from the side whose normal points up). A triangle too big for
+-- one pair of wedges is split into four at its edge midpoints (same plane, no cracks).
+-- Returns the number of parts made.
+function Geometry.triangle(a: Vector3, b: Vector3, c: Vector3, thickness: number, props: { [string]: any }, parent: Instance): number
 	local ab, ac, bc = b - a, c - a, c - b
 	local abd, acd, bcd = ab:Dot(ab), ac:Dot(ac), bc:Dot(bc)
 	-- Make bc the longest edge (opposite a).
@@ -76,7 +80,14 @@ function Geometry.triangle(a: Vector3, b: Vector3, c: Vector3, thickness: number
 	local back = bc.Unit
 	local height = math.abs(ab:Dot(up))
 	if height < 0.05 or right ~= right then
-		return
+		return 0
+	end
+	if math.max(height, math.abs(ab:Dot(back)), math.abs(ac:Dot(back))) > WEDGE_MAX then
+		local mab, mbc, mca = (a + b) / 2, (b + c) / 2, (c + a) / 2
+		return Geometry.triangle(a, mab, mca, thickness, props, parent)
+			+ Geometry.triangle(mab, b, mbc, thickness, props, parent)
+			+ Geometry.triangle(mca, mbc, c, thickness, props, parent)
+			+ Geometry.triangle(mab, mbc, mca, thickness, props, parent)
 	end
 	local normalUp = if right.Y >= 0 then right else -right
 	local offset = -normalUp * (thickness / 2)
@@ -94,6 +105,7 @@ function Geometry.triangle(a: Vector3, b: Vector3, c: Vector3, thickness: number
 	p2.CFrame = CFrame.fromMatrix((a + c) / 2 + offset, -right, up, -back)
 	p2.Parent = parent
 	Geometry.part(p2)
+	return 2
 end
 
 -- A beam-like part from p0 to p1 with the given width/height.

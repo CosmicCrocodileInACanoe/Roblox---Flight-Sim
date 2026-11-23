@@ -64,6 +64,13 @@ These are the most likely places for first-run bugs, so check them first.
    taxiways, an apron, gates, a terminal and a tower, and both cities are visible on the way.
 9. **No missing ground.** At top speed and low altitude, fly over the terrain, both airports
    and both cities. No holes or missing geometry. StreamingEnabled is off, so this should hold.
+   Also fly across the seam about 18 km east or west of the map centre (x ±64,500) and
+   check there are no cracks where the fine and coarse terrain meet.
+   **View distance and map edge.** Climb to 3,000 m over HBR: the northern mountains, Ridgeview
+   and Harbor City's skyline should all be visible. Fly out past any edge: the land should run
+   down into a sea that reaches the horizon. Fly low over Harbor City and its suburbs: windows,
+   houses and trees should appear within about 2.5 km and drop away as you leave or climb.
+   Graphics quality in Roblox settings limits view distance, so test on a high setting too.
 10. **Multiplayer.** Test > Clients and Servers > 2 players. Both fly at once. Each sees the
     other's aircraft move smoothly, with gear and flaps animated. Neither can apply damage to
     the other's aircraft. Grades and rewards appear only for the player who landed.

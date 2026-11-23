@@ -98,16 +98,29 @@ and `Debris`.
 
 ## 7. The world
 
-- Terrain is a low-poly triangle mesh of WedgeParts on a 1,500-stud grid, built from a
-  deterministic height field (`WorldGen`). The same function tells the tests and the client
-  how high the ground is. It covers x ±64,500 and z ±33,000 studs (about 36 × 18 km).
+- Terrain is a low-poly triangle mesh of WedgeParts built from a deterministic height field
+  (`WorldGen`). The same function tells the tests and the client how high the ground is.
+  The land covers x ±130,500 and z −99,000 to +69,000 studs (about 73 × 47 km). The core
+  around both airports (x ±64,500, z ±33,000, about 36 × 18 km) uses a 1,500-stud grid; the
+  outer ring uses 3,000-stud cells fanned from their centre, and the two grids share heights
+  on the seam so there are no cracks. Triangles too big for one wedge pair split in four.
+- The land runs down into the sea on every side, and an opaque sea surface made of 25
+  mesh-scaled tiles carries on to the horizon (about 410 km across), so the map ends at a
+  coast. Atmosphere density is 0.1 on clear days so mountains and skylines show 20+ km out.
+- The outer ring has a northern range, eastern highlands and western fells for horizon
+  silhouettes, plus three towns: Pinecrest (north), Lakeview (east), Westhaven (west).
 - Airports and cities are flattened. Beyond each runway end the terrain is kept below a 2.5%
   surface, so a 3° final has real clearance over the hills.
 - **Harbor City International (HBR):** runway 09/27, 3,000 m, on the coast, 6 gates.
 - **Ridgeview Regional (RDV):** runway 08/26, 2,600 m, on a plateau about 180 m higher,
   5 gates.
 - Harbor City is a metro with a tall spire; Ridgeview is a town. There's a highway, suburbs
-  and forests (capped at 1,200 trees).
+  and forests (capped at 3,500 trees).
+- **Detail LOD.** Scenery comes in two layers. Building boxes, crowns, the spire, streets,
+  parks and highway surfaces are always drawn. Windows, plots, roof units, awnings, houses,
+  trees and road dashes are filed into 4,000-stud tile Models in
+  `ReplicatedStorage.WorldDetail`; `DetailStreamer` on each client moves tiles within about
+  2.5 km of the camera into `Workspace.World.Detail` and back out past about 3 km.
 
 **Streaming trade-off.** StreamingEnabled is off. With streaming on, a jet at 250 kt covers a
 streaming radius in seconds, and the directive forbids missing ground under a fast aircraft.

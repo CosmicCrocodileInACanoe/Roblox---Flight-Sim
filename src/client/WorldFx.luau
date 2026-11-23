@@ -12,6 +12,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Units = require(Shared.Units)
 local Registry = require(Shared.AircraftRegistry)
 local FlightModel = require(Shared.FlightModel)
+local WorldGen = require(Shared.WorldGen)
+local DetailStreamer = require(script.Parent.DetailStreamer)
 
 local WorldFx = {}
 
@@ -24,8 +26,9 @@ function WorldFx.setWeather(w: any)
 	weather = w
 	local atm = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atm then
-		atm.Density = 0.28 + w.fog * 0.5
-		atm.Haze = 1.3 + w.fog * 4
+		-- Clear days use the long-visibility base; fog thickens it the same way as before.
+		atm.Density = WorldGen.atmosphere.density + w.fog * 0.6
+		atm.Haze = WorldGen.atmosphere.haze + w.fog * 4
 	end
 	local clouds = Workspace.Terrain:FindFirstChildOfClass("Clouds")
 	if clouds then
@@ -82,6 +85,7 @@ end
 local accum = 0
 local beaconT = 0
 function WorldFx.update(dt: number, localModel: Model?)
+	DetailStreamer.update(dt)
 	if not scanned then
 		scan()
 	end

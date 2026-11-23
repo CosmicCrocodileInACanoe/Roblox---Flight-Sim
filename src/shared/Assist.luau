@@ -58,6 +58,9 @@ function Assist.limits(cfg: any?): any
 		pitchDown = rad(a.easyPitchDownDeg or -14),
 		pitchRate = rad(a.easyPitchRateDeg or 7),
 		aerobatic = a.aerobatic == true,
+		-- seconds of roll rate to look ahead when easing into the bank limit (slow-rolling
+		-- heavy aircraft need more so they stop at the limit instead of sailing past it)
+		rollLead = a.easyRollLead or 0.3,
 	}
 end
 
@@ -140,10 +143,10 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 			elseif absBank < rad(8) then
 				out.roll = clamp(-bank * 1.2 + env.wz * 0.8, -0.3, 0.3)
 			end
-		elseif absBank > bankLimit - math.max(rad(5), abs(env.wz) * 0.3) and math.sign(raw.roll) == math.sign(bank) then
+		elseif absBank > bankLimit - math.max(rad(5), abs(env.wz) * lim.rollLead) and math.sign(raw.roll) == math.sign(bank) then
 			-- fade the input out over the last few degrees (more for fast-rolling aircraft),
 			-- then push back past the limit
-			local fade = math.max(rad(5), abs(env.wz) * 0.3)
+			local fade = math.max(rad(5), abs(env.wz) * lim.rollLead)
 			local over = (absBank - bankLimit) / fade
 			out.roll = if over > 0 then -math.sign(bank) * clamp(over, 0, 0.5) else raw.roll * clamp(-over, 0, 1)
 			out.roll = clamp(out.roll + env.wz * 0.5, -1, 1)

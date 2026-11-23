@@ -24,7 +24,8 @@ local loaded: { [string]: boolean } = {}
 local accum = 0
 
 local function setup(): boolean
-	if ReplicatedStorage:GetAttribute("WorldReady") ~= true then
+	-- the city detail tiles are built after take-off is allowed, so wait for all of it
+	if ReplicatedStorage:GetAttribute("WorldComplete") ~= true then
 		return false
 	end
 	local src = ReplicatedStorage:FindFirstChild("WorldDetail") :: Folder?

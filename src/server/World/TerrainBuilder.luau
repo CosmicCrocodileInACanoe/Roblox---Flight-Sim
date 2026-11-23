@@ -181,17 +181,29 @@ local function buildSea(folder: Instance): number
 	return count
 end
 
-function TerrainBuilder.build(parent: Instance): number
-	local folder = Instance.new("Folder")
+-- Two stages so players can fly sooner: the detailed land around the airports and
+-- cities first, then the far ring and the open sea (built while people already fly).
+function TerrainBuilder.buildNear(parent: Instance): number
+	local folder = parent:FindFirstChild("Terrain") or Instance.new("Folder")
 	folder.Name = "Terrain"
 	folder.Parent = parent
-	local count = buildFine(folder)
-	count += buildCoarse(folder)
+	return buildFine(folder)
+end
+
+function TerrainBuilder.buildFar(parent: Instance): number
+	local folder = parent:FindFirstChild("Terrain") or Instance.new("Folder")
+	folder.Name = "Terrain"
+	folder.Parent = parent
+	local count = buildCoarse(folder)
 	local sea = Instance.new("Folder")
 	sea.Name = "Sea"
 	sea.Parent = parent
 	count += buildSea(sea)
 	return count
+end
+
+function TerrainBuilder.build(parent: Instance): number
+	return TerrainBuilder.buildNear(parent) + TerrainBuilder.buildFar(parent)
 end
 
 return TerrainBuilder

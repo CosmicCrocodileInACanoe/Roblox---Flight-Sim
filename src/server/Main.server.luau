@@ -102,8 +102,9 @@ world.Name = "World"
 world.Parent = Workspace
 
 local t0 = os.clock()
-ReplicatedStorage:SetAttribute("WorldStage", "terrain")
-local terrainParts = TerrainBuilder.build(world)
+-- Stage 1 (players wait): the land around the airports and cities, and the airports.
+ReplicatedStorage:SetAttribute("WorldStage", "land")
+local nearParts = TerrainBuilder.buildNear(world)
 local airports = Instance.new("Folder")
 airports.Name = "Airports"
 airports.Parent = world
@@ -111,21 +112,21 @@ ReplicatedStorage:SetAttribute("WorldStage", "airports")
 for _, id in Airports.order do
 	AirportBuilder.build(id, airports)
 end
-local scenery = Instance.new("Folder")
-scenery.Name = "Scenery"
-scenery.Parent = world
-ReplicatedStorage:SetAttribute("WorldStage", "cities")
-local sceneryParts, detailParts, detailTiles = CityBuilder.build(scenery, world)
-
-local total = 0
-for _, d in world:GetDescendants() do
-	if d:IsA("BasePart") then
-		total += 1
-	end
-end
-print(string.format(
-	"[World] built %d visible parts (terrain %d, scenery %d) + %d up-close detail parts in %d tiles, in %.1fs",
-	total, terrainParts, sceneryParts - (detailParts or 0), detailParts or 0, detailTiles or 0, os.clock() - t0
-))
+print(string.format("[World] airports ready in %.1fs (%d land parts)", os.clock() - t0, nearParts))
 ReplicatedStorage:SetAttribute("WorldReady", true)
+
+-- Stage 2 (while people fly): the far hills, the open sea, then cities and forests.
+task.spawn(function()
+	local t1 = os.clock()
+	local farParts = TerrainBuilder.buildFar(world)
+	local scenery = Instance.new("Folder")
+	scenery.Name = "Scenery"
+	scenery.Parent = world
+	local sceneryParts, detailParts, detailTiles = CityBuilder.build(scenery, world)
+	print(string.format(
+		"[World] far land %d parts, scenery %d (+%d up-close detail parts in %d tiles) in %.1fs more",
+		farParts, sceneryParts - (detailParts or 0), detailParts or 0, detailTiles or 0, os.clock() - t1
+	))
+	ReplicatedStorage:SetAttribute("WorldComplete", true)
+end)
 ReplicatedStorage:SetAttribute("GameVersion", GameConfig.VERSION)

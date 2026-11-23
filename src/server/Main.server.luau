@@ -19,6 +19,7 @@ local ProgressService = require(Server.ProgressService)
 local TerrainBuilder = require(Server.World.TerrainBuilder)
 local AirportBuilder = require(Server.World.AirportBuilder)
 local CityBuilder = require(Server.World.CityBuilder)
+local StuntCourseBuilder = require(Server.World.StuntCourseBuilder)
 
 -- Physics scale: 1 stud = 0.28 m, so real gravity is 35.02 studs/s^2.
 Workspace.Gravity = Units.GRAVITY_STUDS
@@ -112,7 +113,9 @@ ReplicatedStorage:SetAttribute("WorldStage", "airports")
 for _, id in Airports.order do
 	AirportBuilder.build(id, airports)
 end
-print(string.format("[World] airports ready in %.1fs (%d land parts)", os.clock() - t0, nearParts))
+-- The Stunts ring course (a few hundred parts, so it is ready before anyone can fly).
+local _, ringParts = StuntCourseBuilder.build(world)
+print(string.format("[World] airports and ring course ready in %.1fs (%d land parts, %d ring parts)", os.clock() - t0, nearParts, ringParts))
 ReplicatedStorage:SetAttribute("WorldReady", true)
 
 -- Stage 2 (while people fly): the far hills, the open sea, then cities and forests.

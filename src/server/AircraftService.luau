@@ -17,6 +17,7 @@ local GameConfig = require(Shared.GameConfig)
 local Units = require(Shared.Units)
 local Assist = require(Shared.Assist)
 local Selection = require(Shared.Selection)
+local Stunts = require(Shared.Stunts)
 local AircraftBuilder = require(script.Parent.AircraftBuilder)
 local CrashService = require(script.Parent.CrashService)
 local Crash = require(Shared.Crash)
@@ -140,6 +141,14 @@ local function sanitizeOptions(raw: any): any?
 			mode = m.id
 		end
 	end
+	-- Stunts always flies the stunt plane, whatever the aircraft picker says.
+	if mode == Stunts.MODE then
+		local stuntCfg = Registry.get(Registry.stuntAircraftId)
+		if stuntCfg then
+			aircraftId = Registry.stuntAircraftId
+			cfg = stuntCfg
+		end
+	end
 	local assist = "easy"
 	for _, m in Assist.MODES do
 		if raw.assist == m then
@@ -222,7 +231,7 @@ end
 -- runway start tries the other runway end before falling back to a free gate; only
 -- spots that fit this aircraft (Selection.spawnList) are considered.
 local function resolveSpawn(p: Player, options: any, cfg: any): any
-	local sp = Airports.getSpawn(options.spawnId) :: any
+	local sp = (Airports.getSpawn(options.spawnId) or Stunts.getSpawn(options.spawnId)) :: any
 	if sp.kind ~= "gate" and sp.kind ~= "runway" then
 		return sp
 	end
@@ -574,7 +583,9 @@ local function monitor(dt: number)
 		end
 		if s.protectedUntil > 0 and now > s.protectedUntil then
 			s.protectedUntil = 0
-			setCollisionGroup(model, if GameConfig.aircraftCollide then GameConfig.CollisionGroups.Aircraft else "AircraftProtected")
+			-- Stunts racers stay ghosts to each other: everyone starts at the same gate.
+			local racing = s.options ~= nil and s.options.mode == Stunts.MODE
+			setCollisionGroup(model, if GameConfig.aircraftCollide and not racing then GameConfig.CollisionGroups.Aircraft else "AircraftProtected")
 		end
 		if core.Anchored then
 			continue

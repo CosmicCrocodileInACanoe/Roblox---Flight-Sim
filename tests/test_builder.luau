@@ -29,7 +29,12 @@ return { name = "Aircraft builder (mock Roblox)", run = function(T)
 	if not ok then
 		return
 	end
-	for _, id in Registry.order do
+	-- every menu aircraft, plus the Stunts plane when it is not one of them
+	local ids = table.clone(Registry.order)
+	if not table.find(ids, Registry.stuntAircraftId) then
+		table.insert(ids, Registry.stuntAircraftId)
+	end
+	for _, id in ids do
 		local cfg = Registry.get(id)
 		local name = cfg.displayName
 		local built, model = pcall(Builder.build, cfg, Mock.CFrame.new(0, 100, 0))
@@ -112,7 +117,9 @@ return { name = "Aircraft builder (mock Roblox)", run = function(T)
 				string.format("surfaces F%s A%s E%s R%s S%s", tostring(counts.Flap), tostring(counts.Aileron), tostring(counts.Elevator), tostring(counts.Rudder), tostring(counts.Spoiler)))
 			T.check(counts.Fan == #cfg.engines, "fans " .. tostring(counts.Fan))
 			T.check(counts.Gear == #cfg.gear.units, "gear " .. tostring(counts.Gear))
-			T.check(guis >= 4, "windows/titles " .. guis)
+			if not cfg.stuntsOnly then -- the stunt racer has a canopy, no cabin windows or titles
+				T.check(guis >= 4, "windows/titles " .. guis)
+			end
 		end)
 		T.test(name .. ": overall shape matches the configured size", function()
 			local S = 1 / 0.28

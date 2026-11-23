@@ -12,7 +12,8 @@ local store: DataStore? = nil
 local cache: { [Player]: any } = {}
 
 local function defaultData()
-	return { version = SCHEMA_VERSION, flights = 0, landings = 0, bestLanding = 0, totalScore = 0 }
+	-- bestStunts: best Stunts ring-course time in seconds (0 = no finish yet)
+	return { version = SCHEMA_VERSION, flights = 0, landings = 0, bestLanding = 0, totalScore = 0, bestStunts = 0 }
 end
 
 local function migrate(data: any): any
@@ -89,6 +90,10 @@ local function save(p: Player)
 			merged.landings = math.max(merged.landings, data.landings)
 			merged.bestLanding = math.max(merged.bestLanding, data.bestLanding)
 			merged.totalScore = math.max(merged.totalScore, data.totalScore)
+			-- lower is better; 0 means none
+			if data.bestStunts > 0 and (merged.bestStunts <= 0 or data.bestStunts < merged.bestStunts) then
+				merged.bestStunts = data.bestStunts
+			end
 			merged.version = SCHEMA_VERSION
 			return merged
 		end)
@@ -104,6 +109,29 @@ function ProgressService.recordLanding(p: Player, score: number)
 	data.totalScore += score
 	data.bestLanding = math.max(data.bestLanding, score)
 	updateLeaderstats(p, data)
+end
+
+-- A finished Stunts run (total seconds, penalties included). Returns the best time and
+-- whether this run set it.
+function ProgressService.recordStunts(p: Player, seconds: number): (number, boolean)
+	local data = cache[p]
+	if not data then
+		return seconds, true
+	end
+	local isNew = data.bestStunts <= 0 or seconds < data.bestStunts
+	if isNew then
+		data.bestStunts = seconds
+		task.spawn(save, p)
+	end
+	return data.bestStunts, isNew
+end
+
+function ProgressService.bestStunts(p: Player): number?
+	local data = cache[p]
+	if not data or data.bestStunts <= 0 then
+		return nil
+	end
+	return data.bestStunts
 end
 
 function ProgressService.recordFlight(p: Player, _mission: any)

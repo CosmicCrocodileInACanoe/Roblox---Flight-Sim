@@ -133,6 +133,7 @@ function Hud.new()
 
 	-- Heading + navigation (top centre)
 	local hd = panel(root, UDim2.new(0.5, 0, 0, 12), UDim2.fromOffset(420, 64), Vector2.new(0.5, 0))
+	self.navPanel = hd
 	self.heading = label(hd, "HDG ---", UDim2.fromOffset(12, 6), UDim2.new(0, 140, 0, 26), MONO, WHITE, Enum.TextXAlignment.Left, 22)
 	self.navArrow = label(hd, "^", UDim2.new(0.5, -15, 0, 4), UDim2.fromOffset(30, 30), Enum.Font.GothamBlack, Color3.fromRGB(230, 90, 230), Enum.TextXAlignment.Center, 26)
 	self.nav = label(hd, "", UDim2.new(0.5, 20, 0, 6), UDim2.new(0.5, -30, 0, 26), MONO, Color3.fromRGB(230, 150, 240), Enum.TextXAlignment.Right, 16)
@@ -140,6 +141,7 @@ function Hud.new()
 
 	-- Objective / tutorial (top left)
 	local ob = panel(root, UDim2.fromOffset(12, 12), UDim2.fromOffset(330, 74))
+	self.objectivePanel = ob
 	label(ob, "OBJECTIVE", UDim2.fromOffset(12, 6), UDim2.new(1, -24, 0, 14), FONT, DIM, Enum.TextXAlignment.Left, 11)
 	self.objective = label(ob, "Free flight", UDim2.fromOffset(12, 22), UDim2.new(1, -24, 0, 46), FONT, WHITE, Enum.TextXAlignment.Left, 14)
 	self.objective.TextWrapped = true
@@ -212,6 +214,17 @@ function Hud:setFlying(on: boolean)
 	self.flight.Visible = on and self.visible
 end
 
+-- Stunts mode has its own race HUD (client/StuntsHud.luau): hide the airport navigation,
+-- the objective box and landing grades while racing.
+function Hud:setStuntsMode(on: boolean)
+	self.stunts = on
+	self.navPanel.Visible = not on
+	self.objectivePanel.Visible = not on
+	if on then
+		self.cardUntil = 0
+	end
+end
+
 function Hud:toggle()
 	self.visible = not self.visible
 	self.flight.Visible = self.visible
@@ -232,6 +245,9 @@ function Hud:setMission(data: any)
 end
 
 function Hud:showLanding(result: any)
+	if self.stunts then
+		return
+	end
 	local colors = { A = GREEN, B = GREEN, C = AMBER, D = AMBER, F = RED, CRASH = RED }
 	self.cardGrade.Text = result.letter
 	self.cardGrade.TextColor3 = colors[result.letter] or WHITE
@@ -485,7 +501,7 @@ function Hud:update(t: any, destId: string?)
 	elseif t.ias > sp.vmo + 5 then
 		warn = "OVERSPEED"
 	end
-	if not t.onGround and t.raFt < 900 and t.gearExt < 0.99 and t.vsFpm < -300 then
+	if not self.stunts and not t.onGround and t.raFt < 900 and t.gearExt < 0.99 and t.vsFpm < -300 then
 		caution = "GEAR NOT DOWN"
 	elseif t.ias > sp.flapLimits[flapIdx] + 5 and t.flapPos > 1.1 then
 		caution = "FLAP OVERSPEED: RETRACT FLAPS (V)"

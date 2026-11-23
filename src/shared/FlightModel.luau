@@ -126,7 +126,7 @@ function FlightModel.new(cfg: any, opts: any?)
 		}
 		self.gLimit = cfg.gLimit * (1 + (tough - 1) * 0.5)
 	end
-	self.damage = Damage.new(comps)
+	self.damage = Damage.new(comps, { breakApart = o.breakApart == true })
 	self.failures = {} :: { [string]: any }
 	self.mass = cfg.mass
 	self.airborneTime = 0

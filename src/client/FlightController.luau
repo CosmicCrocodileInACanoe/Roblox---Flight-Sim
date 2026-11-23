@@ -56,7 +56,7 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 	local enginesRunning = model:GetAttribute("EnginesRunning") == true
 	local gearDown = model:GetAttribute("GearDown") ~= false
 	local flaps = (model:GetAttribute("Flaps") :: number?) or 1
-	self.fm = FlightModel.new(cfg, { enginesRunning = enginesRunning, gearDown = gearDown, flaps = flaps, toughness = Assist.toughness(options.assist) })
+	self.fm = FlightModel.new(cfg, { enginesRunning = enginesRunning, gearDown = gearDown, flaps = flaps, toughness = Assist.toughness(options.assist), breakApart = GameConfig.crash.breakApart })
 	self.toughness = Assist.toughness(options.assist)
 	self.env = FlightModel.newEnv(cfg)
 	self.ctl = FlightModel.newControls()
@@ -521,7 +521,9 @@ function FlightController:crashResponse(comp: string, point: Vector3, dvWorld: V
 	end
 	local c = fm.damage.components[comp]
 	if allowSection and c then
-		local sec = Crash.sectionToBreak(prof, { point.X, point.Y, point.Z }, dv, c.sectionsLost)
+		-- With break-apart off (default), sections only tear off in truly extreme hits.
+		local tearDv = if GameConfig.crash.breakApart then dv else dv / GameConfig.crash.extremeSectionFactor
+		local sec = Crash.sectionToBreak(prof, { point.X, point.Y, point.Z }, tearDv, c.sectionsLost)
 		if sec then
 			Damage.breakSection(fm.damage, comp, sec.id, sec.lost)
 			self.lastImpact[comp] = dv
@@ -652,6 +654,11 @@ function FlightController:updateVisuals(dt: number)
 		local u = gc.cfg
 		local gs = fm.gears[gc.index]
 		local a = math.rad(u.retractAngleDeg) * (1 - fm.gearExtension)
+		if Damage.state(fm.damage, u.component) == "failed" then
+			-- Collapsed leg: buckled most of the way up and squashed to the stop.
+			a = math.max(a, math.rad(u.retractAngleDeg) * 0.6)
+			gs = { compression = u.travel, steer = gs.steer }
+		end
 		local rot = if u.retractAxis == "x" then CFrame.Angles(a, 0, 0) else CFrame.Angles(0, 0, a)
 		local comp = math.min(gs.compression, u.travel) * SPM
 		local steer = CFrame.Angles(0, -gs.steer, 0)

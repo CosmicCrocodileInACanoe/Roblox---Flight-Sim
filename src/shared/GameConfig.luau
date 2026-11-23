@@ -43,6 +43,11 @@ GameConfig.debris = {
 
 -- BeamNG-style crash feel (see shared/Crash.luau for per-component profiles).
 GameConfig.crash = {
+	-- Off (default): planes bend, crumple and collapse but stay in one piece. Parts tear
+	-- off only in truly extreme hits (Damage.EXTREME_FACTOR x their destroy speed).
+	-- On: the old behaviour, components detach when their health runs out.
+	breakApart = false,
+	extremeSectionFactor = 2.0, -- break-apart off: tearing a section needs this x the dv
 	impactReportMinInterval = 0.12, -- s between dent reports for one component
 	maxCrumplesPerSecond = 12, -- server, per player
 	maxSplitsPerSecond = 6, -- server, debris secondary breakups across the game

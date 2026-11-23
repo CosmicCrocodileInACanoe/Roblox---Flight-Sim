@@ -56,10 +56,23 @@ AudioConfig.profiles = {
 	jet = { whine = "jetWhine", rumble = "jetRumble" },
 	prop = { whine = "propDrone", rumble = "propRumble" },
 }
+-- (an aircraft config's own soundProfile wins; this table covers older configs)
 AudioConfig.aircraftProfile = {
+	bumble = "prop",
+	meadowlark4 = "prop",
+	sprite = "prop",
+	ridgehopper = "prop",
+	puffin = "prop",
+	breezetwin = "prop",
+	silverline8 = "jet",
+	swiftletj3 = "jet",
+	vectorx1 = "jet",
+	nightjart2 = "jet",
 	kestrel72 = "prop",
 	meridian200 = "jet",
+	hauler4 = "prop",
 	atlas400 = "jet",
+	arrowstar = "jet",
 	celestia800 = "jet",
 }
 AudioConfig.defaultProfile = "jet"

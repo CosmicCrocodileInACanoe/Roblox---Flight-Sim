@@ -67,7 +67,7 @@ function Menu.new(callbacks: any)
 	local aircraftIds = Selection.flyableAircraft(Registry)
 	self.aircraftIds = aircraftIds
 	self.selection = {
-		aircraftId = if table.find(aircraftIds, "kestrel72") then "kestrel72" else aircraftIds[1], -- easiest first
+		aircraftId = if table.find(aircraftIds, "meadowlark4") then "meadowlark4" else aircraftIds[1], -- the gentle trainer first
 		airport = Airports.order[1],
 		mode = "airline",
 		destIndex = 1,

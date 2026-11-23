@@ -259,10 +259,12 @@ local SHORT = {
 	LeftWingGear = "Left wing gear", RightWingGear = "Right wing gear", LeftBodyGear = "Left body gear", RightBodyGear = "Right body gear",
 	HorizontalStab = "Tailplane", VerticalStab = "Fin", NoseGear = "Nose gear",
 	LeftMainGear = "Left main", RightMainGear = "Right main",
+	Engine = "Engine", LeftFloat = "Left float", RightFloat = "Right float",
+	LeftNoseGear = "Left nose gear", RightNoseGear = "Right nose gear",
 }
 local DAMAGE_ORDER = { "ForwardFuselage", "Fuselage", "AftFuselage", "LeftWing", "RightWing",
-	"LeftOuterEngine", "LeftEngine", "LeftInnerEngine", "RightInnerEngine", "RightEngine", "RightOuterEngine",
-	"HorizontalStab", "VerticalStab", "NoseGear", "LeftMainGear", "RightMainGear",
+	"Engine", "LeftOuterEngine", "LeftEngine", "LeftInnerEngine", "RightInnerEngine", "RightEngine", "RightOuterEngine",
+	"LeftFloat", "RightFloat", "HorizontalStab", "VerticalStab", "NoseGear", "LeftNoseGear", "RightNoseGear", "LeftMainGear", "RightMainGear",
 	"LeftWingGear", "RightWingGear", "LeftBodyGear", "RightBodyGear" }
 local DAMAGE_RANK = {}
 for i, n in DAMAGE_ORDER do

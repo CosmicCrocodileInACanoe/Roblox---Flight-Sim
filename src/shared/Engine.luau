@@ -125,7 +125,8 @@ function Engine.update(e: EngineState, throttle: number, reverseCmd: boolean, re
 		frac = Engine.thrustFraction(e.n1, idle)
 	end
 	-- Thrust lapse with density and speed (high-bypass turbofan approximation).
-	local lapse = densityRatio ^ 0.75 * math.max(0.45, 1 - airspeed / 600)
+	-- (propellers lose thrust with speed faster: cfg.lapseSpeed ~300 m/s instead of 600)
+	local lapse = densityRatio ^ 0.75 * math.max(0.45, 1 - airspeed / (cfg.lapseSpeed or 600))
 	local thrust = cfg.maxThrust * frac * lapse
 	if e.reverser > 0 then
 		thrust = thrust * (1 - e.reverser) - thrust * e.reverser * cfg.reverseFraction

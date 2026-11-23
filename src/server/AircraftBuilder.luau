@@ -440,6 +440,24 @@ local function buildFuselage(ctx: Ctx)
 		end
 	end
 
+	-- High wing: a centre-section fairing over the cabin roof joining the two wing roots.
+	if (w.mount or "low") == "high" then
+		local wl = w.rootLE
+		local th = w.rootThickness or w.thickness or 0.4
+		add(ctx, "Fuselage", "WingCentreSection", "block", Vector3.new(wl[1] * 2 + 0.1, th + 0.35, w.rootChord), CFrame.new(0, wl[2] - 0.17, wl[3] + w.rootChord / 2), rgb(liv.wing), { hull = true })
+	end
+
+	-- Main-gear sponsons (high-wing aircraft keep the main gear in fuselage side pods).
+	if g.sponsons then
+		local sp = g.sponsons
+		for _, sx in { -1, 1 } do
+			add(ctx, "Fuselage", "Sponson", "cylinder", Vector3.new(sp.z1 - sp.z0, sp.r * 2, sp.r * 2), CFrame.new(sx * sp.x, sp.y, (sp.z0 + sp.z1) / 2) * ALONG_Z, belly, { hull = true })
+			add(ctx, "Fuselage", "SponsonNose", "ball", Vector3.one * sp.r * 2, CFrame.new(sx * sp.x, sp.y, sp.z0), belly)
+			add(ctx, "Fuselage", "SponsonTail", "ball", Vector3.one * sp.r * 2, CFrame.new(sx * sp.x, sp.y, sp.z1), belly)
+			add(ctx, "Fuselage", "SponsonFairing", "block", Vector3.new(sp.x - g.radius * 0.6, sp.r * 1.2, sp.z1 - sp.z0), CFrame.new(sx * (sp.x + g.radius * 0.6) / 2, sp.y + sp.r * 0.2, (sp.z0 + sp.z1) / 2), belly)
+		end
+	end
+
 	-- Airline name (fictional) on both sides, via SurfaceGui on thin transparent panels.
 	local titleY = R * 0.62 + deck / 2
 	for _, sx in { -1, 1 } do
@@ -864,10 +882,17 @@ function AircraftBuilder.build(cfg: any, cf: CFrame): Model
 	fus.Parent = model
 	ctx.comps.Fuselage = fus
 	-- Ensure components exist in parent-first order.
-	for _, name in { "ForwardFuselage", "AftFuselage", "LeftWing", "RightWing", "HorizontalStab", "VerticalStab", "LeftEngine", "RightEngine", "NoseGear", "LeftMainGear", "RightMainGear" } do
-		if cfg.components[name] then
-			getComponent(ctx, name)
+	-- (getComponent creates a component's parent first, so any order works; sort for
+	-- a deterministic model tree.)
+	local names = {}
+	for name in cfg.components do
+		if name ~= "Fuselage" then
+			table.insert(names, name)
 		end
+	end
+	table.sort(names)
+	for _, name in names do
+		getComponent(ctx, name)
 	end
 
 	buildFuselage(ctx)

@@ -32,23 +32,23 @@ function CameraController.new()
 	self.towerPos = nil :: Vector3?
 	self.connections = {}
 	table.insert(self.connections, UserInputService.InputBegan:Connect(function(input, processed)
-		if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		if input.UserInputType == Enum.UserInputType.MouseButton2 and self.model then
+			-- Hold right mouse to look around: lock the cursor in place like standard Roblox games.
 			self.dragging = true
+			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
 		end
 	end))
 	table.insert(self.connections, UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		if input.UserInputType == Enum.UserInputType.MouseButton2 and self.dragging then
 			self.dragging = false
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		end
 	end))
 	table.insert(self.connections, UserInputService.InputChanged:Connect(function(input, processed)
 		if not self.model then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseMovement and self.dragging then
-			self.yaw -= input.Delta.X * 0.006
-			self.pitch = math.clamp(self.pitch - input.Delta.Y * 0.006, math.rad(-80), math.rad(70))
-		elseif input.UserInputType == Enum.UserInputType.MouseWheel and not processed then
+		if input.UserInputType == Enum.UserInputType.MouseWheel and not processed then
 			self.zoom = math.clamp(self.zoom * (1 - input.Position.Z * 0.1), 0.35, 4)
 		elseif input.KeyCode == Enum.KeyCode.Thumbstick2 then
 			local p = input.Position
@@ -78,6 +78,10 @@ end
 
 function CameraController:detach()
 	RunService:UnbindFromRenderStep("FlightCamera")
+	if self.dragging then
+		self.dragging = false
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	end
 	self:applyCockpitVisibility(false)
 	self.model = nil
 	local cam = Workspace.CurrentCamera
@@ -153,6 +157,12 @@ function CameraController:update(dt: number)
 	end
 	local cam = Workspace.CurrentCamera
 	local cf = core.CFrame
+	if self.dragging then
+		-- GetMouseDelta is reliable while the cursor is locked
+		local d = UserInputService:GetMouseDelta()
+		self.yaw -= d.X * 0.006
+		self.pitch = math.clamp(self.pitch - d.Y * 0.006, math.rad(-80), math.rad(70))
+	end
 	local shake = Effects.shakeAmount
 	Effects.shakeAmount = math.max(0, shake - dt * 1.8)
 	local shakeCF = CFrame.new()

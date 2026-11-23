@@ -62,7 +62,13 @@ AircraftService.notify = notify
 
 -- Gear height: CoM height above ground when resting on the gear (metres).
 local function restHeight(cfg: any): number
-	local u = cfg.gear.units[2] -- a main gear leg
+	local u = cfg.gear.units[2] -- fallback
+	for _, g in cfg.gear.units do
+		if g.brakes then -- the first main gear leg
+			u = g
+			break
+		end
+	end
 	return -(u.pos[2] - u.strutLength - u.wheelRadius) - u.staticCompression * u.travel
 end
 
@@ -104,7 +110,7 @@ local function sanitizeOptions(raw: any): any?
 	if not cfg or not cfg.unlocked then
 		return nil
 	end
-	local spawnId = if type(raw.spawnId) == "string" then raw.spawnId else "HBR-gate1"
+	local spawnId = if type(raw.spawnId) == "string" then raw.spawnId else "HBR-rwy09"
 	if not Airports.getSpawn(spawnId) then
 		return nil
 	end

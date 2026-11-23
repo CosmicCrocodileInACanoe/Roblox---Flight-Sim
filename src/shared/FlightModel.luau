@@ -140,10 +140,18 @@ function FlightModel:setFailure(kind: string, on: boolean)
 		f[kind] = nil
 		return
 	end
-	if kind == "engine1" and self.engines[1] then
-		Engine.fail(self.engines[1], false)
-	elseif kind == "engine2" and self.engines[2] then
-		Engine.fail(self.engines[2], false)
+	if kind == "engine1" or kind == "engine2" then
+		-- engine1 = the left-most engine, engine2 = the right-most (works for 2 or 4 engines)
+		local best, bestX = nil, nil
+		for i, ec in self.cfg.engines do
+			local x = ec.pos[1]
+			if bestX == nil or (kind == "engine1" and x < bestX) or (kind == "engine2" and x > bestX) then
+				best, bestX = i, x
+			end
+		end
+		if best and self.engines[best] then
+			Engine.fail(self.engines[best], false)
+		end
 	elseif kind == "elevatorJam" then
 		f.elevatorJam = self.elevator
 		return

@@ -31,6 +31,11 @@ export type DamageModel = {
 	events: { DamageEvent },
 	destroyed: boolean,
 	totalImpact: number,
+	-- false (the default): components crumple and collapse but stay on; only a truly
+	-- extreme hit (dv >= impactDestroy * extremeFactor) tears one off.
+	breakApart: boolean,
+	extremeFactor: number,
+	extremeNow: { [string]: boolean },
 }
 
 local STATE_RANK = { normal = 0, degraded = 1, failed = 2, detached = 3 }
@@ -38,7 +43,12 @@ Damage.STATE_RANK = STATE_RANK
 
 local PROPAGATE_TO_PARENT = 0.25
 
-function Damage.new(componentsCfg: { [string]: any }): DamageModel
+Damage.EXTREME_FACTOR = 2.2
+
+export type DamageOptions = { breakApart: boolean?, extremeFactor: number? }
+
+function Damage.new(componentsCfg: { [string]: any }, opts: DamageOptions?): DamageModel
+	local o = opts or {}
 	local comps = {}
 	local order = {}
 	for name, cfg in componentsCfg do
@@ -49,12 +59,18 @@ function Damage.new(componentsCfg: { [string]: any }): DamageModel
 		table.insert(order, name)
 	end
 	table.sort(order)
-	return { components = comps, order = order, events = {}, destroyed = false, totalImpact = 0 }
+	return {
+		components = comps, order = order, events = {}, destroyed = false, totalImpact = 0,
+		breakApart = o.breakApart == true, extremeFactor = o.extremeFactor or Damage.EXTREME_FACTOR,
+		extremeNow = {},
+	}
 end
 
-local function stateForHealth(c: ComponentState): string
+local function stateForHealth(d: DamageModel, c: ComponentState): string
 	if c.health <= 0 then
-		return if c.cfg.detachable then "detached" else "failed"
+		-- Collapsed in place unless break-apart is on or this hit was extreme.
+		local tearOff = c.cfg.detachable and (d.breakApart or d.extremeNow[c.name] == true)
+		return if tearOff then "detached" else "failed"
 	elseif c.health < 0.3 then
 		return "failed"
 	elseif c.health < 0.7 then
@@ -87,6 +103,9 @@ local function setState(d: DamageModel, c: ComponentState, newState: string)
 	end
 	if c.name == "Fuselage" and (newState == "failed" or newState == "detached") then
 		d.destroyed = true
+		if not (d.breakApart or d.extremeNow[c.name]) then
+			return -- the airframe is wrecked but stays in one (bent) piece
+		end
 		-- Break-up: every directly attached major component separates.
 		for _, other in d.components do
 			if other.cfg.parent == "Fuselage" and other.state ~= "detached" then
@@ -119,7 +138,13 @@ function Damage.hurt(d: DamageModel, name: string, amount: number, propagate: bo
 	-- wing tip cannot pass more than a quarter of one component's worth to the fuselage.
 	local removed = math.min(amount, c.health)
 	c.health = math.max(0, c.health - amount)
-	setState(d, c, stateForHealth(c))
+	local before = c.state
+	setState(d, c, stateForHealth(d, c))
+	if c.state == "failed" and c.health <= 0 and before == "failed" and not (c :: any).collapseSent then
+		-- Crushed to nothing while already failed: tell the server once so it can collapse it.
+		(c :: any).collapseSent = true
+		pushEvent(d, c)
+	end
 	if propagate ~= false and c.cfg.parent and removed > 0 then
 		Damage.hurt(d, c.cfg.parent, removed * PROPAGATE_TO_PARENT, false)
 	end
@@ -144,7 +169,20 @@ function Damage.applyImpact(d: DamageModel, name: string, dv: number): number
 	end
 	local amount = Damage.impactAmount(c.cfg, dv)
 	d.totalImpact += amount
-	return Damage.hurt(d, name, amount)
+	local extreme = dv >= c.cfg.impactDestroy * d.extremeFactor
+	if extreme then
+		d.extremeNow[name] = true
+	end
+	local r = Damage.hurt(d, name, amount)
+	d.extremeNow[name] = nil
+	return r
+end
+
+-- True if this component has been crushed to nothing but is still attached
+-- (break-apart off): wings droop, gear folds, the fuselage sags.
+function Damage.isCollapsed(d: DamageModel, name: string): boolean
+	local c = d.components[name]
+	return c ~= nil and c.state == "failed" and c.health <= 0
 end
 
 -- Wear from sliding contact. `speed` m/s, `dt` s. Rates are per metre slid.
@@ -229,7 +267,8 @@ function Damage.effectiveness(d: DamageModel, name: string): number
 	if c.state == "detached" then
 		return 0
 	elseif c.state == "failed" then
-		return 0.35 * intact
+		-- 0.35 just below the failed threshold, down to 0.1 when fully collapsed
+		return (0.1 + 0.85 * c.health) * intact
 	elseif c.state == "degraded" then
 		return (0.55 + 0.45 * c.health) * intact
 	end

@@ -238,6 +238,69 @@ function CrashService.bend(model: Model, cfg: any, compName: string, pointM: Vec
 	return moved
 end
 
+-- Collapse ------------------------------------------------------------------------------
+-- With break-apart off, a component whose health runs out stays on and collapses: wings
+-- and tailplanes droop from the root, the fin leans over, and a wrecked centre fuselage
+-- breaks its back (nose and tail sag). Each component collapses once.
+local function rootPoint(model: Model, compName: string, axis: SoftBody.Vec, zone: number): Vector3?
+	local core = model.PrimaryPart
+	local compModel = model:FindFirstChild(compName)
+	if not core or not compModel then
+		return nil
+	end
+	local a = v3(axis)
+	local sMin, best = math.huge, nil
+	for _, d in compModel:GetDescendants() do
+		if d:IsA("BasePart") and d.Name ~= "Root" then
+			local lp = core.CFrame:PointToObjectSpace(d.Position) * MPS
+			local sv = lp:Dot(a)
+			if sv < sMin then
+				sMin, best = sv, lp
+			end
+		end
+	end
+	if not best then
+		return nil
+	end
+	return best + a * zone
+end
+
+function CrashService.collapse(model: Model, cfg: any, compName: string)
+	local key = "Collapsed_" .. compName
+	if model:GetAttribute(key) then
+		return
+	end
+	model:SetAttribute(key, true)
+	local kind = Crash.kind(compName)
+	if compName == "Fuselage" then
+		for _, sec in { "ForwardFuselage", "AftFuselage" } do
+			if cfg.components[sec] and model:GetAttribute("Dmg_" .. sec) ~= "detached" then
+				local bp = SoftBody.bendProfile(cfg, sec, "fuselage")
+				local axis = SoftBody.beamAxis(cfg, sec, "fuselage", { 0, 0, 0 })
+				if bp and axis then
+					local pt = rootPoint(model, sec, axis, bp.bendZone * 0.5)
+					if pt then
+						CrashService.bend(model, cfg, sec, pt, Vector3.new(0, -1, 0), bp.bendThreshold + 12 / bp.bendPerMps)
+					end
+				end
+			end
+		end
+		return
+	end
+	local bp = SoftBody.bendProfile(cfg, compName, kind)
+	local ref = cfg.components[compName].ref or { 0, 0, 0 }
+	local axis = SoftBody.beamAxis(cfg, compName, kind, ref)
+	if not bp or not axis then
+		return
+	end
+	local pt = rootPoint(model, compName, axis, bp.bendZone)
+	if not pt then
+		return
+	end
+	local dir = if axis[2] > 0.5 then Vector3.new(if math.random() < 0.5 then -1 else 1, 0, 0) else Vector3.new(0, -1, 0)
+	CrashService.bend(model, cfg, compName, pt, dir, bp.bendThreshold + 25 / bp.bendPerMps)
+end
+
 -- Debris tracking -----------------------------------------------------------------------
 function CrashService.track(owner: Player, debris: Model, profile: Crash.Profile, integrity: number?)
 	local count = 0
@@ -548,6 +611,16 @@ local function onReportImpact(p: Player, model: any, compName: any, point: any, 
 	local tough = (m:GetAttribute("Toughness") :: number?) or 1
 	local moved = CrashService.crumple(m, cfg, compName, point, unitDir, d)
 	moved += CrashService.bend(m, cfg, compName, point, unitDir, d, tough)
+	if compName == "Fuselage" and math.abs(unitDir.Y) > 0.4 then
+		-- A hard belly/roof hit on the centre bends the whole airframe: nose and tail sag
+		-- (or lift) the opposite way to the push.
+		for _, sec in { "ForwardFuselage", "AftFuselage" } do
+			local secCfg = cfg.components[sec]
+			if secCfg and m:GetAttribute("Dmg_" .. sec) ~= "detached" then
+				moved += CrashService.bend(m, cfg, sec, v3(secCfg.ref or { 0, 0, 0 }), Vector3.new(0, -unitDir.Y, 0), d * 0.8, tough)
+			end
+		end
+	end
 	-- Every client dents its own mesh skins (EditableMesh doesn't replicate).
 	local depth = Crash.dentDepth(Crash.profiles(cfg, tough)[compName], d)
 	if depth > 0 then

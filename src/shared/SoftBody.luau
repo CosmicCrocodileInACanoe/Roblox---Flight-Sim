@@ -32,9 +32,10 @@ export type BendProfile = {
 }
 
 local BEND_DEFAULTS: { [string]: BendProfile? } = {
-	wing = { bendThreshold = 5, bendPerMps = 1.3, maxBendDeg = 28, bendZone = 4.5, crushPerMps = 0.03, maxCrush = 0.8, maxParts = 220 },
-	tail = { bendThreshold = 4, bendPerMps = 1.6, maxBendDeg = 32, bendZone = 2.2, crushPerMps = 0.02, maxCrush = 0.5, maxParts = 160 },
-	fuselage = { bendThreshold = 6, bendPerMps = 0.55, maxBendDeg = 14, bendZone = 5, crushPerMps = 0.09, maxCrush = 3.0, maxParts = 260 },
+	-- Planes stay in one piece by default, so bending and crushing carry the crash.
+	wing = { bendThreshold = 4, bendPerMps = 2.4, maxBendDeg = 70, bendZone = 5, crushPerMps = 0.05, maxCrush = 1.6, maxParts = 220 },
+	tail = { bendThreshold = 3.5, bendPerMps = 2.8, maxBendDeg = 75, bendZone = 2.5, crushPerMps = 0.04, maxCrush = 1.0, maxParts = 160 },
+	fuselage = { bendThreshold = 5, bendPerMps = 1.2, maxBendDeg = 40, bendZone = 6, crushPerMps = 0.16, maxCrush = 7.0, maxParts = 260 },
 }
 SoftBody.BEND_DEFAULTS = BEND_DEFAULTS
 

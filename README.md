@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 416 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 420 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy mode) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `195 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `199 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -157,6 +157,17 @@ LeftWing = { ..., crash = { sections = false } }, -- no break point
 ```
 
 Tunables shared by all aircraft are in `GameConfig.crash`.
+
+### Planes stay in one piece by default
+
+`GameConfig.crash.breakApart = false` (the default). A wrecked component stays attached
+and collapses instead of falling off: wings and tailplanes droop from the root, the fin
+leans over, gear folds up under the plane, and a wrecked centre fuselage breaks its back,
+so the nose and tail sag. Outer wing sections and stabiliser tips tear off only on hits
+twice as hard as normal (`extremeSectionFactor`). A whole component comes off only in a
+truly extreme hit: `Damage.EXTREME_FACTOR` (2.2) times its destroy speed, which is a
+50 m/s (about 100 kt) smash into something solid for a wing. Set `breakApart = true` to
+get the old behaviour back, where parts detach as soon as their health runs out.
 
 ### Bending metal (soft-body look)
 

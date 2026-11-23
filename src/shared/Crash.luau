@@ -48,27 +48,27 @@ export type Profile = {
 
 local DEFAULTS: { [string]: any } = {
 	wing = {
-		dentThreshold = 5, dentScale = 12, maxDent = 0.55, maxTotalDent = 0.9, dentRadius = 4.5,
+		dentThreshold = 5, dentScale = 12, maxDent = 0.8, maxTotalDent = 1.6, dentRadius = 4.5,
 		maxTwistDeg = 10, maxParts = 8, sectionBreakDv = 13, secondaryBreakDv = 11, integrity = 2,
 		shards = 8, sparkScale = 1.0,
 	},
 	engine = {
-		dentThreshold = 3, dentScale = 10, maxDent = 0.4, maxTotalDent = 0.6, dentRadius = 2.2,
+		dentThreshold = 3, dentScale = 10, maxDent = 0.6, maxTotalDent = 1.1, dentRadius = 2.2,
 		maxTwistDeg = 14, maxParts = 6, sectionBreakDv = math.huge, secondaryBreakDv = 9, integrity = 1,
 		shards = 6, sparkScale = 1.4,
 	},
 	fuselage = {
-		dentThreshold = 6, dentScale = 14, maxDent = 0.8, maxTotalDent = 1.2, dentRadius = 5,
+		dentThreshold = 6, dentScale = 14, maxDent = 1.2, maxTotalDent = 2.2, dentRadius = 5,
 		maxTwistDeg = 6, maxParts = 10, sectionBreakDv = math.huge, secondaryBreakDv = 13, integrity = 3,
 		shards = 10, sparkScale = 1.2,
 	},
 	tail = {
-		dentThreshold = 4, dentScale = 10, maxDent = 0.35, maxTotalDent = 0.6, dentRadius = 2.5,
+		dentThreshold = 4, dentScale = 10, maxDent = 0.5, maxTotalDent = 1.0, dentRadius = 2.5,
 		maxTwistDeg = 12, maxParts = 6, sectionBreakDv = 10, secondaryBreakDv = 9, integrity = 1,
 		shards = 5, sparkScale = 0.8,
 	},
 	gear = {
-		dentThreshold = 4, dentScale = 8, maxDent = 0.3, maxTotalDent = 0.45, dentRadius = 1.6,
+		dentThreshold = 4, dentScale = 8, maxDent = 0.45, maxTotalDent = 0.8, dentRadius = 1.6,
 		maxTwistDeg = 18, maxParts = 4, sectionBreakDv = math.huge, secondaryBreakDv = 8, integrity = 1,
 		shards = 4, sparkScale = 1.5,
 	},

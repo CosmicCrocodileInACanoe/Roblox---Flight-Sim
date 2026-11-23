@@ -495,6 +495,10 @@ local function onReportDamage(p: Player, model: any, compName: any, state: any, 
 	if not cfg or not cfg.components[compName] then
 		return
 	end
+	-- Collapse (break-apart off): may arrive while the component is already "failed".
+	if state == "failed" and health <= 0.001 then
+		CrashService.collapse(model :: Model, cfg, compName)
+	end
 	-- States only get worse.
 	local prev = (model :: Model):GetAttribute("Dmg_" .. compName) :: string?
 	local rank = { normal = 0, degraded = 1, failed = 2, detached = 3 }
@@ -514,6 +518,7 @@ local function onReportDamage(p: Player, model: any, compName: any, state: any, 
 	if state == "detached" and withParent ~= true then
 		detachComponent(p, model :: Model, compName, cfg)
 	end
+
 end
 
 local SYSTEM_KEYS = {

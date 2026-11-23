@@ -31,19 +31,9 @@ function CameraController.new()
 	self.dragging = false
 	self.towerPos = nil :: Vector3?
 	self.connections = {}
-	table.insert(self.connections, UserInputService.InputBegan:Connect(function(input, processed)
-		if input.UserInputType == Enum.UserInputType.MouseButton2 and self.model then
-			-- Hold right mouse to look around: lock the cursor in place like standard Roblox games.
-			self.dragging = true
-			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
-		end
-	end))
-	table.insert(self.connections, UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton2 and self.dragging then
-			self.dragging = false
-			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-		end
-	end))
+	-- Right-mouse look is polled every frame in update() (see lookInput), so it works even
+	-- when another script or a GUI swallows the mouse button events.
+	self.lastMouse = nil :: Vector2?
 	table.insert(self.connections, UserInputService.InputChanged:Connect(function(input, processed)
 		if not self.model then
 			return
@@ -141,6 +131,34 @@ function CameraController:setMode(mode: string)
 	end
 end
 
+-- Hold the right mouse button and drag to look around. Polled each frame:
+--   * the cursor is locked in place while held (re-asserted every frame, because
+--     Roblox's default camera script resets MouseBehavior);
+--   * movement comes from GetMouseDelta when the lock holds, otherwise from the
+--     change in cursor position, so it works either way.
+function CameraController:lookInput()
+	local held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+	if held then
+		local loc = UserInputService:GetMouseLocation()
+		if not self.dragging then
+			self.dragging = true
+			self.lastMouse = loc
+		end
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+		local d = UserInputService:GetMouseDelta()
+		if d.Magnitude < 1e-3 and self.lastMouse then
+			d = loc - self.lastMouse
+		end
+		self.lastMouse = loc
+		self.yaw -= d.X * 0.006
+		self.pitch = math.clamp(self.pitch - d.Y * 0.006, math.rad(-80), math.rad(70))
+	elseif self.dragging then
+		self.dragging = false
+		self.lastMouse = nil
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	end
+end
+
 function CameraController:cycle()
 	local idx = table.find(CameraController.MODES, self.mode) or 1
 	self:setMode(CameraController.MODES[idx % #CameraController.MODES + 1])
@@ -157,12 +175,7 @@ function CameraController:update(dt: number)
 	end
 	local cam = Workspace.CurrentCamera
 	local cf = core.CFrame
-	if self.dragging then
-		-- GetMouseDelta is reliable while the cursor is locked
-		local d = UserInputService:GetMouseDelta()
-		self.yaw -= d.X * 0.006
-		self.pitch = math.clamp(self.pitch - d.Y * 0.006, math.rad(-80), math.rad(70))
-	end
+	self:lookInput()
 	local shake = Effects.shakeAmount
 	Effects.shakeAmount = math.max(0, shake - dt * 1.8)
 	local shakeCF = CFrame.new()

@@ -48,6 +48,7 @@ local suites = {
 	require("./test_fleet"),
 	require("./test_controls"),
 	require("./test_geometry"),
+	require("./test_builder"),
 }
 
 for _, suite in suites do

@@ -185,6 +185,27 @@ local function rod(ctx: Ctx, comp: string, name: string, p0: Vector3, p1: Vector
 	return add(ctx, comp, name, "cylinder", Vector3.new(d.Magnitude, diameter, diameter), cf, color, opts)
 end
 
+-- A smooth ellipsoid: a block part with a SpecialMesh sphere, which Roblox stretches to
+-- the part's size. `semi` holds the semi-axes in metres along the CFrame's own axes.
+-- Collisions use the part's box, which is fine for the hull's purposes.
+local function ellipsoid(ctx: Ctx, comp: string, name: string, cf: CFrame, semi: Vector3, color: Color3, opts: any?): BasePart
+	local p = add(ctx, comp, name, "block", semi * 2, cf, color, opts)
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere
+	mesh.Parent = p
+	return p
+end
+
+-- Elliptical cylinder along body Z: a block with a stretched SpecialMesh cylinder.
+-- semi = (halfWidth, halfHeight); len is the full length.
+local function ecylinder(ctx: Ctx, comp: string, name: string, pos: Vector3, len: number, halfW: number, halfH: number, color: Color3, opts: any?): BasePart
+	local p = add(ctx, comp, name, "block", Vector3.new(len, halfH * 2, halfW * 2), CFrame.new(pos) * ALONG_Z, color, opts)
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Cylinder
+	mesh.Parent = p
+	return p
+end
+
 -- Fuselage cross-section: a "stadium" (two circles of radius r whose centres are `deck`
 -- apart vertically, joined by a block). deck = 0 is a plain circular barrel.
 local function station(ctx: Ctx, comp: string, name: string, z0: number, z1: number, r: number, yc: number, deck: number, color: Color3, opts: any?)
@@ -308,24 +329,12 @@ local function buildFuselage(ctx: Ctx)
 		end
 	end
 
-	-- Nose: many short stations along a smooth (elliptical) profile.
+	-- Nose: one smooth half-ellipsoid, tipped down slightly so the chin sits lower than
+	-- the crown. Its rear half hides inside the cabin barrel.
 	local noseLen = g.cabinStartZ - g.noseZ
-	local steps = 14
-	local lastR, lastY = R, 0
-	for i = 1, steps do
-		local t0, t1 = (i - 1) / steps, i / steps
-		local tm = (t0 + t1) / 2
-		local z0 = g.cabinStartZ - noseLen * t0
-		local z1 = g.cabinStartZ - noseLen * t1
-		local r = R * math.max(0.14, math.sqrt(1 - tm ^ 2.4))
-		local yc = -noseDrop * tm * tm
-		local d = deck * math.max(0, 1 - tm * 1.25)
-		-- with a double deck the top falls away faster than the chin
-		yc -= (deck - d) * 0.5
-		station(ctx, "ForwardFuselage", "Nose", z0, z1, r, yc, d, body, { hull = true, tag = "HideInCockpit" })
-		lastR, lastY = r, yc
-	end
-	add(ctx, "ForwardFuselage", "NoseTip", "ball", Vector3.one * (lastR * 2), CFrame.new(0, lastY, g.noseZ + lastR * 0.3), body, { hull = true, tag = "HideInCockpit" })
+	local noseTilt = math.atan2(noseDrop, noseLen)
+	ellipsoid(ctx, "ForwardFuselage", "Nose", CFrame.new(0, 0, g.cabinStartZ) * CFrame.Angles(noseTilt, 0, 0),
+		Vector3.new(R, R + deck / 2, noseLen), body, { hull = true, tag = "HideInCockpit" })
 
 	-- Cockpit windscreen: four panes sitting on the nose surface, tilted back.
 	-- Default: on the main nose at fraction `at` of its length. `windscreen = { z, cy, r }`
@@ -335,11 +344,12 @@ local function buildFuselage(ctx: Ctx)
 	if ws.z then
 		wz, cy, wr = ws.z, ws.cy, ws.r
 	else
-		local tm = ws.at or 0.5
+		-- on the nose ellipsoid at fraction `at` of its length
+		local tm = ws.at or 0.55
 		wz = g.cabinStartZ - noseLen * tm
-		wr = R * math.sqrt(1 - tm ^ 2.4)
-		local d = deck * math.max(0, 1 - tm * 1.25)
-		cy = -noseDrop * tm * tm - (deck - d) * 0.5 + d / 2
+		local k = math.sqrt(1 - tm * tm)
+		wr = R * k
+		cy = -noseDrop * tm + (R + deck / 2) * k - wr
 	end
 	for _, sx in { -1, 1 } do
 		for k = 1, 2 do
@@ -353,91 +363,74 @@ local function buildFuselage(ctx: Ctx)
 		end
 	end
 
-	-- Upper-deck hump (jumbo style): flat-topped upper cylinder over the forward cabin,
-	-- tapering into the nose at the front and into the cabin roof at the back.
+	local function compAt(z: number): string
+		return if z < g.forwardSplitZ then "ForwardFuselage" elseif z < g.aftSplitZ then "Fuselage" else "AftFuselage"
+	end
+
+	-- A smooth body of revolution-ish shape built from a chain of overlapping ellipsoids.
+	-- prof(s) gives (centreY, halfWidth, halfHeight) at fraction s of [z0, z1]; each
+	-- ellipsoid is two steps long so neighbours overlap and the seams barely show.
+	local function chain(name: string, z0: number, z1: number, n: number, prof: (number) -> (number, number, number), opts: any?)
+		local d = (z1 - z0) / (n + 3)
+		for i = 1, n do
+			local z = z0 + i * d
+			local cyc, hw, hh = prof((z - z0) / (z1 - z0))
+			ellipsoid(ctx, compAt(z), name, CFrame.new(0, cyc, z), Vector3.new(hw, hh, d * 3), body, opts)
+		end
+	end
+
+	-- Upper-deck hump (jumbo style): an elliptical section sitting low in the barrel so it
+	-- blends into the cabin sides, rounding into the nose at the front and the roof behind.
 	if g.hump then
 		local h = g.hump
-		local rh = h.radius
 		local topY = h.top
+		local baseY = h.baseY or R * 0.45
+		local hw = h.halfWidth or math.sqrt(R * R - baseY * baseY) * 0.93
+		local hh = topY - baseY
 		local flat0, flat1 = h.startZ + h.frontTaper, h.endZ - h.rearTaper
-		local function hstation(comp: string, z0: number, z1: number, top: number)
-			local r = math.min(rh, math.max(0.3, (top - (R - rh * 0.2)) * 0.5 + rh * 0.5))
-			add(ctx, comp, "Hump", "cylinder", Vector3.new(math.abs(z1 - z0) + 0.04, r * 2, r * 2), CFrame.new(0, top - r, (z0 + z1) / 2) * ALONG_Z, body, { hull = true, tag = "HideInCockpit" })
-		end
-		local function compAt(z: number): string
-			return if z < g.forwardSplitZ then "ForwardFuselage" elseif z < g.aftSplitZ then "Fuselage" else "AftFuselage"
-		end
-		local n = 6
-		for i = 1, n do
-			local z0 = h.startZ + (flat0 - h.startZ) * (i - 1) / n
-			local z1 = h.startZ + (flat0 - h.startZ) * i / n
-			local t = (i - 0.5) / n
-			local top = R + (topY - R) * math.sqrt(t)
-			hstation(compAt(z0), z0, z1, top)
-		end
-		-- flat part split at the joints
+		ellipsoid(ctx, compAt(flat0), "HumpFront", CFrame.new(0, baseY, flat0), Vector3.new(hw, hh, h.frontTaper), body, { hull = true, tag = "HideInCockpit" })
+		ellipsoid(ctx, compAt(flat1), "HumpRear", CFrame.new(0, baseY, flat1), Vector3.new(hw, hh, h.rearTaper), body, { hull = true })
+		-- straight middle, split at the structural joints
 		local cuts = { flat0, g.forwardSplitZ, g.aftSplitZ, flat1 }
 		for k = 1, 3 do
 			local a, b = math.max(flat0, cuts[k]), math.min(flat1, cuts[k + 1])
 			if b - a > 0.2 then
-				hstation(compAt(a + 0.01), a, b, topY)
+				ecylinder(ctx, compAt(a + 0.01), "Hump", Vector3.new(0, baseY, (a + b) / 2), b - a + 0.04, hw, hh, body, { hull = true, tag = if a < g.forwardSplitZ then "HideInCockpit" else nil })
 			end
 		end
-		for i = 1, n do
-			local z0 = flat1 + (h.endZ - flat1) * (i - 1) / n
-			local z1 = flat1 + (h.endZ - flat1) * i / n
-			local t = (i - 0.5) / n
-			local top = topY - (topY - R) * (t ^ 1.6)
-			hstation(compAt(z0), z0, z1, top)
-		end
-		-- upper-deck windows
+		-- upper-deck windows, on the flat part of the hump
+		local wy = topY - hh * 0.32
+		local wx = hw * math.sqrt(1 - ((wy - baseY) / hh) ^ 2) + 0.02
 		for _, sx in { -1, 1 } do
-			local cuts2 = { flat0 + 1, g.forwardSplitZ, g.aftSplitZ, flat1 - 0.5 }
+			local cuts2 = { flat0 + 0.5, g.forwardSplitZ, g.aftSplitZ, flat1 }
 			local comps = { "ForwardFuselage", "Fuselage", "AftFuselage" }
 			for k = 1, 3 do
-				local a, b = math.max(flat0 + 1, cuts2[k]), math.min(flat1 - 0.5, cuts2[k + 1])
+				local a, b = math.max(flat0 + 0.5, cuts2[k]), math.min(flat1, cuts2[k + 1])
 				if b - a > 1 then
-					windowStrip(ctx, comps[k], sx, a, b, rh * math.sqrt(1 - 0.25 ^ 2) + 0.01, topY - rh * 0.75, g.windowPitch or 0.53, {}, if k == 1 then "HideInCockpit" else nil)
+					windowStrip(ctx, comps[k], sx, a, b, wx, wy, g.windowPitch or 0.53, {}, if k == 1 then "HideInCockpit" else nil)
 				end
 			end
 		end
 	end
 
-	-- Tail cone: tapering and sweeping upward.
-	local tailLen = g.tailEndZ - g.cabinEndZ
-	steps = 12
-	local tipR, tipY = R, 0
-	for i = 1, steps do
-		local t0, t1 = (i - 1) / steps, i / steps
-		local tm = (t0 + t1) / 2
-		local z0 = g.cabinEndZ + tailLen * t0
-		local z1 = g.cabinEndZ + tailLen * t1
-		local r = R * (1 - 0.8 * tm ^ 1.15)
-		local d = deck * (1 - tm) ^ 1.5
-		-- bottom sweeps up, top stays nearly level
-		local yc = g.tailUpsweep * tm ^ 1.3 + (deck - d) * 0.5 * 0
-		station(ctx, "AftFuselage", "TailCone", z0, z1, r, yc + (deck / 2 - d / 2), d, body, { hull = true })
-		tipR, tipY = r, yc + (deck / 2 - d / 2)
-	end
-	add(ctx, "AftFuselage", "APU", "cylinder", Vector3.new(0.6, tipR * 1.4, tipR * 1.4), CFrame.new(0, tipY, g.tailEndZ + 0.25) * ALONG_Z, Color3.fromRGB(110, 112, 118), { material = Enum.Material.Metal })
-
+	-- Tail cone: the crown stays nearly level while the belly sweeps up to the tail tip.
+	local H = R + deck / 2
+	local tipY = g.tailUpsweep
+	local tipR = R * 0.12
+	chain("TailCone", g.cabinEndZ, g.tailEndZ, 10, function(s: number)
+		local top = H - (H - (tipY + tipR)) * s ^ 1.8
+		local bot = -H + (H + tipY - tipR) * s ^ 1.25
+		local hw = R - (R - tipR) * s ^ 1.5
+		return (top + bot) / 2, hw, (top - bot) / 2
+	end, { hull = true })
+	add(ctx, "AftFuselage", "APU", "cylinder", Vector3.new(0.5, tipR * 1.3, tipR * 1.3), CFrame.new(0, tipY, g.tailEndZ - 0.15) * ALONG_Z, Color3.fromRGB(110, 112, 118), { material = Enum.Material.Metal })
 	-- Belly fairing under the wing root (a long, shallow bulge).
 	local w = ctx.cfg.geometry.wing
 	if (w.mount or "low") == "low" then
 		local fz0, fz1 = w.rootLE[3] - 1.5, w.rootLE[3] + w.rootChord + 2.5
-		local fr = R * 0.78
-		local fy = -deck / 2 - R + fr * 0.82
-		local cuts = { fz0, g.forwardSplitZ, g.aftSplitZ, fz1 }
-		local comps = { "ForwardFuselage", "Fuselage", "AftFuselage" }
-		for k = 1, 3 do
-			local a, b = math.max(fz0, cuts[k]), math.min(fz1, cuts[k + 1])
-			if b - a > 0.2 then
-				add(ctx, comps[k], "BellyFairing", "cylinder", Vector3.new(b - a, fr * 2, fr * 2), CFrame.new(0, fy - 0.12, (a + b) / 2) * ALONG_Z, belly, { hull = true })
-			end
-		end
-		for _, z in { fz0, fz1 } do
-			add(ctx, if z == fz0 then (if fz0 < g.forwardSplitZ then "ForwardFuselage" else "Fuselage") else (if fz1 > g.aftSplitZ then "AftFuselage" else "Fuselage"), "BellyFairingEnd", "ball", Vector3.one * fr * 2, CFrame.new(0, fy - 0.12, z), belly)
-		end
+		local zc = (fz0 + fz1) / 2
+		local comp = if zc < g.forwardSplitZ then "ForwardFuselage" elseif zc > g.aftSplitZ then "AftFuselage" else "Fuselage"
+		ellipsoid(ctx, comp, "BellyFairing", CFrame.new(0, -deck / 2 - R * 0.72, zc), Vector3.new(R * 0.8, R * 0.42, (fz1 - fz0) / 2), belly, { hull = true })
 	end
 
 	-- High wing: a centre-section fairing over the cabin roof joining the two wing roots.
@@ -451,9 +444,7 @@ local function buildFuselage(ctx: Ctx)
 	if g.sponsons then
 		local sp = g.sponsons
 		for _, sx in { -1, 1 } do
-			add(ctx, "Fuselage", "Sponson", "cylinder", Vector3.new(sp.z1 - sp.z0, sp.r * 2, sp.r * 2), CFrame.new(sx * sp.x, sp.y, (sp.z0 + sp.z1) / 2) * ALONG_Z, belly, { hull = true })
-			add(ctx, "Fuselage", "SponsonNose", "ball", Vector3.one * sp.r * 2, CFrame.new(sx * sp.x, sp.y, sp.z0), belly)
-			add(ctx, "Fuselage", "SponsonTail", "ball", Vector3.one * sp.r * 2, CFrame.new(sx * sp.x, sp.y, sp.z1), belly)
+			ellipsoid(ctx, "Fuselage", "Sponson", CFrame.new(sx * sp.x, sp.y, (sp.z0 + sp.z1) / 2), Vector3.new(sp.r, sp.r, (sp.z1 - sp.z0) / 2 + sp.r), belly, { hull = true })
 			add(ctx, "Fuselage", "SponsonFairing", "block", Vector3.new(sp.x - g.radius * 0.6, sp.r * 1.2, sp.z1 - sp.z0), CFrame.new(sx * (sp.x + g.radius * 0.6) / 2, sp.y + sp.r * 0.2, (sp.z0 + sp.z1) / 2), belly)
 		end
 	end
@@ -675,8 +666,7 @@ local function buildEngines(ctx: Ctx)
 			add(ctx, comp, "Intake", "cylinder", Vector3.new(0.3, R * 2.04, R * 2.04), CFrame.new(front + Vector3.new(0, 0, 0.15)) * ALONG_Z, metal, { material = Enum.Material.Metal })
 			add(ctx, comp, "FanFace", "cylinder", Vector3.new(0.05, R * 1.75, R * 1.75), CFrame.new(front + Vector3.new(0, 0, 0.32)) * ALONG_Z, Color3.fromRGB(26, 28, 32))
 		end
-		add(ctx, comp, "NacelleAft", "cylinder", Vector3.new(L * 0.18, R * 1.8, R * 1.8), CFrame.new(p + Vector3.new(0, 0, L * 0.26)) * ALONG_Z, nac, { hull = true })
-		add(ctx, comp, "NacelleAft", "cylinder", Vector3.new(L * 0.12, R * 1.45, R * 1.45), CFrame.new(p + Vector3.new(0, 0, L * 0.4)) * ALONG_Z, nac)
+		ellipsoid(ctx, comp, "NacelleAft", CFrame.new(p + Vector3.new(0, 0, L * 0.17)), Vector3.new(R * 0.98, R * 0.98, L * 0.36), nac, { hull = true })
 		add(ctx, comp, "Exhaust", "cylinder", Vector3.new(L * 0.14, R * 0.95, R * 0.95), CFrame.new(p + Vector3.new(0, 0, L * 0.52)) * ALONG_Z, Color3.fromRGB(110, 110, 118), { material = Enum.Material.Metal })
 		add(ctx, comp, "ExhaustCone", "ball", Vector3.one * R * 0.7, CFrame.new(p + Vector3.new(0, 0, L * 0.6)), Color3.fromRGB(80, 80, 86), { material = Enum.Material.Metal })
 		-- rotating fan or propeller: hub + blades on a Motor6D

@@ -13,6 +13,7 @@ local GameConfig = require(Shared.GameConfig)
 local Registry = require(Shared.AircraftRegistry)
 local Assist = require(Shared.Assist)
 local Selection = require(Shared.Selection)
+local Stunts = require(Shared.Stunts)
 local InputController = require(script.Parent.InputController)
 
 local Menu = {}
@@ -163,6 +164,9 @@ function Menu.new(callbacks: any)
 	end
 	-- Changing the aircraft, airport, mode or route starts the list again on a runway.
 	local function stepAircraft(d: number)
+		if sel.mode == Stunts.MODE then
+			return -- Stunts always uses the stunt plane
+		end
 		local i = table.find(aircraftIds, sel.aircraftId) or 1
 		sel.aircraftId = aircraftIds[wrapIndex(i + d, #aircraftIds)]
 		sel.spawnIndex = 1
@@ -346,8 +350,27 @@ function Menu.new(callbacks: any)
 	table.insert(lines, "5. Line up, flaps down (F), gear down (G), slow down.")
 	table.insert(lines, "6. Just before touching down: throttle idle, nose up a little.")
 	table.insert(lines, "7. On the ground: B (brakes) and Z (reverse) to stop.")
-	make("TextLabel", {
-		Parent = right, Text = table.concat(lines, "\n"), RichText = true, Position = UDim2.fromOffset(12, 10),
+	self.helpText = table.concat(lines, "\n")
+	self.stuntsHelpText = table.concat({
+		"<b>STUNTS: RING RACE</b>",
+		"Fly through all the rings in order, from START to FINISH, as fast as you can.",
+		"",
+		'<font color="#5ad27a">Green ring</font>   the one to fly through next',
+		'<font color="#ffd23c">Yellow ring</font>   the one after that',
+		'<font color="#8fd0ff">Big arrow</font>   points to the next ring',
+		"",
+		"The clock starts at the START ring.",
+		`Miss a ring and you get +{Stunts.MISS_PENALTY_S} seconds.`,
+		"Touch the ground and the run is over.",
+		"",
+		"<b>TIPS</b>",
+		"A / D roll hard into the turns, S pulls you round.",
+		"Too fast to make a turn? Ctrl for less throttle.",
+		`Beat {Stunts.formatTime(Stunts.MEDALS.gold)} for GOLD!`,
+		"R starts again instantly.",
+	}, "\n")
+	self.helpLabel = make("TextLabel", {
+		Parent = right, Text = self.helpText, RichText = true, Position = UDim2.fromOffset(12, 10),
 		Size = UDim2.new(1, -24, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 		Font = Enum.Font.Gotham, TextColor3 = WHITE, TextSize = 15, TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
@@ -417,8 +440,16 @@ function Menu.new(callbacks: any)
 	return self
 end
 
+-- The aircraft that will fly: the picked one, or the stunt plane in Stunts mode.
+function Menu:aircraftId(): string
+	if self.selection.mode == Stunts.MODE and Registry.get(Registry.stuntAircraftId) then
+		return Registry.stuntAircraftId
+	end
+	return self.selection.aircraftId
+end
+
 function Menu:aircraft(): any
-	return Registry.get(self.selection.aircraftId)
+	return Registry.get(self:aircraftId())
 end
 
 -- Destination choices: airport ids, or false for "no destination" (free flight / sandbox).
@@ -451,7 +482,7 @@ function Menu:options()
 		dest = sp.airport
 	end
 	return {
-		aircraftId = sel.aircraftId,
+		aircraftId = self:aircraftId(),
 		airport = sel.airport,
 		mode = sel.mode,
 		spawnId = sp.id,
@@ -499,7 +530,8 @@ function Menu:refresh()
 	local cfg = self:aircraft()
 	local n = #self.aircraftIds
 	local i = table.find(self.aircraftIds, sel.aircraftId) or 1
-	self.aircraftValue.Text = `{cfg.displayName}  ({i} of {n})`
+	local stunts = sel.mode == Stunts.MODE
+	self.aircraftValue.Text = if stunts then `{cfg.displayName}  (stunt plane)` else `{cfg.displayName}  ({i} of {n})`
 	self:refreshCard(cfg)
 
 	local ap = Airports.list[sel.airport]
@@ -513,7 +545,10 @@ function Menu:refresh()
 	local dests = self:destinations()
 	sel.destIndex = math.clamp(sel.destIndex, 1, math.max(1, #dests))
 	local dest = self:destination()
-	if sel.mode == "airline" then
+	if stunts then
+		self.routeTitle.Text = "Course"
+		self.routeValue.Text = `{#Stunts.course()} rings, high and low, near Harbor City`
+	elseif sel.mode == "airline" then
 		self.routeTitle.Text = "Route"
 		self.routeValue.Text = if dest then `{airportName(sel.airport)} to {airportName(dest)}` else "No routes from here"
 	else
@@ -537,7 +572,9 @@ function Menu:refresh()
 	end
 
 	local tip
-	if sp.kind == "runway" then
+	if stunts then
+		tip = `Fly through every ring in order. Don't touch the ground! A missed ring costs {Stunts.MISS_PENALTY_S} seconds.`
+	elseif sp.kind == "runway" then
 		tip = "Engines on, lined up and ready. Full throttle to go!"
 	elseif sp.kind == "gate" then
 		tip = "Parked at the gate: press I for engines, P to let the brake off, then taxi to the runway."
@@ -546,12 +583,14 @@ function Menu:refresh()
 	else
 		tip = "Starting in the air."
 	end
-	if not Selection.gateFits(cfg, sel.airport) then
+	if not stunts and not Selection.gateFits(cfg, sel.airport) then
 		tip ..= ` The {cfg.displayName} is too big for the gates here.`
 	end
 	self.tip.Text = tip
 
-	self.status.Text = if sel.mode == "airline" then "Fly the route from runway to gate. Your landing gets a score!"
+	self.helpLabel.Text = if stunts then self.stuntsHelpText else self.helpText
+	self.status.Text = if stunts then "Stunts: race the ring course against the clock!"
+		elseif sel.mode == "airline" then "Fly the route from runway to gate. Your landing gets a score!"
 		elseif sandbox then "Crash and failure testing. Nothing is saved; R resets instantly."
 		else "Fly anywhere you like. Landings at any airport get a score."
 	self.resumeButton.Visible = self.flying

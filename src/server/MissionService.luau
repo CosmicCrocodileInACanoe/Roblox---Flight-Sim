@@ -13,6 +13,7 @@ local Mission = require(Shared.Mission)
 local Grading = require(Shared.Grading)
 local Units = require(Shared.Units)
 local Registry = require(Shared.AircraftRegistry)
+local Stunts = require(Shared.Stunts)
 
 local MissionService = {}
 
@@ -29,6 +30,7 @@ type Track = {
 	pendingGrade: any?,
 	lastPhase: string?,
 	gradedTouchdown: number?,
+	stunts: any?, -- Stunts.Run while racing the ring course
 }
 
 local tracks: { [Player]: Track } = {}
@@ -45,6 +47,31 @@ local function sendMission(p: Player, t: Track)
 		origin = if m then m.origin else nil,
 		destination = if m then m.destination else nil,
 	})
+end
+
+-- Stunts: tell the client where the race stands (and what just happened).
+local function sendStunts(p: Player, t: Track, events: { any }, now: number, extra: any?)
+	local run = t.stunts
+	if not run then
+		return
+	end
+	local data: any = {
+		state = run.state,
+		nextRing = run.nextRing,
+		total = run.total,
+		elapsed = Stunts.elapsed(run, now),
+		penalties = run.penalties,
+		hit = run.hit,
+		missed = run.missed,
+		events = events,
+		best = if progress then progress.bestStunts(p) else nil,
+	}
+	if extra then
+		for k, v in extra do
+			data[k] = v
+		end
+	end
+	;(remotes:FindFirstChild("StuntsUpdate") :: RemoteEvent):FireClient(p, data)
 end
 
 local function countDamaged(model: Model): (number, boolean)
@@ -96,8 +123,14 @@ function MissionService.onSpawned(p: Player, options: any, sp: any)
 			t.mission.airborneAt = os.clock()
 		end
 	end
+	if options.mode == Stunts.MODE then
+		t.stunts = Stunts.newRun()
+	end
 	tracks[p] = t
 	sendMission(p, t)
+	if t.stunts then
+		sendStunts(p, t, { { kind = "ready" } }, os.clock())
+	end
 end
 
 local function finishGrade(p: Player, t: Track, model: Model)
@@ -171,6 +204,27 @@ function MissionService.onTelemetry(p: Player, s: any, model: Model)
 		t.airborne = false
 	end
 
+	-- Stunts: ring passes, misses and the finish, timed by the server. Touching the
+	-- ground or breaking up ends the run.
+	local run = t.stunts
+	if run and (run.state == "ready" or run.state == "racing") then
+		local events = Stunts.update(run, pos.X, pos.Y, pos.Z, now, crashed or onGround)
+		if #events > 0 then
+			local extra = nil
+			if run.state == "finished" then
+				local total = Stunts.totalTime(run, now)
+				local best, isNew = total, true
+				if progress then
+					best, isNew = progress.recordStunts(p, total)
+				end
+				extra = { totalTime = total, best = best, newBest = isNew, medal = Stunts.medal(total) }
+			elseif run.state == "crashed" then
+				extra = { crashReason = if crashed then "broken" else "ground" }
+			end
+			sendStunts(p, t, events, now, extra)
+		end
+	end
+
 	local mission = t.mission
 	if mission then
 		local tel = {
@@ -196,7 +250,7 @@ function MissionService.onTelemetry(p: Player, s: any, model: Model)
 		end
 	end
 
-	if touchdown then
+	if touchdown and not run then
 		local nearId = Airports.nearest(pos.X, pos.Z)
 		local l = Airports.layout(nearId)
 		if Airports.isOnRunway(l, pos.X, pos.Z, 60) then

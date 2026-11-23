@@ -61,6 +61,7 @@ AudioConfig.aircraftProfile = {
 	meridian200 = "jet",
 	atlas400 = "jet",
 	celestia800 = "jet",
+	stunt = "prop",
 }
 AudioConfig.defaultProfile = "jet"
 

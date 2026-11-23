@@ -47,6 +47,20 @@ function Assist.nextMode(mode: string): string
 	return Assist.MODES[1]
 end
 
+-- Easy-mode envelope for an aircraft. Agile types (aerobatic, fighters) carry a wider
+-- one in `cfg.assist`; everything else keeps the gentle airliner limits. `aerobatic`
+-- also lifts the bank limit in Assisted mode so loops and rolls are possible there.
+function Assist.limits(cfg: any?): any
+	local a = (cfg and cfg.assist) or {}
+	return {
+		bank = rad(a.easyBankDeg or 45),
+		pitchUp = rad(a.easyPitchUpDeg or 20),
+		pitchDown = rad(a.easyPitchDownDeg or -14),
+		pitchRate = rad(a.easyPitchRateDeg or 7),
+		aerobatic = a.aerobatic == true,
+	}
+end
+
 -- Attitude from world-up expressed in body axes.
 function Assist.attitude(ux: number, uy: number, uz: number): (number, number)
 	local pitch = math.asin(clamp(-uz, -1, 1))
@@ -69,6 +83,7 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 	end
 
 	local easy = st.mode == "easy"
+	local lim = Assist.limits(model.cfg)
 	local r = model.result
 	local airborne = not r.onGround and env.agl > 3
 	local pitch, bank = Assist.attitude(env.ux, env.uy, env.uz)
@@ -82,7 +97,7 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 		-- Easy: the stick asks for a pitch rate (about 7 deg/s at full deflection) inside
 		-- a +20 / -14 deg attitude envelope; released, it steers back to level flight
 		-- (or a gentle landing glide with the gear and flaps down).
-		local qd = raw.pitch * (if raw.pitch > 0 then rad(7) else rad(6))
+		local qd = raw.pitch * (if raw.pitch > 0 then lim.pitchRate else lim.pitchRate * 6 / 7)
 		if abs(raw.pitch) < 0.05 then
 			local vs = env.vgx * env.ux + env.vgy * env.uy + env.vgz * env.uz
 			-- level flight, or a gentle glide when set up to land (gear down, flaps 3+)
@@ -90,8 +105,8 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 			local target = if not landing then 0 elseif env.agl < 8 then -1.0 else -3.0
 			qd = clamp((target - vs) * 0.006 - (if landing then 0 else (pitch - rad(2)) * 0.05), rad(-2.5), rad(2.5))
 		end
-		qd = math.min(qd, (rad(20) - pitch) * 0.6)
-		qd = math.max(qd, (rad(-14) - pitch) * 0.6)
+		qd = math.min(qd, (lim.pitchUp - pitch) * 0.6)
+		qd = math.max(qd, (lim.pitchDown - pitch) * 0.6)
 		local err = env.wx - turnPitchRate - qd
 		st.autoTrim = clamp(st.autoTrim - clamp(err * 2.5, -0.35, 0.35) * dt, -1, 1)
 		out.pitch = clamp(raw.pitch * 0.3 - err * 3.0, -1, 1)
@@ -112,18 +127,23 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 		-- Bank protection: spring back to 33 deg when released, hard stop at 60 deg.
 		-- Easy: level the wings whenever the stick is released, and stop at 45 deg.
 		local absBank = abs(bank)
-		local bankLimit = if easy then rad(45) else rad(60)
+		local bankLimit = if easy then lim.bank elseif lim.aerobatic then math.huge else rad(60)
 		if abs(raw.roll) < 0.05 then
 			if easy then
 				out.roll = clamp(-bank * 1.7 + env.wz * 1.0, -0.65, 0.65)
+			elseif lim.aerobatic then
+				-- aerobatic types hold whatever attitude the pilot leaves them in
+				out.roll = 0
 			elseif absBank > rad(33) then
 				out.roll = clamp(-math.sign(bank) * (absBank - rad(33)) * 2.5, -0.6, 0.6)
 			elseif absBank < rad(8) then
 				out.roll = clamp(-bank * 1.2 + env.wz * 0.8, -0.3, 0.3)
 			end
-		elseif absBank > bankLimit - rad(5) and math.sign(raw.roll) == math.sign(bank) then
-			-- fade the input out over the last 5 degrees, then push back past the limit
-			local over = (absBank - bankLimit) / rad(5)
+		elseif absBank > bankLimit - math.max(rad(5), abs(env.wz) * 0.3) and math.sign(raw.roll) == math.sign(bank) then
+			-- fade the input out over the last few degrees (more for fast-rolling aircraft),
+			-- then push back past the limit
+			local fade = math.max(rad(5), abs(env.wz) * 0.3)
+			local over = (absBank - bankLimit) / fade
 			out.roll = if over > 0 then -math.sign(bank) * clamp(over, 0, 0.5) else raw.roll * clamp(-over, 0, 1)
 			out.roll = clamp(out.roll + env.wz * 0.5, -1, 1)
 		end

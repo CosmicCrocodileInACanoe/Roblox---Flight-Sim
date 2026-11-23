@@ -24,6 +24,8 @@ local ControlsPopup = require(Client.ControlsPopup)
 local FlightPanel = require(Client.FlightPanel)
 local Minimap = require(Client.Minimap)
 local SoundController = require(Client.SoundController)
+local StuntsHud = require(Client.StuntsHud)
+local Stunts = require(Shared.Stunts)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -35,6 +37,15 @@ local camera = CameraController.new()
 local controlsPopup = ControlsPopup.new()
 local minimap = Minimap.new()
 local sound = SoundController.new()
+local menu: any
+local stunts = StuntsHud.new({
+	onRetry = function()
+		(remotes:WaitForChild("RequestReset") :: RemoteEvent):FireServer()
+	end,
+	onMenu = function()
+		menu:show()
+	end,
+})
 
 local function command(name: string)
 	return function()
@@ -44,7 +55,6 @@ local function command(name: string)
 	end
 end
 
-local menu: any
 local flightPanel: any
 local input = InputController.new({
 	camera = function()
@@ -92,6 +102,8 @@ local function stopFlying()
 	input:unbind()
 	camera:detach()
 	hud:setFlying(false)
+	hud:setStuntsMode(false)
+	stunts:stop()
 	flightPanel:setFlying(false)
 	minimap:setFlying(false)
 	menu.flying = false
@@ -151,6 +163,15 @@ local function onAssigned(model: Model, options: any, sp: any)
 	if not model then
 		return
 	end
+	-- Start the race HUD before anything yields, so the server's first race update
+	-- (sent right after this event) is never missed.
+	local racing = type(options) == "table" and options.mode == Stunts.MODE
+	if racing then
+		stunts:start()
+	else
+		stunts:stop()
+	end
+	hud:setStuntsMode(racing)
 	model:WaitForChild("Core", 10)
 	local cfg = Registry.get(model:GetAttribute("AircraftId") :: string)
 	fc = FlightController.new(model, options, sp, remotes, input)
@@ -179,6 +200,9 @@ end)
 	if data and data.destination then
 		destination = data.destination
 	end
+end)
+;(remotes:WaitForChild("StuntsUpdate") :: RemoteEvent).OnClientEvent:Connect(function(data: any)
+	stunts:onUpdate(data)
 end)
 ;(remotes:WaitForChild("LandingResult") :: RemoteEvent).OnClientEvent:Connect(function(result: any)
 	hud:showLanding(result)
@@ -275,6 +299,8 @@ RunService.Heartbeat:Connect(function(dt)
 		hud:update(fc.telemetry, destination)
 		flightPanel:update(fc.telemetry)
 		minimap:update(fc.telemetry, destination, fc.model)
+		local core = fc.model.PrimaryPart
+		stunts:update(if core then core.Position else nil)
 	else
 		hud:update(nil, nil)
 	end

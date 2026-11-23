@@ -118,6 +118,17 @@ These are the most likely places for first-run bugs, so check them first.
     shows "[Minimap] could not draw the base map", and whether the map looks smooth
     (EditableImage) or blocky (Frame fallback).
 
+14. **Stunts ring race.** Menu: Mode > "Stunts: Ring Race", FLY. You start in the air east of
+    HBR runway 09 in the Zephyr R1, heading at a green START ring. Check: 12 orange neon rings
+    with numbers are visible (high and low, none buried in the ground or in trees, none in
+    the runway 27 approach); the next ring is green and outlined through hills, the one after
+    yellow; the arrow at the screen edge points at the next ring and turns into a circle
+    marker with a distance when it is on screen; the clock starts at START; a cheer shows
+    for each ring; flying past a ring shows "MISSED! +3 s"; FINISH shows the results card
+    with time, medal and best time; FLY AGAIN and R restart at the start; touching the ground
+    shows "CRASHED!". With two players, both race at once and pass through each other.
+    Note any Output errors from StuntsHud or MissionService.
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

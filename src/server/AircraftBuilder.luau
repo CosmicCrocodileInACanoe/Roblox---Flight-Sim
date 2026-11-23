@@ -834,7 +834,8 @@ local function buildCockpit(ctx: Ctx)
 	local panel = add(ctx, "ForwardFuselage", "Panel", "block", Vector3.new(hw * 1.7, 0.75, 0.08), CFrame.new(0, eye.Y - 0.72, front + 0.42) * CFrame.Angles(math.rad(-12), 0, 0), dark, o)
 	local sg = Instance.new("SurfaceGui")
 	sg.Face = Enum.NormalId.Back -- faces the pilots (+z)
-	sg.PixelsPerUnit = 40
+	sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	sg.PixelsPerStud = 40
 	sg.LightInfluence = 0
 	sg.Parent = panel
 	local nScreens = 4

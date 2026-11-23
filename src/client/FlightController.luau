@@ -20,6 +20,8 @@ local Units = require(Shared.Units)
 local FlightModel = require(Shared.FlightModel)
 local Assist = require(Shared.Assist)
 local Damage = require(Shared.Damage)
+local Crash = require(Shared.Crash)
+local GameConfig = require(Shared.GameConfig)
 local Registry = require(Shared.AircraftRegistry)
 local WorldGen = require(Shared.WorldGen)
 local Effects = require(script.Parent.Effects)
@@ -122,6 +124,8 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 
 	-- Contact tracking for impact localisation.
 	self.lastTouch = {} :: { [string]: number }
+	self.lastContactPoint = {} :: { [string]: Vector3 } -- body metres
+	self.lastImpactReport = {} :: { [string]: number }
 	self.touchCount = {} :: { [string]: number }
 	self.connections = {}
 	local character = Players.LocalPlayer.Character
@@ -135,6 +139,10 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 		if hit:GetAttribute("DebrisOwner") == Players.LocalPlayer.UserId then
 			return false
 		end
+		local fx = Workspace:FindFirstChild("LocalEffects")
+		if fx and hit:IsDescendantOf(fx) then
+			return false
+		end
 		local parentModel = hit:FindFirstAncestorWhichIsA("Model")
 		if parentModel and parentModel:FindFirstChildOfClass("Humanoid") then
 			return false
@@ -144,8 +152,13 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 	for _, p in self.hullParts do
 		local comp = p:GetAttribute("Component") :: string
 		table.insert(self.connections, p.Touched:Connect(function(hit)
-			if isForeign(hit) then
+			-- Torn-off sections keep this connection; they are debris now, not the aircraft.
+			if isForeign(hit) and p:IsDescendantOf(model) then
 				self.lastTouch[comp] = self.time
+				local core = self.core
+				if core and core.Parent then
+					self.lastContactPoint[comp] = core.CFrame:PointToObjectSpace(p.Position) * MPS
+				end
 				self.touchCount[comp] = (self.touchCount[comp] or 0) + 1
 				self.lastContactPart = p
 			end
@@ -340,6 +353,17 @@ function FlightController:step(dt: number)
 
 	-- Damage events -> server
 	for _, ev in Damage.drainEvents(fm.damage) do
+		if ev.state == "section" then
+			self.remotes.ReportSection:FireServer(self.model, ev.component, ev.section, self.lastImpact[ev.component] or 0)
+			local lp = self.lastContactPoint[ev.component] or self.compRefs[ev.component]
+			if lp then
+				local pos = cf:PointToWorldSpace(lp * SPM)
+				Effects.debrisPuff(pos, 1.5)
+				Effects.sparks(pos, 3)
+			end
+			Effects.shake(0.6)
+			continue
+		end
 		reportDamage(self, ev)
 		if ev.state == "detached" then
 			local ref = self.compRefs[ev.component]
@@ -408,8 +432,11 @@ function FlightController:detectImpacts(dt: number, cf: CFrame, v: Vector3, w: V
 				Damage.applyImpact(fm.damage, comp, dvp)
 				hitSomething = true
 				maxDv = math.max(maxDv, dvp)
+				local point = self.lastContactPoint[comp] or ref
+				local dvWorld = dvUnexpected + dw:Cross(rWorld)
+				self:crashResponse(comp, point, dvWorld, dvp, cf, v, w, true)
 				if dvp > 4 then
-					local pos = cf:PointToWorldSpace(ref * SPM)
+					local pos = cf:PointToWorldSpace(point * SPM)
 					Effects.sparks(pos, dvp / 4)
 					Effects.dust(pos, dvp / 5)
 				end
@@ -422,7 +449,13 @@ function FlightController:detectImpacts(dt: number, cf: CFrame, v: Vector3, w: V
 			if speed > 3 then
 				Damage.applyScrape(fm.damage, comp, speed, dt)
 				if math.random() < dt * 12 then
-					Effects.sparks(cf:PointToWorldSpace(ref * SPM) + Vector3.new(0, -2, 0), speed / 20)
+					local pos = cf:PointToWorldSpace((self.lastContactPoint[comp] or ref) * SPM) + Vector3.new(0, -2, 0)
+					if speed > 20 then
+						local vp = v + w:Cross(rWorld)
+						Effects.sparkShower(pos, -vp, speed / 25)
+					else
+						Effects.sparks(pos, speed / 20)
+					end
 				end
 			end
 		end
@@ -444,6 +477,7 @@ function FlightController:detectImpacts(dt: number, cf: CFrame, v: Vector3, w: V
 			self.lastImpact[best] = mag
 			Damage.applyImpact(fm.damage, best, mag)
 			maxDv = mag
+			self:crashResponse(best, self.compRefs[best], dvUnexpected, mag, cf, v, w, false)
 		end
 	end
 	if maxDv > 5 then
@@ -452,6 +486,48 @@ function FlightController:detectImpacts(dt: number, cf: CFrame, v: Vector3, w: V
 	-- Water spray
 	if fm.result.waterImpact > 2 then
 		Effects.spray(cf.Position + Vector3.new(0, -4, 0), fm.result.waterImpact / 3)
+	end
+end
+
+-- Dents (server), break points and shards for one localised impact.
+--   point: body metres; dvWorld: world-frame velocity change (m/s) at the contact.
+--   v, w: world velocity (m/s) and angular velocity (rad/s) of the aircraft.
+function FlightController:crashResponse(comp: string, point: Vector3, dvWorld: Vector3, dv: number, cf: CFrame, v: Vector3, w: Vector3, allowSection: boolean)
+	local fm = self.fm
+	local prof = Crash.profiles(self.cfg)[comp]
+	if not prof then
+		return
+	end
+	local dirBody = cf:VectorToObjectSpace(dvWorld)
+	if dirBody.Magnitude > 1e-6 then
+		dirBody = dirBody.Unit
+	else
+		dirBody = Vector3.zero
+	end
+	if dv > prof.dentThreshold then
+		local last = self.lastImpactReport[comp]
+		if not last or self.time - last >= GameConfig.crash.impactReportMinInterval then
+			self.lastImpactReport[comp] = self.time
+			self.remotes.ReportImpact:FireServer(self.model, comp, point, dirBody, dv)
+		end
+	end
+	local c = fm.damage.components[comp]
+	if allowSection and c then
+		local sec = Crash.sectionToBreak(prof, { point.X, point.Y, point.Z }, dv, c.sectionsLost)
+		if sec then
+			Damage.breakSection(fm.damage, comp, sec.id, sec.lost)
+			self.lastImpact[comp] = dv
+		end
+	end
+	local rWorld = cf:VectorToWorldSpace(point)
+	local pos = cf:PointToWorldSpace(point * SPM)
+	local velStuds = (v + w:Cross(rWorld)) * SPM
+	local n = Crash.shardCount(prof, dv)
+	if n > 0 then
+		Effects.shards(pos, velStuds, n)
+	end
+	if dv > 6 then
+		Effects.sparkShower(pos, dvWorld, dv / 6 * prof.sparkScale) -- sprays back off the obstacle
 	end
 end
 

@@ -16,6 +16,8 @@ local Airports = require(Shared.Airports)
 local GameConfig = require(Shared.GameConfig)
 local Units = require(Shared.Units)
 local AircraftBuilder = require(script.Parent.AircraftBuilder)
+local CrashService = require(script.Parent.CrashService)
+local Crash = require(Shared.Crash)
 
 local AircraftService = {}
 
@@ -289,6 +291,26 @@ local function trimDebris()
 	end
 end
 
+-- Count a debris model against the per-player and global caps, and schedule cleanup.
+local function registerDebris(p: Player, debris: Model)
+	local s = getState(p)
+	local entry = { model = debris, t = os.clock(), owner = p }
+	table.insert(s.debris, entry)
+	table.insert(allDebris, entry)
+	while #s.debris > GameConfig.debris.maxPiecesPerPlayer do
+		local old = table.remove(s.debris, 1) :: any
+		if old.model.Parent then
+			old.model:Destroy()
+		end
+	end
+	trimDebris()
+	task.delay(GameConfig.debris.lifetime, function()
+		if debris.Parent and not debris:FindFirstChild("PilotSeat", true) then
+			debris:Destroy()
+		end
+	end)
+end
+
 local function detachComponent(p: Player, model: Model, compName: string, cfg: any)
 	local comp = model:FindFirstChild(compName)
 	if not comp or not comp:IsA("Model") then
@@ -298,6 +320,11 @@ local function detachComponent(p: Player, model: Model, compName: string, cfg: a
 	if not root then
 		return
 	end
+	-- Momentum: remember how the aircraft was moving so the piece keeps it.
+	local core = model.PrimaryPart
+	local v = if core then core.AssemblyLinearVelocity else Vector3.zero
+	local w = if core then core.AssemblyAngularVelocity else Vector3.zero
+	local origin = if core then core.Position else root.Position
 	local joint = root:FindFirstChild("Joint")
 	if joint then
 		joint:Destroy()
@@ -332,33 +359,24 @@ local function detachComponent(p: Player, model: Model, compName: string, cfg: a
 			d:SetAttribute("DebrisOwner", p.UserId)
 		end
 	end
+	debris.PrimaryPart = root
 	debris.Parent = debrisFolder
 	-- The pilot rides along if the cockpit section separates; otherwise debris is
 	-- simulated by the server so it can't be used to fling other players.
 	if not seat then
-		local anyPart = debris:FindFirstChildWhichIsA("BasePart", true)
-		if anyPart and not anyPart.Anchored then
+		if not root.Anchored then
 			pcall(function()
-				anyPart:SetNetworkOwner(nil)
+				root:SetNetworkOwner(nil)
 			end)
 		end
 	end
-	local s = getState(p)
-	local entry = { model = debris, t = os.clock(), owner = p }
-	table.insert(s.debris, entry)
-	table.insert(allDebris, entry)
-	while #s.debris > GameConfig.debris.maxPiecesPerPlayer do
-		local old = table.remove(s.debris, 1) :: any
-		if old.model.Parent then
-			old.model:Destroy()
-		end
+	if core and not root.Anchored then
+		local away = root.Position - origin
+		CrashService.inherit(root, v, w, origin, if away.Magnitude > 1e-3 then away.Unit else Vector3.zero, 1.5)
 	end
-	trimDebris()
-	task.delay(GameConfig.debris.lifetime, function()
-		if debris.Parent and not debris:FindFirstChild("PilotSeat", true) then
-			debris:Destroy()
-		end
-	end)
+	registerDebris(p, debris)
+	CrashService.track(p, debris, Crash.profiles(cfg)[compName])
+	CrashService.fx("shards", root.Position, 2, root.AssemblyLinearVelocity, p)
 end
 
 local function maxRecentSpeed(s: PlayerState, window: number): number
@@ -559,6 +577,17 @@ function AircraftService.init(remoteFolder: Folder)
 			destroyAircraft(p)
 		end)
 	end
+	CrashService.init({
+		remotes = remotes,
+		debrisFolder = debrisFolder,
+		getAircraft = function(p: Player): Model?
+			return getState(p).aircraft
+		end,
+		registerDebris = registerDebris,
+		maxRecentSpeed = function(p: Player, window: number): number
+			return maxRecentSpeed(getState(p), window)
+		end,
+	})
 	RunService.Heartbeat:Connect(monitor)
 end
 

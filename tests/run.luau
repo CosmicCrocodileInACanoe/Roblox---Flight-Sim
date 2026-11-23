@@ -51,6 +51,7 @@ local suites = {
 	require("./test_geometry"),
 	require("./test_builder"),
 	require("./test_minimap"),
+	require("./test_selection"),
 }
 
 for _, suite in suites do

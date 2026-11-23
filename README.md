@@ -74,7 +74,8 @@ Expected: `50 passed, 0 failed`. These tests do not start Roblox.
 | Z | Reverse thrust (hold, on the ground) |
 | X | Speedbrake |
 | [ / ] | Pitch trim (Simulation mode) |
-| T | Toggle Assisted / Simulation |
+| T | Cycle Easy (default) / Assisted / Simulation |
+| U | Show / hide the on-screen buttons (throttle lever, stick, gear, flaps, brakes...) |
 | C | Camera: chase / cockpit / tower |
 | Right mouse drag, wheel | Look around, camera distance |
 | H | Hide HUD |
@@ -95,7 +96,8 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Units, MathUtil         scale (1 stud = 0.28 m), ISA atmosphere, heading helpers
   Aero, Engine, Gear      lift/drag per panel, spool and lapse, raycast spring-dampers
   FlightModel             6-DOF forces and torques for one aircraft (the core of the game)
-  Assist                  Assisted mode: auto-trim, turn coordination, bank and stall protection
+  Assist                  Easy mode (self-levelling, pitch/bank limits, no stalls, speed floor, flare help,
+                          tougher airframe) and Assisted mode (auto-trim, turn coordination, protections)
   Damage                  component health, states, propagation, detachment
   Grading, Mission        landing score, gate-to-gate mission state machine
   Airports, WorldGen      airport layouts, deterministic terrain height field

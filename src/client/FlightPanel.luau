@@ -239,12 +239,13 @@ function FlightPanel.new(input: any, callbacks: { [string]: () -> () })
 	-------------------------------------------------------------------------------
 	-- Right: toggle buttons
 	local col = make("Frame", {
-		Parent = root, Name = "Buttons", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, -40),
-		Size = UDim2.fromOffset(176, 330), BackgroundColor3 = PANEL, BackgroundTransparency = 0.25,
+		-- bottom right, above the airframe panel and below the minimap
+		Parent = root, Name = "Buttons", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -190),
+		Size = UDim2.fromOffset(164, 236), BackgroundColor3 = PANEL, BackgroundTransparency = 0.25,
 	})
 	round(col, 10)
 	local grid = make("UIGridLayout", {
-		Parent = col, CellSize = UDim2.fromOffset(80, 46), CellPadding = UDim2.fromOffset(6, 6),
+		Parent = col, CellSize = UDim2.fromOffset(74, 40), CellPadding = UDim2.fromOffset(5, 5),
 		SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 	})
@@ -254,7 +255,7 @@ function FlightPanel.new(input: any, callbacks: { [string]: () -> () })
 		order += 1
 		local b = make("TextButton", {
 			Parent = col, Name = name, LayoutOrder = order, BackgroundColor3 = OFF, Text = text,
-			Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = WHITE, TextWrapped = true, AutoButtonColor = true,
+			Font = Enum.Font.GothamBold, TextSize = 12, TextColor3 = WHITE, TextWrapped = true, AutoButtonColor = true,
 		})
 		round(b, 8)
 		b.Activated:Connect(function()
@@ -272,11 +273,11 @@ function FlightPanel.new(input: any, callbacks: { [string]: () -> () })
 	order += 1
 	local brake = holdButton(col, "Brake", "BRAKES\n(hold)", "brake", UDim2.new(), UDim2.new())
 	brake.LayoutOrder = order
-	brake.TextSize = 13
+	brake.TextSize = 12
 	order += 1
 	local rev = holdButton(col, "Reverse", "REVERSE\n(hold)", "reverse", UDim2.new(), UDim2.new())
 	rev.LayoutOrder = order
-	rev.TextSize = 13
+	rev.TextSize = 12
 	pressButton("Assist", "EASY", "assist")
 	pressButton("Camera", "CAMERA", "camera")
 	return self

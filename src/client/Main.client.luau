@@ -20,6 +20,7 @@ local Menu = require(Client.Menu)
 local WorldFx = require(Client.WorldFx)
 local ControlsPopup = require(Client.ControlsPopup)
 local FlightPanel = require(Client.FlightPanel)
+local Minimap = require(Client.Minimap)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -29,6 +30,7 @@ local destination: string? = nil
 local hud = Hud.new()
 local camera = CameraController.new()
 local controlsPopup = ControlsPopup.new()
+local minimap = Minimap.new()
 
 local function command(name: string)
 	return function()
@@ -68,6 +70,9 @@ local input = InputController.new({
 			flightPanel:toggle()
 		end
 	end,
+	minimap = function()
+		minimap:toggle()
+	end,
 	engines = command("engines"),
 	assist = command("assist"),
 })
@@ -83,6 +88,7 @@ local function stopFlying()
 	camera:detach()
 	hud:setFlying(false)
 	flightPanel:setFlying(false)
+	minimap:setFlying(false)
 	menu.flying = false
 	menu:show()
 end
@@ -131,6 +137,7 @@ end
 	camera:attach(model, cfg)
 	hud:setFlying(true)
 	flightPanel:setFlying(true)
+	minimap:setFlying(true)
 	menu.flying = true
 	menu:hide()
 end)
@@ -204,6 +211,7 @@ RunService.Heartbeat:Connect(function(dt)
 	if fc then
 		hud:update(fc.telemetry, destination)
 		flightPanel:update(fc.telemetry)
+		minimap:update(fc.telemetry, destination, fc.model)
 	else
 		hud:update(nil, nil)
 	end

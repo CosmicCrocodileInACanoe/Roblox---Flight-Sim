@@ -79,7 +79,7 @@ Expected: `50 passed, 0 failed`. These tests do not start Roblox.
 | Right mouse drag, wheel | Look around, camera distance |
 | H | Hide HUD |
 | F3 | Debug panel |
-| M | Menu (aircraft, mode, spawn, weather, time, failures) |
+| M | Menu (aircraft, airport, mode, route, start point, weather, time, failures) |
 | R | Reset / respawn |
 
 A typical first flight: spawn at an HBR runway threshold, press I and wait for the engines,
@@ -98,6 +98,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Damage                  component health, states, propagation, detachment
   Grading, Mission        landing score, gate-to-gate mission state machine
   Airports, WorldGen      airport layouts, deterministic terrain height field
+  Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
   GameConfig, AircraftRegistry, Aircraft/Meridian200
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build
 src/client/               input, flight controller, cameras, HUD, menu, weather and effects

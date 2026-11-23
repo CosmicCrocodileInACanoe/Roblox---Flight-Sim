@@ -15,6 +15,8 @@ local Registry = require(Shared.AircraftRegistry)
 local Airports = require(Shared.Airports)
 local GameConfig = require(Shared.GameConfig)
 local Units = require(Shared.Units)
+local Assist = require(Shared.Assist)
+local Selection = require(Shared.Selection)
 local AircraftBuilder = require(script.Parent.AircraftBuilder)
 
 local AircraftService = {}
@@ -101,17 +103,29 @@ local function destroyAircraft(p: Player)
 end
 
 -- Options validation --------------------------------------------------------------
+-- The default aircraft if the request names none (or a locked/unknown one).
+local function defaultAircraftId(): string
+	local cfg = Registry.get("meridian200")
+	if cfg and cfg.unlocked then
+		return "meridian200"
+	end
+	return Selection.flyableAircraft(Registry)[1]
+end
+
 local function sanitizeOptions(raw: any): any?
 	if type(raw) ~= "table" then
 		return nil
 	end
-	local aircraftId = if type(raw.aircraftId) == "string" then raw.aircraftId else "meridian200"
-	local cfg = Registry.get(aircraftId)
-	if not cfg or not cfg.unlocked then
-		return nil
+	-- Any unlocked registry aircraft; anything else falls back to the default type.
+	local aircraftId = defaultAircraftId()
+	if type(raw.aircraftId) == "string" then
+		local c = Registry.get(raw.aircraftId)
+		if c and c.unlocked then
+			aircraftId = raw.aircraftId
+		end
 	end
-	local spawnId = if type(raw.spawnId) == "string" then raw.spawnId else "HBR-rwy09"
-	if not Airports.getSpawn(spawnId) then
+	local cfg = Registry.get(aircraftId)
+	if not cfg then
 		return nil
 	end
 	local mode = "free"
@@ -120,10 +134,29 @@ local function sanitizeOptions(raw: any): any?
 			mode = m.id
 		end
 	end
-	local assist = if raw.assist == "simulation" or raw.assist == "assisted" then raw.assist else "easy"
+	local assist = "easy"
+	for _, m in Assist.MODES do
+		if raw.assist == m then
+			assist = m
+		end
+	end
+	-- Departure airport: as asked, else the requested spawn's airport, else the first.
+	local requested = if type(raw.spawnId) == "string" then Airports.getSpawn(raw.spawnId) else nil
+	local airport = Airports.order[1]
+	if type(raw.airport) == "string" and Airports.list[raw.airport] then
+		airport = raw.airport
+	elseif requested and requested.kind ~= "air" and Airports.list[requested.airport] then
+		airport = requested.airport
+	end
 	local destination = nil
 	if type(raw.destination) == "string" and Airports.list[raw.destination] then
 		destination = raw.destination
+	end
+	-- The spawn must be one the menu offers for this airport, aircraft and mode (so a big
+	-- aircraft never gets a stand or runway it doesn't fit); otherwise the first runway.
+	local sp = Selection.resolveSpawn(raw.spawnId, airport, cfg, mode, destination)
+	if not sp then
+		return nil
 	end
 	local failures = {}
 	if mode == "sandbox" and type(raw.failures) == "table" then
@@ -135,7 +168,8 @@ local function sanitizeOptions(raw: any): any?
 	end
 	return {
 		aircraftId = aircraftId,
-		spawnId = spawnId,
+		airport = airport,
+		spawnId = sp.id,
 		mode = mode,
 		assist = assist,
 		destination = destination,
@@ -152,11 +186,25 @@ local function groundBelow(x: number, z: number, fromY: number): number?
 	return if r then r.Position.Y else nil
 end
 
-local function gateOccupied(x: number, z: number, except: Player): boolean
+-- Wingspan (metres) of a spawned aircraft model, for spacing checks.
+local function modelSpanM(model: Model): number
+	local id = model:GetAttribute("AircraftId")
+	local cfg = if type(id) == "string" then Registry.get(id) else nil
+	if not cfg then
+		return 40
+	end
+	return (Selection.dimensions(cfg))
+end
+
+-- Is another player's aircraft parked close enough to this spot that an aircraft with
+-- wingspan `spanM` would overlap it? The radius grows with both aircraft's size.
+local function spotOccupied(x: number, z: number, spanM: number, except: Player): boolean
 	for p, s in states do
 		if p ~= except and s.aircraft and s.aircraft.PrimaryPart then
 			local pos = s.aircraft.PrimaryPart.Position
-			if (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(x, 0, z)).Magnitude < 160 then
+			local needM = (spanM + modelSpanM(s.aircraft)) * 0.5 + 5
+			local radius = math.max(160, needM * Units.STUDS_PER_METER)
+			if (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(x, 0, z)).Magnitude < radius then
 				return true
 			end
 		end
@@ -164,19 +212,26 @@ local function gateOccupied(x: number, z: number, except: Player): boolean
 	return false
 end
 
--- Choose the spawn, moving to a free gate/runway slot when the requested one is taken.
-local function resolveSpawn(p: Player, spawnId: string): any
-	local sp = Airports.getSpawn(spawnId) :: any
-	if sp.kind == "gate" and gateOccupied(sp.x, sp.z, p) then
-		for _, alt in Airports.spawnPoints(sp.airport) do
-			if alt.kind == "gate" and not gateOccupied(alt.x, alt.z, p) then
-				return alt
-			end
-		end
-	elseif sp.kind == "runway" and gateOccupied(sp.x, sp.z, p) then
-		notify(p, "Runway start is occupied, spawning at a gate instead.")
-		for _, alt in Airports.spawnPoints(sp.airport) do
-			if alt.kind == "gate" and not gateOccupied(alt.x, alt.z, p) then
+-- Choose the spawn, moving to a free slot when the requested one is taken. A taken
+-- runway start tries the other runway end before falling back to a free gate; only
+-- spots that fit this aircraft (Selection.spawnList) are considered.
+local function resolveSpawn(p: Player, options: any, cfg: any): any
+	local sp = Airports.getSpawn(options.spawnId) :: any
+	if sp.kind ~= "gate" and sp.kind ~= "runway" then
+		return sp
+	end
+	local spanM = (Selection.dimensions(cfg))
+	if not spotOccupied(sp.x, sp.z, spanM, p) then
+		return sp
+	end
+	local list = Selection.spawnList(options.airport, cfg, options.mode, options.destination)
+	local order = if sp.kind == "runway" then { "runway", "gate" } else { "gate", "runway" }
+	for _, kind in order do
+		for _, alt in list do
+			if alt.kind == kind and alt.id ~= sp.id and not spotOccupied(alt.x, alt.z, spanM, p) then
+				if kind ~= sp.kind then
+					notify(p, if kind == "gate" then "Runways are busy, starting at a gate instead." else "Gates are full, starting on the runway instead.")
+				end
 				return alt
 			end
 		end
@@ -213,7 +268,7 @@ function AircraftService.spawn(p: Player, rawOptions: any)
 	destroyDebrisOf(p)
 
 	local cfg = Registry.get(options.aircraftId)
-	local sp = resolveSpawn(p, options.spawnId)
+	local sp = resolveSpawn(p, options, cfg)
 	local y = sp.y
 	if sp.kind == "gate" or sp.kind == "runway" then
 		local gy = groundBelow(sp.x, sp.z, sp.y)

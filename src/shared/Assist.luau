@@ -7,7 +7,7 @@
 --   coordinated turns (auto-rudder), bank-angle protection, soft stall protection,
 --   gentle wing levelling near wings-level, automatic ground spoilers.
 -- Easy (default, aimed at younger pilots): everything Assisted does, plus wings that
---   level themselves, a 35 deg bank limit, pitch limits, a speed floor that adds power
+--   level themselves, a 45 deg bank limit, pitch limits, a speed floor that adds power
 --   when the aircraft gets slow, overspeed protection and a gentle flare helper near
 --   the runway. Still only moves the pilot's own controls (surfaces and throttle).
 -- Simulation: inputs pass straight through; trim is manual.
@@ -79,10 +79,10 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 	local cosB = math.cos(bank)
 	local turnPitchRate = if abs(cosB) > 0.2 then (9.81 / tas) * math.sin(bank) * math.tan(bank) else 0
 	if airborne and easy then
-		-- Easy: the stick asks for a pitch rate (about 5 deg/s at full deflection) inside
-		-- a +15 / -10 deg attitude envelope; released, it steers back to level flight
+		-- Easy: the stick asks for a pitch rate (about 7 deg/s at full deflection) inside
+		-- a +20 / -14 deg attitude envelope; released, it steers back to level flight
 		-- (or a gentle landing glide with the gear and flaps down).
-		local qd = raw.pitch * (if raw.pitch > 0 then rad(5) else rad(4))
+		local qd = raw.pitch * (if raw.pitch > 0 then rad(7) else rad(6))
 		if abs(raw.pitch) < 0.05 then
 			local vs = env.vgx * env.ux + env.vgy * env.uy + env.vgz * env.uz
 			-- level flight, or a gentle glide when set up to land (gear down, flaps 3+)
@@ -90,11 +90,11 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 			local target = if not landing then 0 elseif env.agl < 8 then -1.0 else -3.0
 			qd = clamp((target - vs) * 0.006 - (if landing then 0 else (pitch - rad(2)) * 0.05), rad(-2.5), rad(2.5))
 		end
-		qd = math.min(qd, (rad(15) - pitch) * 0.6)
-		qd = math.max(qd, (rad(-10) - pitch) * 0.6)
+		qd = math.min(qd, (rad(20) - pitch) * 0.6)
+		qd = math.max(qd, (rad(-14) - pitch) * 0.6)
 		local err = env.wx - turnPitchRate - qd
 		st.autoTrim = clamp(st.autoTrim - clamp(err * 2.5, -0.35, 0.35) * dt, -1, 1)
-		out.pitch = clamp(raw.pitch * 0.2 - err * 3.0, -1, 1)
+		out.pitch = clamp(raw.pitch * 0.3 - err * 3.0, -1, 1)
 	elseif airborne and abs(raw.pitch) < 0.05 then
 		local err = env.wx - turnPitchRate
 		st.autoTrim = clamp(st.autoTrim - clamp(err * 2.5, -0.35, 0.35) * dt, -1, 1)
@@ -110,12 +110,12 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 		out.yaw = clamp(raw.yaw + r.beta * 4.0, -1, 1)
 
 		-- Bank protection: spring back to 33 deg when released, hard stop at 60 deg.
-		-- Easy: level the wings whenever the stick is released, and stop at 35 deg.
+		-- Easy: level the wings whenever the stick is released, and stop at 45 deg.
 		local absBank = abs(bank)
-		local bankLimit = if easy then rad(35) else rad(60)
+		local bankLimit = if easy then rad(45) else rad(60)
 		if abs(raw.roll) < 0.05 then
 			if easy then
-				out.roll = clamp(-bank * 2.2 + env.wz * 1.2, -0.8, 0.8)
+				out.roll = clamp(-bank * 1.7 + env.wz * 1.0, -0.65, 0.65)
 			elseif absBank > rad(33) then
 				out.roll = clamp(-math.sign(bank) * (absBank - rad(33)) * 2.5, -0.6, 0.6)
 			elseif absBank < rad(8) then

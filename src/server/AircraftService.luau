@@ -30,6 +30,7 @@ local onTelemetry: ((Player, any, any) -> ())? = nil
 local onSpawned: ((Player, any, any) -> ())? = nil
 
 type PlayerState = {
+	pendingSpawn: any?,
 	aircraft: Model?,
 	options: any?,
 	lastSpawn: number,
@@ -251,7 +252,23 @@ function AircraftService.spawn(p: Player, rawOptions: any)
 		return
 	end
 	if ReplicatedStorage:GetAttribute("WorldReady") ~= true then
-		notify(p, "The world is still being built, try again in a moment.")
+		-- hold the latest request and serve it as soon as the world is ready
+		local first = s.pendingSpawn == nil
+		s.pendingSpawn = rawOptions
+		notify(p, "The world is still being built. Your flight starts as soon as it is ready...")
+		if first then
+			task.spawn(function()
+				while ReplicatedStorage:GetAttribute("WorldReady") ~= true do
+					ReplicatedStorage:GetAttributeChangedSignal("WorldReady"):Wait()
+				end
+				local o = s.pendingSpawn
+				s.pendingSpawn = nil
+				if o ~= nil and p.Parent then
+					s.lastSpawn = -math.huge
+					AircraftService.spawn(p, o)
+				end
+			end)
+		end
 		return
 	end
 	local options = sanitizeOptions(rawOptions)
@@ -622,7 +639,13 @@ function AircraftService.init(remoteFolder: Folder)
 	debrisFolder.Name = "Debris"
 	debrisFolder.Parent = Workspace
 
-	;(remotes:FindFirstChild("RequestSpawn") :: RemoteEvent).OnServerEvent:Connect(AircraftService.spawn)
+	;(remotes:FindFirstChild("RequestSpawn") :: RemoteEvent).OnServerEvent:Connect(function(p: Player, raw: any)
+		local ok, err = xpcall(AircraftService.spawn, debug.traceback, p, raw)
+		if not ok then
+			warn("[Spawn] failed for " .. p.Name .. ": " .. tostring(err))
+			notify(p, "Could not create the aircraft (see Output, F9): " .. tostring(err):split("\n")[1])
+		end
+	end)
 	;(remotes:FindFirstChild("RequestReset") :: RemoteEvent).OnServerEvent:Connect(AircraftService.reset)
 	;(remotes:FindFirstChild("ControllerReady") :: RemoteEvent).OnServerEvent:Connect(onControllerReady)
 	;(remotes:FindFirstChild("ReportDamage") :: RemoteEvent).OnServerEvent:Connect(onReportDamage)

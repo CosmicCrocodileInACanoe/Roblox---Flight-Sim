@@ -97,11 +97,34 @@ local function stopFlying()
 	menu:show()
 end
 
+-- Ask the server for an aircraft. While the world is still being built the request is
+-- held and sent automatically when it is ready; if nothing comes back, say so.
+local pendingOptions: any = nil
+local requestId = 0
+local function sendRequest(options: any)
+	requestId += 1
+	local id = requestId
+	destination = options.destination
+	menu:setStatus("Requesting aircraft...")
+	;(remotes:WaitForChild("RequestSpawn") :: RemoteEvent):FireServer(options)
+	task.delay(10, function()
+		if id == requestId and not fc and menu:isOpen() then
+			menu:setStatus("No answer from the server yet. Press Fly again in a moment.")
+		end
+	end)
+end
+local function requestFlight(options: any)
+	if ReplicatedStorage:GetAttribute("WorldReady") ~= true then
+		pendingOptions = options
+		menu:setStatus("The world is still being built. Your flight starts as soon as it is ready...")
+		return
+	end
+	sendRequest(options)
+end
+
 menu = Menu.new({
 	onFly = function(options: any)
-		destination = options.destination
-		menu:setStatus("Requesting aircraft...")
-		;(remotes:WaitForChild("RequestSpawn") :: RemoteEvent):FireServer(options)
+		requestFlight(options)
 	end,
 	onWeather = function(w: any)
 		WorldFx.setWeather(w)
@@ -118,13 +141,7 @@ menu = Menu.new({
 WorldFx.setWeather(GameConfig.weather[1])
 WorldFx.setTime(GameConfig.timeOfDay[2])
 
-if ReplicatedStorage:GetAttribute("WorldReady") ~= true then
-	menu:setStatus("Building the world (first load takes a few seconds)...")
-	ReplicatedStorage:GetAttributeChangedSignal("WorldReady"):Wait()
-	menu:refresh()
-end
-
-;(remotes:WaitForChild("AircraftAssigned") :: RemoteEvent).OnClientEvent:Connect(function(model: Model, options: any, sp: any)
+local function onAssigned(model: Model, options: any, sp: any)
 	if fc then
 		fc:destroy()
 		fc = nil
@@ -146,6 +163,14 @@ end
 	minimap:setFlying(true)
 	menu.flying = true
 	menu:hide()
+end
+;(remotes:WaitForChild("AircraftAssigned") :: RemoteEvent).OnClientEvent:Connect(function(model: Model, options: any, sp: any)
+	requestId += 1 -- answered
+	local ok, err = xpcall(onAssigned, debug.traceback, model, options, sp)
+	if not ok then
+		warn("[Flight] could not start the flight: " .. tostring(err))
+		menu:setStatus("Could not start the flight (see Output, F9): " .. tostring(err):split("\n")[1])
+	end
 end)
 
 ;(remotes:WaitForChild("MissionUpdate") :: RemoteEvent).OnClientEvent:Connect(function(data: any)
@@ -171,6 +196,7 @@ end)
 	Effects.crashFx(kind, pos, intensity, vel)
 end)
 ;(remotes:WaitForChild("Notify") :: RemoteEvent).OnClientEvent:Connect(function(text: string)
+	requestId += 1 -- answered
 	hud:notify(text)
 	if menu:isOpen() then
 		menu:setStatus(text)
@@ -238,3 +264,30 @@ RunService.Heartbeat:Connect(function(dt)
 		hud:update(nil, nil)
 	end
 end)
+
+-- Wait for the world last, so every handler above is already connected (a message the
+-- server sends while the world builds is never lost).
+if ReplicatedStorage:GetAttribute("WorldReady") ~= true then
+	local function showStage()
+		if pendingOptions == nil then
+			local stage = ReplicatedStorage:GetAttribute("WorldStage")
+			menu:setStatus("Building the world" .. (if type(stage) == "string" then ": " .. stage else "") .. " (first load takes a little while)...")
+		end
+	end
+	showStage()
+	local stageConn = ReplicatedStorage:GetAttributeChangedSignal("WorldStage"):Connect(showStage)
+	task.spawn(function()
+		while ReplicatedStorage:GetAttribute("WorldReady") ~= true do
+			ReplicatedStorage:GetAttributeChangedSignal("WorldReady"):Wait()
+		end
+		stageConn:Disconnect()
+		menu:refresh()
+		if pendingOptions then
+			local o = pendingOptions
+			pendingOptions = nil
+			sendRequest(o)
+		else
+			menu:setStatus("Ready. Press Fly!")
+		end
+	end)
+end

@@ -102,16 +102,19 @@ world.Name = "World"
 world.Parent = Workspace
 
 local t0 = os.clock()
+ReplicatedStorage:SetAttribute("WorldStage", "terrain")
 local terrainParts = TerrainBuilder.build(world)
 local airports = Instance.new("Folder")
 airports.Name = "Airports"
 airports.Parent = world
+ReplicatedStorage:SetAttribute("WorldStage", "airports")
 for _, id in Airports.order do
 	AirportBuilder.build(id, airports)
 end
 local scenery = Instance.new("Folder")
 scenery.Name = "Scenery"
 scenery.Parent = world
+ReplicatedStorage:SetAttribute("WorldStage", "cities")
 local sceneryParts, detailParts, detailTiles = CityBuilder.build(scenery, world)
 
 local total = 0

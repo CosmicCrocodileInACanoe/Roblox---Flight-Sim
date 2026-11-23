@@ -783,17 +783,91 @@ local function buildGear(ctx: Ctx)
 end
 
 local function buildCockpit(ctx: Ctx)
-	-- Minimal interior seen only from the cockpit camera.
+	-- Flight deck interior, shown only from the cockpit camera (the outer nose shell is
+	-- hidden then). Walls leave side windows, so the wings and engines stay in view.
 	local g = ctx.cfg.geometry
+	local fz = g.fuselage
 	local eye = v3(ctx.cfg.cameras.cockpit)
-	local dark = Color3.fromRGB(38, 40, 46)
-	local z = eye.Z - 1.15
-	add(ctx, "ForwardFuselage", "Glareshield", "block", Vector3.new(2.4, 0.18, 0.7), CFrame.new(0.55, eye.Y - 0.35, z), dark, { tag = "CockpitOnly", transparency = 1 })
-	add(ctx, "ForwardFuselage", "Panel", "block", Vector3.new(2.4, 0.8, 0.1), CFrame.new(0.55, eye.Y - 0.8, z + 0.25) * CFrame.Angles(math.rad(-15), 0, 0), Color3.fromRGB(28, 30, 34), { tag = "CockpitOnly", transparency = 1 })
-	for _, x in { -1.2, 0.55, 2.3 } do
-		add(ctx, "ForwardFuselage", "Post", "block", Vector3.new(0.09, 0.9, 0.09), CFrame.new(x, eye.Y + 0.05, z - 0.1) * CFrame.Angles(math.rad(-30), 0, 0), dark, { tag = "CockpitOnly", transparency = 1 })
+	local wall = Color3.fromRGB(196, 198, 202)
+	local dark = Color3.fromRGB(44, 46, 52)
+	local black = Color3.fromRGB(22, 23, 26)
+	local o = { tag = "CockpitOnly", transparency = 1 }
+	-- inner half-width at the eye station (narrower towards the nose; jumbo hump if any)
+	local noseLen = fz.cabinStartZ - fz.noseZ
+	local t = math.clamp((fz.cabinStartZ - eye.Z) / noseLen, 0, 0.95)
+	local outer = if fz.hump then (fz.hump.halfWidth or fz.radius * 0.8) else fz.radius
+	local hw = math.clamp(outer * math.sqrt(1 - t * t) * 0.9, 1.1, 2.4)
+	local front, back = eye.Z - 1.25, eye.Z + 1.9
+	local floorY, sill, winTop, roofY = eye.Y - 1.3, eye.Y - 0.22, eye.Y + 0.42, eye.Y + 0.7
+	local len = back - front
+	local zc = (front + back) / 2
+	add(ctx, "ForwardFuselage", "DeckFloor", "block", Vector3.new(hw * 2, 0.08, len), CFrame.new(0, floorY, zc), dark, o)
+	add(ctx, "ForwardFuselage", "DeckRoof", "block", Vector3.new(hw * 2, 0.08, len), CFrame.new(0, roofY, zc), wall, o)
+	add(ctx, "ForwardFuselage", "Overhead", "block", Vector3.new(hw * 1.1, 0.16, 1.2), CFrame.new(0, roofY - 0.1, eye.Z - 0.4) * CFrame.Angles(math.rad(-12), 0, 0), dark, o)
+	add(ctx, "ForwardFuselage", "Bulkhead", "block", Vector3.new(hw * 2, roofY - floorY, 0.08), CFrame.new(0, (roofY + floorY) / 2, back), wall, o)
+	add(ctx, "ForwardFuselage", "Door", "block", Vector3.new(0.7, 1.7, 0.1), CFrame.new(0, floorY + 0.9, back - 0.03), Color3.fromRGB(150, 152, 158), o)
+	for _, sx in { -1, 1 } do
+		local x = sx * hw
+		-- side wall below and above the side windows, and a window post
+		add(ctx, "ForwardFuselage", "SideWall", "block", Vector3.new(0.08, sill - floorY, len), CFrame.new(x, (sill + floorY) / 2, zc), wall, o)
+		add(ctx, "ForwardFuselage", "SideWall", "block", Vector3.new(0.08, roofY - winTop, len), CFrame.new(x, (roofY + winTop) / 2, zc), wall, o)
+		add(ctx, "ForwardFuselage", "SidePost", "block", Vector3.new(0.1, winTop - sill, 0.14), CFrame.new(x, (winTop + sill) / 2, eye.Z + 0.35), dark, o)
+		add(ctx, "ForwardFuselage", "SideWall", "block", Vector3.new(0.08, winTop - sill, back - eye.Z - 1.05), CFrame.new(x, (winTop + sill) / 2, (back + eye.Z + 1.05) / 2), wall, o)
+		-- windscreen corner post
+		add(ctx, "ForwardFuselage", "Post", "block", Vector3.new(0.12, 0.85, 0.12), CFrame.new(sx * hw * 0.78, eye.Y + 0.1, front + 0.05) * CFrame.Angles(math.rad(-28), 0, 0), black, o)
+		-- seats (the camera sits in the left one)
+		local seatX = sx * math.abs(eye.X)
+		add(ctx, "ForwardFuselage", "SeatBack", "block", Vector3.new(0.55, 0.9, 0.14), CFrame.new(seatX, floorY + 0.95, eye.Z + 0.45), black, o)
+		add(ctx, "ForwardFuselage", "SeatPan", "block", Vector3.new(0.55, 0.12, 0.55), CFrame.new(seatX, floorY + 0.5, eye.Z + 0.15), black, o)
+		-- control yoke in front of each seat
+		local yz = front + 0.75
+		add(ctx, "ForwardFuselage", "YokeColumn", "block", Vector3.new(0.08, 0.6, 0.08), CFrame.new(seatX, eye.Y - 0.85, yz), dark, o)
+		add(ctx, "ForwardFuselage", "Yoke", "block", Vector3.new(0.36, 0.06, 0.06), CFrame.new(seatX, eye.Y - 0.52, yz - 0.03), black, o)
+		for _, hx in { -1, 1 } do
+			add(ctx, "ForwardFuselage", "Yoke", "block", Vector3.new(0.06, 0.16, 0.06), CFrame.new(seatX + hx * 0.18, eye.Y - 0.45, yz - 0.03), black, o)
+		end
 	end
-	add(ctx, "ForwardFuselage", "Roof", "block", Vector3.new(3.4, 0.08, 1.4), CFrame.new(0.55, eye.Y + 0.55, z + 0.4), dark, { tag = "CockpitOnly", transparency = 1 })
+	add(ctx, "ForwardFuselage", "Post", "block", Vector3.new(0.1, 0.85, 0.1), CFrame.new(0, eye.Y + 0.1, front - 0.05) * CFrame.Angles(math.rad(-28), 0, 0), black, o)
+	add(ctx, "ForwardFuselage", "WindscreenFrame", "block", Vector3.new(hw * 1.7, 0.12, 0.12), CFrame.new(0, winTop + 0.05, front + 0.2), black, o)
+	-- glareshield and instrument panel with screens
+	add(ctx, "ForwardFuselage", "Glareshield", "block", Vector3.new(hw * 1.7, 0.14, 0.45), CFrame.new(0, eye.Y - 0.3, front + 0.25), black, o)
+	local panel = add(ctx, "ForwardFuselage", "Panel", "block", Vector3.new(hw * 1.7, 0.75, 0.08), CFrame.new(0, eye.Y - 0.72, front + 0.42) * CFrame.Angles(math.rad(-12), 0, 0), dark, o)
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Back -- faces the pilots (+z)
+	sg.PixelsPerUnit = 40
+	sg.LightInfluence = 0
+	sg.Parent = panel
+	local nScreens = 4
+	for i = 1, nScreens do
+		local f = Instance.new("Frame")
+		f.AnchorPoint = Vector2.new(0.5, 0.5)
+		f.Position = UDim2.fromScale((i - 0.5) / nScreens, 0.45)
+		f.Size = UDim2.fromScale(0.8 / nScreens, 0.7)
+		f.BackgroundColor3 = Color3.fromRGB(8, 10, 14)
+		f.BorderSizePixel = 0
+		f.Parent = sg
+		local top = Instance.new("Frame")
+		top.Size = UDim2.fromScale(1, if i % 2 == 1 then 0.5 else 0.3)
+		top.BackgroundColor3 = if i % 2 == 1 then Color3.fromRGB(40, 110, 200) else Color3.fromRGB(20, 60, 40)
+		top.BorderSizePixel = 0
+		top.Parent = f
+		if i % 2 == 1 then
+			local ground = Instance.new("Frame")
+			ground.Position = UDim2.fromScale(0, 0.5)
+			ground.Size = UDim2.fromScale(1, 0.5)
+			ground.BackgroundColor3 = Color3.fromRGB(130, 85, 45)
+			ground.BorderSizePixel = 0
+			ground.Parent = f
+		end
+	end
+	-- centre pedestal with one thrust lever per engine
+	add(ctx, "ForwardFuselage", "Pedestal", "block", Vector3.new(0.5, eye.Y - 0.85 - floorY, 1.1), CFrame.new(0, (eye.Y - 0.85 + floorY) / 2, front + 1.05), dark, o)
+	local n = #ctx.cfg.engines
+	for i = 1, n do
+		local x = (i - (n + 1) / 2) * 0.09
+		add(ctx, "ForwardFuselage", "ThrustLever", "block", Vector3.new(0.04, 0.22, 0.04), CFrame.new(x, eye.Y - 0.74, front + 0.8), Color3.fromRGB(220, 220, 225), o)
+	end
+
 	-- pilot seat
 	local seat = Instance.new("Seat")
 	seat.Name = "PilotSeat"

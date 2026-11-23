@@ -98,6 +98,9 @@ local function destroyAircraft(p: Player)
 		s.aircraft:Destroy()
 		s.aircraft = nil
 	end
+	if p.Parent then
+		p.ReplicationFocus = nil
+	end
 	s.samples = {}
 	s.systems = {}
 end
@@ -301,6 +304,8 @@ function AircraftService.spawn(p: Player, rawOptions: any)
 		hrp.CFrame = seat.CFrame + Vector3.new(0, 3, 0)
 	end
 	seat:Sit(humanoid)
+	-- stream the world around the aircraft, not wherever the character started
+	p.ReplicationFocus = model.PrimaryPart
 
 	;(remotes:FindFirstChild("AircraftAssigned") :: RemoteEvent):FireClient(p, model, options, sp)
 	if onSpawned then

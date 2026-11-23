@@ -70,7 +70,7 @@ def mesh(part):
     W = V @ R.T + p
     return W, F, col
 
-def render(parts, view, out, W=1100, H=700, title=None):
+def render(parts, view, out, W=1100, H=700, title=None, vfov=None):
     eye, target = np.array(view[0], float), np.array(view[1], float)
     fwd = target - eye; fwd /= np.linalg.norm(fwd)
     right = np.cross(fwd, [0,1,0]); right /= np.linalg.norm(right)
@@ -88,7 +88,7 @@ def render(parts, view, out, W=1100, H=700, title=None):
     if ortho:
         sx = cx / ortho * (W/2) + W/2; sy = -cy / ortho * (W/2) + H/2
     else:
-        f = (W/2) / math.tan(math.radians(25))
+        f = (W/2) / math.tan(math.radians(25)) if not vfov else (H/2) / math.tan(math.radians(vfov/2))
         cz = np.maximum(cz, 0.1)
         sx = cx / cz * f + W/2; sy = -cy / cz * f + H/2
     n = np.cross(tris[:,1]-tris[:,0], tris[:,2]-tris[:,0])
@@ -127,3 +127,15 @@ if __name__ == "__main__":
         render(ps, ([-d*0.8, d*0.2, d*0.9], [0, 0, 0]), f"{outdir}/{ac}_rear.png")
         render(ps, ([0, d*3, 0.001], [0, 0, 0], ext*1.1), f"{outdir}/{ac}_top.png")
         render(ps, ([d*3, 0, 0], [0, 0, 0], ext*1.1), f"{outdir}/{ac}_side.png")
+
+def render_cockpit(parts, eye, out, look=(0, -0.08, -1)):
+    """Perspective view from the pilot's eye; drops triangles that cross the near plane."""
+    global render
+    e = np.array(eye, float); t = e + np.array(look, float) * 10
+    keep = []
+    fwd = (t - e) / np.linalg.norm(t - e)
+    for part in parts:
+        Wv, F, col = mesh(part)
+        if ((Wv - e) @ fwd).min() > 0.05 * 3.57:
+            keep.append(part)
+    render(keep, (e, t), out, vfov=75)

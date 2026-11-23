@@ -51,9 +51,17 @@ function CameraController.new()
 	return self
 end
 
+-- Radius (metres) of a sphere around the CoM that holds the whole aircraft.
+local function aircraftRadius(cfg: any): number
+	local f = cfg.geometry and cfg.geometry.fuselage
+	local half = if f then math.max(-f.noseZ, f.tailEndZ) else 20
+	return math.max(cfg.aero.wingSpan / 2, half)
+end
+
 function CameraController:attach(model: Model, cfg: any)
 	self.model = model
 	self.cfg = cfg
+	self.radius = aircraftRadius(cfg)
 	self.camCF = nil
 	self.yaw = 0
 	self.pitch = math.rad(-8)
@@ -189,7 +197,7 @@ function CameraController:update(dt: number)
 		local pos = cf:PointToWorldSpace(Vector3.new(eye[1], eye[2], eye[3]) * SPM)
 		local look = CFrame.Angles(0, self.yaw, 0) * CFrame.Angles(self.pitch, 0, 0)
 		cam.CFrame = CFrame.new(pos) * cf.Rotation * look * shakeCF
-		cam.FieldOfView = 72
+		cam.FieldOfView = 75
 	elseif self.mode == "tower" and self.towerPos then
 		local target = cf.Position
 		cam.CFrame = CFrame.lookAt(self.towerPos, target) * shakeCF
@@ -209,10 +217,24 @@ function CameraController:update(dt: number)
 		local lagged = if self.camCF then (self.camCF :: CFrame):Lerp(basis, alpha) else basis
 		self.camCF = lagged
 		local orbit = lagged * CFrame.Angles(0, self.yaw, 0) * CFrame.Angles(self.pitch, 0, 0)
-		local dist = self.cfg.cameras.chaseDistance * SPM * self.zoom
+		-- never closer than the aircraft's own size, or the camera ends up inside the
+		-- fuselage or a wing and the aircraft seems to vanish (faces are one-sided)
+		local minDist = (self.radius * 1.3 + 6) * SPM
+		local dist = math.max(self.cfg.cameras.chaseDistance * SPM * self.zoom, minDist)
 		local height = self.cfg.cameras.chaseHeight * SPM * math.sqrt(self.zoom)
 		local target = cf.Position + Vector3.new(0, height * 0.35, 0)
 		local camPos = target + orbit:VectorToWorldSpace(Vector3.new(0, height * 0.5, dist))
+		-- keep the camera above the ground and water (looking up from below the runway
+		-- would hide everything)
+		self.rayParams = self.rayParams or RaycastParams.new()
+		local params = self.rayParams :: RaycastParams
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { model, Players.LocalPlayer.Character :: any }
+		params.IgnoreWater = false
+		local hit = Workspace:Raycast(camPos + Vector3.new(0, 400, 0), Vector3.new(0, -800, 0), params)
+		if hit and camPos.Y < hit.Position.Y + 3 * SPM then
+			camPos = Vector3.new(camPos.X, hit.Position.Y + 3 * SPM, camPos.Z)
+		end
 		cam.CFrame = CFrame.lookAt(camPos, target + lagged.LookVector * 20) * shakeCF
 		cam.FieldOfView = 70
 	end

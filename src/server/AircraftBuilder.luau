@@ -1160,8 +1160,10 @@ local function buildTurboprop(ctx: Ctx, comp: string, index: number, p: Vector3,
 	local le, chord, th = wingAt(w, p.X)
 	local wingBot = le.Y - th / 2
 	local top = p.Y + R * 0.9
-	local hgt = math.max(0.2, wingBot - top + 0.15)
-	add(ctx, comp, "Pylon", "block", Vector3.new(R * 1.5, hgt, chord * 0.9), CFrame.new(p.X, top + hgt / 2 - 0.05, le.Z + chord * 0.45), nac, { hull = true })
+	if wingBot > top - 0.1 then
+		local hgt = math.max(0.2, wingBot - top + 0.15)
+		add(ctx, comp, "Pylon", "block", Vector3.new(R * 1.5, hgt, chord * 0.9), CFrame.new(p.X, top + hgt / 2 - 0.05, le.Z + chord * 0.45), nac, { hull = true })
+	end
 end
 
 -- Piston engine in the nose: spinner and propeller ahead of the fuselage cowling, two

@@ -15,6 +15,7 @@ Registry.types = {
 	sprite = req("Sprite"),
 	bumble = req("Bumble"),
 	puffin = req("Puffin"),
+	breezetwin = req("BreezeTwin"),
 	ridgehopper = req("Ridgehopper"),
 	silverline8 = req("Silverline8"),
 	vectorx1 = req("VectorX1"),
@@ -27,7 +28,7 @@ Registry.types = {
 }
 
 -- Smallest to largest; the menu shows them in this order.
-Registry.order = { "bumble", "meadowlark4", "sprite", "ridgehopper", "puffin", "silverline8", "swiftletj3", "vectorx1", "nightjart2", "kestrel72", "meridian200", "atlas400", "celestia800" }
+Registry.order = { "bumble", "meadowlark4", "sprite", "ridgehopper", "puffin", "breezetwin", "silverline8", "swiftletj3", "vectorx1", "nightjart2", "kestrel72", "meridian200", "atlas400", "celestia800" }
 
 Registry.planned = {
 	{ id = "regionaljet", label = "Regional twinjet", milestone = 3 },

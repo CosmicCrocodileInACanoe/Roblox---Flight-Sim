@@ -95,7 +95,7 @@ Store audio asset ID there (just the number) and it plays. Empty slots stay sile
 error. What each slot does:
 
 - Engines: `jetWhine` (pitch and volume follow N1) and `jetRumble` (follows thrust and
-  reverse). A turboprop would use `propDrone` and `propRumble` instead (`AudioConfig.aircraftProfile`).
+  reverse). The Kestrel 72 turboprop uses `propDrone` and `propRumble` instead (`AudioConfig.aircraftProfile`).
   `engineStart` plays once when you start the engines.
 - `wind` grows with airspeed, louder with gear down or speedbrake out; `runwayRoll` rumbles
   with ground speed while the wheels are down.

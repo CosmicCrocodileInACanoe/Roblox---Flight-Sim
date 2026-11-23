@@ -73,6 +73,16 @@ These are the most likely places for first-run bugs, so check them first.
 12. **End to end.** Join, pick the aircraft and Airline mode from HBR to RDV, spawn, taxi,
     take off, fly, land, park at a gate, see the results screen, then pick the next flight
     from the menu.
+13. **Minimap.** While flying, a round map sits top right under the Controls button and does
+    not cover any HUD panel. Check: sea is blue and the coastline matches what you see out of
+    the window; both cities are named; each airport shows a runway strip lined up with the
+    real runway; your yellow plane points the way you fly; - and + zoom; the middle button
+    switches "North up" / "Plane up" (in Plane up, whatever is ahead is at the top and the
+    city names stay upright); N hides and shows the map. In Airline mode the destination has a
+    gold ring and "Fly here!" tag, and a gold arrow sits on the rim when it is off the map. With
+    two players, each sees the other as a blue plane with their name. Note whether the Output
+    shows "[Minimap] could not draw the base map", and whether the map looks smooth
+    (EditableImage) or blocky (Frame fallback).
 
 ## C. Report back
 

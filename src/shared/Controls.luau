@@ -43,6 +43,7 @@ Controls.KEYMAP = {
 	{ action = "camera", kind = "press", group = "Camera and game", label = "Camera: chase / cockpit / tower", keys = { "C", "ButtonSelect" } },
 	{ action = "assist", kind = "press", group = "Camera and game", label = "Assisted / Simulation mode", keys = { "T" } },
 	{ action = "controls", kind = "press", group = "Camera and game", label = "Show / hide this controls list", keys = { "K" } },
+	{ action = "minimap", kind = "press", group = "Camera and game", label = "Show / hide the map", keys = { "N" } },
 	{ action = "hud", kind = "press", group = "Camera and game", label = "Hide / show HUD", keys = { "H" } },
 	{ action = "debug", kind = "press", group = "Camera and game", label = "Debug panel", keys = { "F3" } },
 	{ action = "menu", kind = "press", group = "Camera and game", label = "Menu", keys = { "M", "ButtonStart" } },

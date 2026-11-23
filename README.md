@@ -78,6 +78,7 @@ Expected: `50 passed, 0 failed`. These tests do not start Roblox.
 | C | Camera: chase / cockpit / tower |
 | Right mouse drag, wheel | Look around, camera distance |
 | H | Hide HUD |
+| N | Show / hide the minimap |
 | F3 | Debug panel |
 | M | Menu (aircraft, mode, spawn, weather, time, failures) |
 | R | Reset / respawn |

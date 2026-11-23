@@ -19,6 +19,7 @@ local Hud = require(Client.Hud)
 local Menu = require(Client.Menu)
 local WorldFx = require(Client.WorldFx)
 local Effects = require(Client.Effects)
+local MeshSkins = require(Client.MeshSkins)
 local ControlsPopup = require(Client.ControlsPopup)
 local FlightPanel = require(Client.FlightPanel)
 local Minimap = require(Client.Minimap)
@@ -181,6 +182,20 @@ end)
 end)
 ;(remotes:WaitForChild("LandingResult") :: RemoteEvent).OnClientEvent:Connect(function(result: any)
 	hud:showLanding(result)
+end)
+;(remotes:WaitForChild("DentFx") :: RemoteEvent).OnClientEvent:Connect(function(model: any, comp: any, point: any, dir: any, depth: any)
+	if typeof(model) ~= "Instance" or not model:IsA("Model") or type(comp) ~= "string" then
+		return
+	end
+	if typeof(point) ~= "Vector3" or typeof(dir) ~= "Vector3" or type(depth) ~= "number" or depth ~= depth or depth <= 0 then
+		return
+	end
+	local cam = workspace.CurrentCamera
+	local core = (model :: Model).PrimaryPart
+	if not core or (cam and (cam.CFrame.Position - core.Position).Magnitude > 1500) then
+		return -- too far away to see a dent
+	end
+	MeshSkins.onDent(model :: Model, comp, point, dir, math.min(depth, 2))
 end)
 ;(remotes:WaitForChild("CrashFx") :: RemoteEvent).OnClientEvent:Connect(function(kind: any, pos: any, intensity: any, vel: any)
 	if type(kind) ~= "string" or typeof(pos) ~= "Vector3" or type(intensity) ~= "number" or intensity ~= intensity then

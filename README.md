@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 182 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 195 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and 13 offline 6-DOF flights through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `182 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `195 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -156,6 +156,28 @@ LeftWing = { ..., crash = { sections = false } }, -- no break point
 ```
 
 Tunables shared by all aircraft are in `GameConfig.crash`.
+
+### Bending metal (soft-body look)
+
+Two more layers on top, in `src/shared/SoftBody.luau`:
+
+- **Beam bending** (server, everyone sees it). Wings, tailplanes, the fin and the nose and tail
+  sections bend like a beam at a hinge just inboard of the hit. The angle builds up over a bend
+  zone, so the structure curves instead of snapping. A hit along the beam, like a nose-first
+  crash, crushes it like an accordion. Bending adds up to a cap per component, and easy mode
+  needs harder hits. This works in every game with no special settings. Override it per
+  component with `crash = { bend = { maxBendDeg = 10 } }`, or turn it off with
+  `crash = { bend = false }`.
+- **Mesh skins** (each client, uses EditableMesh). A dented part is swapped, on screen only,
+  for a subdivided mesh of the same shape (box, wedge, cylinder or ellipsoid, 150 vertices).
+  Vertices near the hit are pushed in, so panels bow and crease. EditableMesh doesn't
+  replicate, so the server broadcasts each dent (`DentFx`) and every client deforms its own
+  copy. Collisions still use the original parts. At most 6 skins live per client, and the
+  oldest goes back to a plain part when a new one is needed.
+  **Turn this on** in Studio under Game Settings > Security > "Allow Mesh / Image APIs". For
+  the published game, use Creator Dashboard > Configure > Settings > "Enable Mesh / Image
+  APIs". With it off, skins switch themselves off after one warning in the output, and part
+  dents and bending carry on.
 
 ## Known limits of this milestone
 

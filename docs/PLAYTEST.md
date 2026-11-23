@@ -61,6 +61,16 @@ These are the most likely places for first-run bugs, so check them first.
      the aircraft breaks up.
    - With a damaged wing (sandbox failure "Left wing damaged"): the aircraft still flies but
      needs right aileron.
+   - **Bending.** Hit a wingtip hard on a hangar or the ground: the outer wing visibly bends up
+     or down and stays bent. A second hit on the same wing bends it further, up to about 28°.
+     A nose-first hit into a building shortens the nose (crush) rather than bending it.
+     The ailerons should follow the bent wing; if they float in place, report it.
+   - **Mesh dents (needs "Allow Mesh / Image APIs").** After a hard hit, look closely at the
+     panel that got hit: it should bow inward around the impact rather than move as one
+     block. Output must not show `[MeshSkins] off`. If it does, the API setting is off or
+     EditableMesh failed; paste the message. Check a second player sees the dent too.
+     If faces look inside-out (see-through from outside), report it: the triangle winding
+     needs flipping.
    - **Crash feel.** Clip a wingtip on the ground at about 70 kt: sparks, a few shards, and the
      outer wing tears off while the inner wing stays on. The aircraft rolls toward that side.
    - Belly-scrape a building corner: the panels near the contact visibly dent inward and

@@ -15,6 +15,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Crash = require(Shared.Crash)
+local SoftBody = require(Shared.SoftBody)
 local Damage = require(Shared.Damage)
 local GameConfig = require(Shared.GameConfig)
 local Registry = require(Shared.AircraftRegistry)
@@ -147,6 +148,94 @@ function CrashService.crumple(model: Model, cfg: any, compName: string, pointM: 
 		end
 	end
 	return #moves
+end
+
+-- Bending -----------------------------------------------------------------------------
+-- Bends a wing/tail/nose like a beam (see Shared/SoftBody). Control surfaces hang off an
+-- invisible Mount -> Motor6D -> Hinge; moving the Mount carries the surface with it, so
+-- Hinge parts and the parts welded to them "ride" instead of being moved directly.
+function CrashService.bend(model: Model, cfg: any, compName: string, pointM: Vector3, dirBody: Vector3, dv: number, toughness: number?): number
+	local core = model.PrimaryPart
+	local compModel = model:FindFirstChild(compName)
+	if not core or not compModel then
+		return 0
+	end
+	local kind = Crash.kind(compName)
+	local bp = SoftBody.bendProfile(cfg, compName, kind)
+	local point = { pointM.X, pointM.Y, pointM.Z }
+	local axis = SoftBody.beamAxis(cfg, compName, kind, point)
+	if not bp or not axis then
+		return 0
+	end
+	local tough = toughness or 1
+	if tough ~= 1 then
+		local t: any = table.clone(bp :: any)
+		t.bendThreshold *= tough
+		bp = t
+	end
+	local driven: { [BasePart]: boolean } = {}
+	for _, d in compModel:GetDescendants() do
+		if d:IsA("Motor6D") and d.Part1 then
+			driven[d.Part1 :: BasePart] = true
+		end
+	end
+	local parts: { BasePart } = {}
+	local list: { SoftBody.BendPart } = {}
+	local isRider: { [BasePart]: boolean } = {}
+	local coreCF = core.CFrame
+	for _, d in compModel:GetDescendants() do
+		if d:IsA("BasePart") and d.Name ~= "Root" and not d:IsA("Seat") and not d:IsA("VehicleSeat") then
+			local rider = driven[d] == true
+			if not rider then
+				for _, j in d:GetJoints() do
+					if j:IsA("WeldConstraint") then
+						local other = if j.Part0 == d then j.Part1 else j.Part0
+						if other and driven[other :: BasePart] then
+							rider = true
+							break
+						end
+					end
+				end
+			end
+			table.insert(parts, d)
+			isRider[d] = rider
+			local lp = coreCF:PointToObjectSpace(d.Position) * MPS
+			table.insert(list, { id = #parts, pos = { lp.X, lp.Y, lp.Z } })
+		end
+	end
+	local already = {
+		bentDeg = (model:GetAttribute("BendDeg_" .. compName) :: number?) or 0,
+		crushed = (model:GetAttribute("CrushM_" .. compName) :: number?) or 0,
+	}
+	local res = SoftBody.bend(bp, list, axis, point, { dirBody.X, dirBody.Y, dirBody.Z }, dv, already)
+	if #res.moves == 0 then
+		return 0
+	end
+	model:SetAttribute("BendDeg_" .. compName, already.bentDeg + res.bentDeg)
+	model:SetAttribute("CrushM_" .. compName, already.crushed + res.crushed)
+	-- Targets from the original poses, then movers first, riders checked afterwards.
+	local targets: { [BasePart]: CFrame } = {}
+	for _, mv in res.moves do
+		local part = parts[mv.id]
+		local pivotW = coreCF:PointToWorldSpace(v3(mv.pivot) * S)
+		local rotW = coreCF:VectorToWorldSpace(v3(mv.rotation))
+		local angle = rotW.Magnitude
+		local r = if angle > 1e-6 then CFrame.fromAxisAngle(rotW / angle, angle) else CFrame.identity
+		local tW = coreCF:VectorToWorldSpace(v3(mv.translate) * S)
+		targets[part] = (CFrame.new(pivotW) * r * CFrame.new(-pivotW) * part.CFrame) + tW
+	end
+	local moved = 0
+	for part, cf in targets do
+		if not isRider[part] and reweldTo(part, cf) then
+			moved += 1
+		end
+	end
+	for part, cf in targets do
+		if isRider[part] and (part.Position - cf.Position).Magnitude > 0.05 then
+			reweldTo(part, cf)
+		end
+	end
+	return moved
 end
 
 -- Debris tracking -----------------------------------------------------------------------
@@ -455,7 +544,18 @@ local function onReportImpact(p: Player, model: any, compName: any, point: any, 
 		return
 	end
 	crumpleBudget[p] = budget - 1
-	local moved = CrashService.crumple(m, cfg, compName, point, if dir.Magnitude > 1e-6 then dir.Unit else Vector3.zero, d)
+	local unitDir = if dir.Magnitude > 1e-6 then dir.Unit else Vector3.zero
+	local tough = (m:GetAttribute("Toughness") :: number?) or 1
+	local moved = CrashService.crumple(m, cfg, compName, point, unitDir, d)
+	moved += CrashService.bend(m, cfg, compName, point, unitDir, d, tough)
+	-- Every client dents its own mesh skins (EditableMesh doesn't replicate).
+	local depth = Crash.dentDepth(Crash.profiles(cfg, tough)[compName], d)
+	if depth > 0 then
+		local r = hooks.remotes:FindFirstChild("DentFx") :: RemoteEvent?
+		if r then
+			r:FireAllClients(m, compName, point, unitDir, depth, d)
+		end
+	end
 	if moved > 0 and d > 8 and m.PrimaryPart then
 		local worldPos = m.PrimaryPart.CFrame:PointToWorldSpace(point * S)
 		fx("sparks", worldPos, math.clamp(d / 8, 0.5, 3), nil, p)

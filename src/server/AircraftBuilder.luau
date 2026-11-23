@@ -853,6 +853,44 @@ local function buildWings(ctx: Ctx)
 			local mid = base:Lerp(wingPt, 0.55)
 			rod(ctx, comp, "Strut", mid, Vector3.new(mid.X, le(math.abs(mid.X) - w.rootLE[1]).Y - thick(s) / 2, mid.Z), 0.05, wingColor)
 		end
+		-- upper wing (biplanes): a plain surface with a tip cap, and interplane struts
+		-- (an N pair) tying it to the lower wing
+		if w.upper then
+			local uw = w.upper
+			local spec = {
+				rootLE = uw.rootLE, rootChord = uw.rootChord, tipChord = uw.tipChord, span = uw.span,
+				sweepDeg = uw.sweepDeg or 0, dihedralDeg = uw.dihedralDeg or 0, thickness = uw.thickness or 0.14,
+			}
+			local ule, uchord, uthick = buildHalfSurface(ctx, comp, spec, sx, wingColor, "upper")
+			local ut = ule(uw.span)
+			quad(ctx, comp, "Skin", ule(uw.span * 0.97), ut, ut + Vector3.new(0, 0, uchord(uw.span)), ule(uw.span * 0.97) + Vector3.new(0, 0, uchord(uw.span * 0.97)), uthick(uw.span), wingColor, { hull = true })
+			local at = uw.strutAt or 0.75
+			local us = uw.span * at
+			local ls = math.clamp(math.abs(ule(us).X) - w.rootLE[1], 0, w.span)
+			local lTop = le(ls) + Vector3.new(0, thick(ls) / 2, 0)
+			local uBot = ule(us) - Vector3.new(0, uthick(us) / 2, 0)
+			local strutColor = if liv.strut then rgb(liv.strut) else wingColor
+			for _, f in { 0.2, 0.75 } do
+				rod(ctx, comp, "InterplaneStrut", lTop + Vector3.new(0, 0, chord(ls) * f), uBot + Vector3.new(0, 0, uchord(us) * f), 0.06, strutColor, { hull = true })
+			end
+			-- bracing wires (thin dark rods crossing the bay)
+			rod(ctx, comp, "Wire", lTop + Vector3.new(0, 0, chord(ls) * 0.2), Vector3.new(sx * (uw.rootLE[1] + 0.05), ule(0).Y - uthick(0) / 2, ule(0).Z + uchord(0) * 0.2), 0.02, DARK_METAL)
+			if sx > 0 then
+				-- centre section over the fuselage, on cabane struts
+				local x0 = uw.rootLE[1]
+				local c0 = uchord(0)
+				local A = Vector3.new(-x0 - 0.02, uw.rootLE[2], uw.rootLE[3])
+				local B = Vector3.new(x0 + 0.02, uw.rootLE[2], uw.rootLE[3])
+				quad(ctx, "Fuselage", "UpperCentre", A, B, B + Vector3.new(0, 0, c0), A + Vector3.new(0, 0, c0), uthick(0), wingColor, { hull = true })
+				local _, H = bodyHalf(geo.fuselage)
+				for _, cx in { -1, 1 } do
+					for _, f in { 0.15, 0.7 } do
+						local top = Vector3.new(cx * x0 * 0.8, uw.rootLE[2] - uthick(0) / 2, uw.rootLE[3] + c0 * f)
+						rod(ctx, "Fuselage", "CabaneStrut", Vector3.new(cx * x0 * 0.55, H * 0.7, top.Z + 0.1), top, 0.05, strutColor)
+					end
+				end
+			end
+		end
 		-- leading-edge root extension (fighters): a thin swept strake ahead of the wing root
 		if w.strake then
 			local st = w.strake

@@ -37,6 +37,9 @@ function InputController.new(callbacks: { [string]: () -> () })
 	} :: Raw
 	self.maxFlaps = 5
 	self.gamepad = { lx = 0, ly = 0, lt = 0, rt = 0, lb = false, rb = false }
+	-- on-screen controls (mouse / touch): held buttons and a virtual stick
+	self.virtualHeld = {} :: { [string]: boolean }
+	self.stick = { x = 0, y = 0, active = false }
 	self.bound = false
 	return self
 end
@@ -93,6 +96,24 @@ function InputController:_handle(_actionName: string, state: Enum.UserInputState
 	return Enum.ContextActionResult.Pass
 end
 
+-- On-screen controls ----------------------------------------------------------------
+function InputController:press(name: string)
+	self:_press(name)
+end
+
+function InputController:setVirtualHeld(action: string, on: boolean)
+	self.virtualHeld[action] = on or nil
+end
+
+-- x: -1 (left) .. 1 (right); y: -1 (push, nose down) .. 1 (pull, nose up)
+function InputController:setStick(x: number, y: number, active: boolean)
+	self.stick.x, self.stick.y, self.stick.active = math.clamp(x, -1, 1), math.clamp(y, -1, 1), active
+end
+
+function InputController:setThrottle(v: number)
+	self.raw.throttle = math.clamp(v, 0, 1)
+end
+
 function InputController:_press(name: string)
 	local raw = self.raw
 	if name == "gear" then
@@ -141,6 +162,8 @@ function InputController:unbind()
 	self.bound = false
 	ContextActionService:UnbindAction("FlightControls")
 	table.clear(self.held)
+	table.clear(self.virtualHeld)
+	self.stick.active = false
 end
 
 local function ramp(current: number, target: number, rate: number, dt: number): number
@@ -154,7 +177,10 @@ end
 
 -- Advance continuous axes. Returns the raw control table.
 function InputController:update(dt: number): Raw
-	local h, raw, gp = self.held, self.raw, self.gamepad
+	local raw, gp = self.raw, self.gamepad
+	local h = setmetatable({}, { __index = function(_, k)
+		return self.held[k] or self.virtualHeld[k]
+	end }) :: any
 	local function axis(neg: string, pos: string): number
 		return (if h[pos] then 1 else 0) - (if h[neg] then 1 else 0)
 	end
@@ -167,6 +193,10 @@ function InputController:update(dt: number): Raw
 	end
 	if math.abs(gp.lx) > 0.12 then
 		rollT = gp.lx
+	end
+	local st = self.stick
+	if st.active then
+		pitchT, rollT = st.y, st.x
 	end
 	-- Keyboard: ramp up over ~0.35 s, return to centre faster.
 	local function rate(cur: number, tgt: number): number

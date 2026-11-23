@@ -41,8 +41,9 @@ Controls.KEYMAP = {
 	{ action = "reverse", kind = "hold", group = "Aircraft systems", label = "Reverse thrust (on the ground)", keys = { "Z" } },
 	-- Camera and game
 	{ action = "camera", kind = "press", group = "Camera and game", label = "Camera: chase / cockpit / tower", keys = { "C", "ButtonSelect" } },
-	{ action = "assist", kind = "press", group = "Camera and game", label = "Assisted / Simulation mode", keys = { "T" } },
+	{ action = "assist", kind = "press", group = "Camera and game", label = "Easy / Assisted / Simulation mode", keys = { "T" } },
 	{ action = "controls", kind = "press", group = "Camera and game", label = "Show / hide this controls list", keys = { "K" } },
+	{ action = "panel", kind = "press", group = "Camera and game", label = "Show / hide on-screen buttons", keys = { "U" } },
 	{ action = "hud", kind = "press", group = "Camera and game", label = "Hide / show HUD", keys = { "H" } },
 	{ action = "debug", kind = "press", group = "Camera and game", label = "Debug panel", keys = { "F3" } },
 	{ action = "menu", kind = "press", group = "Camera and game", label = "Menu", keys = { "M", "ButtonStart" } },
@@ -54,6 +55,7 @@ Controls.EXTRAS = {
 	{ group = "Camera and game", keys = "Right mouse drag", label = "Look around" },
 	{ group = "Camera and game", keys = "Mouse wheel", label = "Camera distance" },
 	{ group = "Flying", keys = "Left stick / triggers", label = "Gamepad: pitch and roll / throttle" },
+	{ group = "Flying", keys = "On-screen stick and buttons", label = "Mouse or touch: drag the stick and throttle, tap the buttons" },
 }
 
 local DISPLAY = {

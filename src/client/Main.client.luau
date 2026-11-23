@@ -19,6 +19,7 @@ local Hud = require(Client.Hud)
 local Menu = require(Client.Menu)
 local WorldFx = require(Client.WorldFx)
 local ControlsPopup = require(Client.ControlsPopup)
+local FlightPanel = require(Client.FlightPanel)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -38,6 +39,7 @@ local function command(name: string)
 end
 
 local menu: any
+local flightPanel: any
 local input = InputController.new({
 	camera = function()
 		camera:cycle()
@@ -61,9 +63,16 @@ local input = InputController.new({
 	controls = function()
 		controlsPopup:toggle()
 	end,
+	panel = function()
+		if flightPanel then
+			flightPanel:toggle()
+		end
+	end,
 	engines = command("engines"),
 	assist = command("assist"),
 })
+
+flightPanel = FlightPanel.new(input, {})
 
 local function stopFlying()
 	if fc then
@@ -73,6 +82,7 @@ local function stopFlying()
 	input:unbind()
 	camera:detach()
 	hud:setFlying(false)
+	flightPanel:setFlying(false)
 	menu.flying = false
 	menu:show()
 end
@@ -120,6 +130,7 @@ end
 	input:bind()
 	camera:attach(model, cfg)
 	hud:setFlying(true)
+	flightPanel:setFlying(true)
 	menu.flying = true
 	menu:hide()
 end)
@@ -192,6 +203,7 @@ RunService.Heartbeat:Connect(function(dt)
 	WorldFx.update(dt, if fc then fc.model else nil)
 	if fc then
 		hud:update(fc.telemetry, destination)
+		flightPanel:update(fc.telemetry)
 	else
 		hud:update(nil, nil)
 	end

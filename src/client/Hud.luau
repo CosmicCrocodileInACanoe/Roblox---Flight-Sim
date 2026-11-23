@@ -86,7 +86,7 @@ function Hud.new()
 	local root = self.flight
 
 	-- Speed (left)
-	local sp = panel(root, UDim2.new(0.5, -330, 0.5, -70), UDim2.fromOffset(120, 140), Vector2.new(0.5, 0))
+	local sp = panel(root, UDim2.new(0.5, -300, 0.5, -70), UDim2.fromOffset(120, 140), Vector2.new(0.5, 0))
 	self.ias = label(sp, "---", UDim2.fromOffset(10, 8), UDim2.new(1, -20, 0, 40), MONO, WHITE, Enum.TextXAlignment.Right, 34)
 	label(sp, "KT IAS", UDim2.fromOffset(10, 46), UDim2.new(1, -20, 0, 16), FONT, DIM, Enum.TextXAlignment.Right, 12)
 	self.gs = label(sp, "GS ---", UDim2.fromOffset(10, 70), UDim2.new(1, -20, 0, 18), MONO, DIM, Enum.TextXAlignment.Right, 15)
@@ -94,7 +94,7 @@ function Hud.new()
 	self.speedHint.TextWrapped = true
 
 	-- Altitude (right)
-	local al = panel(root, UDim2.new(0.5, 330, 0.5, -70), UDim2.fromOffset(140, 140), Vector2.new(0.5, 0))
+	local al = panel(root, UDim2.new(0.5, 300, 0.5, -70), UDim2.fromOffset(140, 140), Vector2.new(0.5, 0))
 	self.alt = label(al, "---", UDim2.fromOffset(10, 8), UDim2.new(1, -20, 0, 40), MONO, WHITE, Enum.TextXAlignment.Left, 30)
 	label(al, "FT MSL", UDim2.fromOffset(10, 46), UDim2.new(1, -20, 0, 16), FONT, DIM, Enum.TextXAlignment.Left, 12)
 	self.vs = label(al, "", UDim2.fromOffset(10, 70), UDim2.new(1, -20, 0, 18), MONO, WHITE, Enum.TextXAlignment.Left, 15)
@@ -148,13 +148,14 @@ function Hud.new()
 	local en = panel(root, UDim2.new(0, 12, 1, -12), UDim2.fromOffset(230, 128), Vector2.new(0, 1))
 	label(en, "ENGINES", UDim2.fromOffset(12, 6), UDim2.new(1, -24, 0, 14), FONT, DIM, Enum.TextXAlignment.Left, 11)
 	self.engineBars = {}
-	for i = 1, 2 do
-		local y = 24 + (i - 1) * 30
-		local bg = make("Frame", { Parent = en, Position = UDim2.fromOffset(12, y), Size = UDim2.fromOffset(120, 18), BackgroundColor3 = Color3.fromRGB(40, 44, 50), BorderSizePixel = 0 }, { corner(4) })
+	-- up to four engines: two tall bars for a twin, four compact ones for a jumbo
+	for i = 1, 4 do
+		local bg = make("Frame", { Parent = en, BackgroundColor3 = Color3.fromRGB(40, 44, 50), BorderSizePixel = 0 }, { corner(4) })
 		local fill = make("Frame", { Parent = bg, Size = UDim2.fromScale(0, 1), BackgroundColor3 = GREEN, BorderSizePixel = 0 }, { corner(4) })
-		local txt = label(en, "", UDim2.fromOffset(140, y), UDim2.fromOffset(80, 18), MONO, WHITE, Enum.TextXAlignment.Left, 14)
-		self.engineBars[i] = { fill = fill, text = txt }
+		local txt = label(en, "", UDim2.new(), UDim2.fromOffset(80, 18), MONO, WHITE, Enum.TextXAlignment.Left, 14)
+		self.engineBars[i] = { bg = bg, fill = fill, text = txt }
 	end
+	self.engineCount = 0
 	self.throttle = label(en, "", UDim2.fromOffset(12, 86), UDim2.new(1, -24, 0, 16), MONO, WHITE, Enum.TextXAlignment.Left, 14)
 	self.fuel = label(en, "", UDim2.fromOffset(12, 104), UDim2.new(1, -24, 0, 16), MONO, DIM, Enum.TextXAlignment.Left, 13)
 
@@ -168,7 +169,7 @@ function Hud.new()
 	self.mode = label(cfgp, "", UDim2.fromOffset(12, 104), UDim2.new(1, -24, 0, 18), FONT, Color3.fromRGB(120, 200, 255), Enum.TextXAlignment.Left, 13)
 
 	-- Damage (bottom right)
-	local dm = panel(root, UDim2.new(1, -12, 1, -12), UDim2.fromOffset(200, 196), Vector2.new(1, 1))
+	local dm = panel(root, UDim2.new(1, -12, 1, -12), UDim2.fromOffset(200, 170), Vector2.new(1, 1))
 	label(dm, "AIRFRAME", UDim2.fromOffset(12, 6), UDim2.new(1, -24, 0, 14), FONT, DIM, Enum.TextXAlignment.Left, 11)
 	self.damageList = label(dm, "", UDim2.fromOffset(12, 22), UDim2.new(1, -24, 1, -28), MONO, WHITE, Enum.TextXAlignment.Left, 12)
 	self.damageList.TextYAlignment = Enum.TextYAlignment.Top
@@ -253,10 +254,19 @@ end
 local SHORT = {
 	Fuselage = "Fuselage ctr", ForwardFuselage = "Fuselage fwd", AftFuselage = "Fuselage aft",
 	LeftWing = "Left wing", RightWing = "Right wing", LeftEngine = "Engine 1", RightEngine = "Engine 2",
+	LeftOuterEngine = "Engine 1", LeftInnerEngine = "Engine 2", RightInnerEngine = "Engine 3", RightOuterEngine = "Engine 4",
+	LeftWingGear = "Left wing gear", RightWingGear = "Right wing gear", LeftBodyGear = "Left body gear", RightBodyGear = "Right body gear",
 	HorizontalStab = "Tailplane", VerticalStab = "Fin", NoseGear = "Nose gear",
 	LeftMainGear = "Left main", RightMainGear = "Right main",
 }
-local DAMAGE_ORDER = { "ForwardFuselage", "Fuselage", "AftFuselage", "LeftWing", "RightWing", "LeftEngine", "RightEngine", "HorizontalStab", "VerticalStab", "NoseGear", "LeftMainGear", "RightMainGear" }
+local DAMAGE_ORDER = { "ForwardFuselage", "Fuselage", "AftFuselage", "LeftWing", "RightWing",
+	"LeftOuterEngine", "LeftEngine", "LeftInnerEngine", "RightInnerEngine", "RightEngine", "RightOuterEngine",
+	"HorizontalStab", "VerticalStab", "NoseGear", "LeftMainGear", "RightMainGear",
+	"LeftWingGear", "RightWingGear", "LeftBodyGear", "RightBodyGear" }
+local DAMAGE_RANK = {}
+for i, n in DAMAGE_ORDER do
+	DAMAGE_RANK[n] = i
+end
 
 -- Navigation: destination bearing/distance and approach deviations.
 local function navInfo(t: any, destId: string?)
@@ -373,6 +383,17 @@ function Hud:update(t: any, destId: string?)
 	end
 
 	-- engines
+	local count = math.min(#t.n1, 4)
+	if count ~= self.engineCount then
+		self.engineCount = count
+		local h, step = if count > 2 then 12 else 18, if count > 2 then 15 else 30
+		for i, b in self.engineBars do
+			local y = 24 + (i - 1) * step
+			b.bg.Visible, b.text.Visible = i <= count, i <= count
+			b.bg.Position, b.bg.Size = UDim2.fromOffset(12, y), UDim2.fromOffset(120, h)
+			b.text.Position = UDim2.fromOffset(140, y + h / 2 - 9)
+		end
+	end
 	for i, b in self.engineBars do
 		local e = t.n1[i]
 		if e then
@@ -415,10 +436,31 @@ function Hud:update(t: any, destId: string?)
 	self.mode.Text = `{string.upper(t.assist or "easy")} (T to switch)`
 
 	-- damage
+	-- only parts that are hurt, worst first (in a fixed order), so it fits any aircraft
 	local lines = {}
 	local dmg = t.damage
-	for _, name in DAMAGE_ORDER do
+	local names = {}
+	for name, c in dmg.components do
+		if c.state ~= "normal" or c.health < 0.995 then
+			table.insert(names, name)
+		end
+	end
+	table.sort(names, function(a, b)
+		local ra, rb = Damage.STATE_RANK[dmg.components[a].state], Damage.STATE_RANK[dmg.components[b].state]
+		if ra ~= rb then
+			return ra > rb
+		end
+		return (DAMAGE_RANK[a] or 99) < (DAMAGE_RANK[b] or 99)
+	end)
+	if #names == 0 then
+		table.insert(lines, '<font color="#5ad27a">All parts OK</font>')
+	end
+	for k, name in names do
 		local c = dmg.components[name]
+		if k > 9 then
+			table.insert(lines, string.format("+%d more", #names - 9))
+			break
+		end
 		if c then
 			local col = damageColor(c.state)
 			local hex = string.format("#%02x%02x%02x", math.floor(col.R * 255), math.floor(col.G * 255), math.floor(col.B * 255))
@@ -448,7 +490,14 @@ function Hud:update(t: any, destId: string?)
 		caution = "FLAP OVERSPEED: RETRACT FLAPS (V)"
 	elseif not t.onGround and t.gearExt > 0.5 and t.ias > sp.gearLimit then
 		caution = "GEAR OVERSPEED"
-	elseif t.n1[1].failed or (t.n1[2] and t.n1[2].failed) then
+	elseif (function()
+		for _, e in t.n1 do
+			if e.failed then
+				return true
+			end
+		end
+		return false
+	end)() then
 		caution = "ENGINE FAILURE"
 	elseif t.fuel <= 0 then
 		caution = "FUEL EXHAUSTED"

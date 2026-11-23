@@ -51,7 +51,16 @@ These are the most likely places for first-run bugs, so check them first.
 4. **Flaps, gear, throttle, wind, mass.** Compare liftoff speed and roll with flaps 1 and
    flaps 3; feel the drag from the gear and speedbrake; take off in "Crosswind 15 kt"; and
    compare roll with fuel full and nearly empty. Record what you see.
-5. **Six aircraft classes.** Not testable in M1: there's only one aircraft. This is M3.
+5. **The fleet (16 aircraft).** For each aircraft in the menu:
+   - It spawns on the runway sitting level on its wheels, with no parts floating or buried.
+   - Glass looks like glass from outside (tinted, a little shiny), and from the cockpit view
+     the windscreen or canopy is see-through but still faintly visible.
+   - Jet engines: the intake and spinning fan face forward, the nozzle and cone face back.
+     Propellers spin with the throttle.
+   - Fighters, trainer and stunt plane: the canopy shows a pilot; fighters have a HUD glass.
+   - Bumble: both wings, struts and wires are attached and move together when damaged.
+   - Puffin: it floats on the sea, takes off from the water and lands back on it.
+   - Hauler 4 and Arrowstar: all four engines spin and show smoke when failed.
 6. **Damage.**
    - Land at under 300 fpm: no damage.
    - Land at about 800 fpm: gear is degraded but holds.

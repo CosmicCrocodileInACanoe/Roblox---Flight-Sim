@@ -58,6 +58,9 @@ function Assist.limits(cfg: any?): any
 		pitchDown = rad(a.easyPitchDownDeg or -14),
 		pitchRate = rad(a.easyPitchRateDeg or 7),
 		aerobatic = a.aerobatic == true,
+		-- seconds of roll rate to look ahead when easing into the bank limit (slow-rolling
+		-- heavy aircraft need more so they stop at the limit instead of sailing past it)
+		rollLead = a.easyRollLead or 0.3,
 	}
 end
 
@@ -101,7 +104,8 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 		if abs(raw.pitch) < 0.05 then
 			local vs = env.vgx * env.ux + env.vgy * env.uy + env.vgz * env.uz
 			-- level flight, or a gentle glide when set up to land (gear down, flaps 3+)
-			local landing = raw.gearDown and raw.flaps >= 3
+			-- (types with fewer flap settings count their last setting as landing flaps)
+			local landing = raw.gearDown and raw.flaps >= math.min(3, #model.cfg.aero.flaps.labels)
 			local target = if not landing then 0 elseif env.agl < 8 then -1.0 else -3.0
 			qd = clamp((target - vs) * 0.006 - (if landing then 0 else (pitch - rad(2)) * 0.05), rad(-2.5), rad(2.5))
 		end
@@ -139,10 +143,10 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 			elseif absBank < rad(8) then
 				out.roll = clamp(-bank * 1.2 + env.wz * 0.8, -0.3, 0.3)
 			end
-		elseif absBank > bankLimit - math.max(rad(5), abs(env.wz) * 0.3) and math.sign(raw.roll) == math.sign(bank) then
+		elseif absBank > bankLimit - math.max(rad(5), abs(env.wz) * lim.rollLead) and math.sign(raw.roll) == math.sign(bank) then
 			-- fade the input out over the last few degrees (more for fast-rolling aircraft),
 			-- then push back past the limit
-			local fade = math.max(rad(5), abs(env.wz) * 0.3)
+			local fade = math.max(rad(5), abs(env.wz) * lim.rollLead)
 			local over = (absBank - bankLimit) / fade
 			out.roll = if over > 0 then -math.sign(bank) * clamp(over, 0, 0.5) else raw.roll * clamp(-over, 0, 1)
 			out.roll = clamp(out.roll + env.wz * 0.5, -1, 1)
@@ -160,7 +164,7 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 			-- Speed floor and overspeed protection, through the throttle.
 			local sp = model.cfg.speeds
 			local kt = (r.ias or tas) * 1.943844
-			local floor = if raw.flaps >= 3 then sp.vref * 1.02 else sp.vref * 1.25
+			local floor = if raw.flaps >= math.min(3, #model.cfg.aero.flaps.labels) then sp.vref * 1.02 else sp.vref * 1.25
 			if env.agl > 12 and kt < floor then
 				out.throttle = math.max(out.throttle, clamp((floor - kt) / 12, 0, 1))
 			end

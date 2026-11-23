@@ -3,7 +3,8 @@ local Enum = Mock.Enum
 local Registry = require("../../src/shared/AircraftRegistry")
 local src = require("../generated/AircraftBuilder_src")
 local B = Mock.loadModule(src, "AircraftBuilder", "../../src/shared/", function(p) return require(p) end)
-for _, id in Registry.order do
+local okOnly, only = pcall(require, "../generated/only_preview")
+for _, id in (if okOnly then only else Registry.order) do
 	local m = B.build(Registry.get(id), Mock.CFrame.new(0, 0, 0))
 	for _, d in m:GetDescendants() do
 		if d:IsA("BasePart") and (d.Transparency or 0) < 1 then

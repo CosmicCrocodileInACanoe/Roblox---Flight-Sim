@@ -32,10 +32,11 @@ export type GearState = {
 -- Derive spring and damper rates from aircraft mass and gear geometry.
 function Gear.derive(units: { any }, mass: number, g: number): { GearState }
 	-- Static load split from fore/aft positions relative to the CoM (z = 0).
-	local noseZ, mainZ, mains = 0, 0, 0
+	local noseZ, mainZ, mains, noses = 0, 0, 0, 0
 	for _, u in units do
 		if u.steerMaxDeg > 0 then
 			noseZ = u.pos[3]
+			noses += 1
 		else
 			mainZ += u.pos[3]
 			mains += 1
@@ -47,7 +48,7 @@ function Gear.derive(units: { any }, mass: number, g: number): { GearState }
 
 	local states = {}
 	for i, u in units do
-		local share = if u.steerMaxDeg > 0 then noseFraction else (1 - noseFraction) / math.max(1, mains)
+		local share = if u.steerMaxDeg > 0 then noseFraction / math.max(1, noses) else (1 - noseFraction) / math.max(1, mains)
 		local load = weight * share
 		local sc = u.staticCompression
 		local x = sc * u.travel

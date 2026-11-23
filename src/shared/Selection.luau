@@ -219,12 +219,12 @@ end
 -- Everything the aircraft card shows.
 function Selection.card(cfg: any)
 	local span, nose, tail = Selection.dimensions(cfg)
-	local d = Selection.DIFFICULTY[cfg.id] or 2
+	local d = cfg.difficulty or Selection.DIFFICULTY[cfg.id] or 2
 	return {
 		name = cfg.displayName,
 		class = cfg.class or "",
 		description = cfg.description or "",
-		seats = Selection.SEATS[cfg.id],
+		seats = cfg.seats or Selection.SEATS[cfg.id],
 		cruiseKt = cfg.speeds and cfg.speeds.cruise,
 		spanM = span,
 		lengthM = nose + tail,

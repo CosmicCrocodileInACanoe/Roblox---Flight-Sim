@@ -12,7 +12,7 @@ local MODES = { "free", "airline", "sandbox" }
 return { name = "Aircraft and airport selection", run = function(T)
 	T.test("every unlocked aircraft in registry order is flyable", function()
 		local ids = Selection.flyableAircraft(Registry)
-		T.check(#ids == #Registry.order, "all four types unlocked")
+		T.check(#ids == #Registry.order, "every aircraft type unlocked")
 		for i, id in Registry.order do
 			T.check(ids[i] == id, "order kept: " .. id)
 		end
@@ -166,17 +166,17 @@ return { name = "Aircraft and airport selection", run = function(T)
 	end)
 
 	T.test("aircraft cards and start labels are filled in", function()
-		local lastDiff = 0
 		for _, id in Registry.order do
 			local c = Selection.card(Registry.get(id))
 			T.check(#c.name > 0 and #c.class > 0 and #c.description > 0, id .. " text")
 			T.check(c.seats and c.seats > 0, id .. " seats")
-			T.check(c.cruiseKt and c.cruiseKt > 100, id .. " cruise")
-			T.check(c.difficulty >= lastDiff, "difficulty grows with size")
-			lastDiff = c.difficulty
+			T.check(c.cruiseKt and c.cruiseKt > 60, id .. " cruise")
+			T.check(c.difficulty >= 1 and c.difficulty <= #Selection.DIFFICULTY_LABELS, id .. " difficulty")
 			T.check(#c.difficultyLabel > 0)
 		end
-		T.check(Selection.card(Registry.get("kestrel72")).difficulty == 1, "Kestrel is the easiest")
+		T.check(Selection.card(Registry.get("kestrel72")).difficulty == 1, "Kestrel is among the easiest")
+		T.check(Selection.card(Registry.get("meadowlark4")).difficulty == 1, "the trainer is among the easiest")
+		T.check(Selection.card(Registry.get("celestia800")).difficulty == 4, "the jumbo is expert")
 		for _, s in Selection.spawnList("RDV", Registry.get("meridian200"), "sandbox") do
 			local label = Selection.spawnLabel(s)
 			T.check(#label > 0 and not string.find(label, "?", 1, true), "label for " .. s.id .. ": " .. label)

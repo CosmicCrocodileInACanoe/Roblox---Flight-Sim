@@ -213,8 +213,14 @@ return { name = "Fleet: every aircraft", run = function(T)
 				local _, _, bz = Sim.mulMtV(s.R, s.wx, s.wy, s.wz)
 				maxp = math.max(maxp, -bz)
 			end
+			-- bands by handling class: airliners (big ones slower), light aircraft, jets
+			-- built for aerobatics (fighters, trainers) and the aerobatic stunt plane
+			local bands = {
+				light = { 15, 90 }, fighter = { 90, 320 }, aerobatic = { 150, 420 },
+			}
 			local big = cfg.mass > 150000
-			T.between(math.deg(maxp), if big then 6 else 10, if big then 22 else 32, "roll rate deg/s")
+			local band = bands[cfg.handling] or (if big then { 6, 22 } else { 10, 32 })
+			T.between(math.deg(maxp), band[1], band[2], "roll rate deg/s")
 		end)
 
 		T.test(name .. ": stalls with full back stick and recovers", function()
@@ -247,6 +253,117 @@ return { name = "Fleet: every aircraft", run = function(T)
 			T.check((releaseAlt - minAlt) < 700, "recovery height loss " .. (releaseAlt - minAlt))
 			T.check(s:isFinite())
 		end)
+
+		if cfg.water then
+			T.test(name .. ": floats on the sea, takes off from the water and lands back on it", function()
+				-- float at rest: start just above the water, let it settle
+				local floatY = math.huge
+				for _, hp in cfg.hullPoints do
+					if hp[5] == "float" then
+						floatY = math.min(floatY, hp[2])
+					end
+				end
+				local s = Sim.new(cfg, { enginesRunning = true, flaps = 3, gearDown = false, y = -floatY + 0.05, water = true })
+				s.ctl.gearDown = false
+				s.ctl.flaps = 3
+				for _ = 1, 60 * 8 do
+					s:frame()
+				end
+				local p0 = s:attitude()
+				T.check(s.model.result.onFloats and not s.model.result.inWater, "rides on its floats, hull dry")
+				T.between(p0, -3, 4, "pitch afloat")
+				T.check(math.abs(s.vy) < 0.3, "settled " .. s.vy)
+				-- take-off run on the water
+				local z0 = s.pz
+				s.ctl.throttle = 1
+				local lift
+				for _ = 1, 60 * 90 do
+					s:prepareEnv()
+					local p, b = s:attitude()
+					local kts = s.model.result.ias * U.KTS_PER_MPS
+					local target = if kts > cfg.speeds.rotate then 8 else 3
+					s.ctl.pitch = math.clamp((target - p) * 0.12 - s.env.wx * 1.5, -1, 1)
+					s.ctl.roll = math.clamp(-b * 0.05, -1, 1)
+					s:frame()
+					if not lift and not s.model.result.onFloats and s.py > -floatY + 3 then
+						lift = { dist = math.abs(s.pz - z0), t = s.time }
+					end
+					if lift and s.time > lift.t + 10 then
+						break
+					end
+				end
+				T.check(lift ~= nil, "never left the water")
+				T.check(lift.dist < 1500, string.format("water run %.0f m", lift.dist))
+				T.check(s.vy > 1, "climbing away " .. s.vy)
+				for cname, c in s.model.damage.components do
+					T.check(c.state == "normal", cname .. " damaged on the water take-off")
+				end
+
+				-- landing on the water: shallow approach, flare, settle and slow down
+				local w = Sim.new(cfg, { enginesRunning = true, flaps = 4, gearDown = false, y = 60, z = 1000, speed = (cfg.speeds.vref + 5) * U.MPS_PER_KT, water = true })
+				w.ctl.gearDown = false
+				w.ctl.flaps = 4
+				w.ctl.throttle = 0.35
+				local touched, worst = false, 0
+				for _ = 1, 60 * 120 do
+					w:prepareEnv()
+					local p, b = w:attitude()
+					local h = w.py + floatY
+					local vsT = if h > 8 then -2.5 else -0.8
+					local pitchT = math.clamp((vsT - w.vy) * 2 + 3, -6, 9)
+					w.ctl.pitch = math.clamp((pitchT - p) * 0.1 - w.env.wx, -1, 1)
+					w.ctl.roll = math.clamp(-b * 0.05, -1, 1)
+					if h < 4 then
+						w.ctl.throttle = 0
+					end
+					local vyBefore = w.vy
+					w:frame()
+					if not touched and w.model.result.onFloats then
+						touched = true
+						worst = vyBefore * U.FPM_PER_MPS
+					end
+					if touched and w.time > 30 and w:groundSpeed() < 7 then
+						break
+					end
+				end
+				T.check(touched, "never touched the water")
+				T.check(worst > -500, string.format("touched down at %.0f fpm", worst))
+				T.check(w:groundSpeed() < 7, "slows to taxi speed on the water " .. w:groundSpeed())
+				T.check(not w.model.result.inWater, "hull stayed dry")
+				for cname, c in w.model.damage.components do
+					T.check(c.state == "normal", cname .. " damaged on the water landing")
+				end
+				T.check(w:isFinite())
+			end)
+		end
+
+		if #cfg.engines == 1 then
+			T.test(name .. ": an engine failure on climb-out leaves a steady, controllable glide", function()
+				local s = Sim.new(cfg, { enginesRunning = true, flaps = 3, gearDown = false, y = 400, speed = (cfg.speeds.v2 + 10) * U.MPS_PER_KT })
+				s.ctl.gearDown = false
+				s.ctl.throttle = 1
+				s.model:setFailure("engine1", true)
+				local maxBank, minKt = 0, 1e9
+				for _ = 1, 60 * 30 do
+					s:prepareEnv()
+					local p, b = s:attitude()
+					s.ctl.roll = math.clamp(-b * 0.08 + s.env.wz * 0.5, -1, 1)
+					-- lower the nose to hold a glide a little above the stall
+					s.ctl.pitch = math.clamp((-4 - p) * 0.1 - s.env.wx, -1, 1)
+					s:frame()
+					maxBank = math.max(maxBank, math.abs(b))
+					if s.time > 10 then
+						minKt = math.min(minKt, s.model.result.ias * U.KTS_PER_MPS)
+					end
+				end
+				T.check(s.model.engines[1].failed, "engine should be failed")
+				T.check(maxBank < 20, "bank excursion " .. maxBank)
+				T.check(minKt > cfg.speeds.vref * 0.8, string.format("glide too slow: %.0f kt", minKt))
+				T.check(s.vy > -15, "descending too fast " .. s.vy)
+				T.check(s:isFinite())
+			end)
+			continue
+		end
 
 		T.test(name .. ": an outboard engine failure on climb-out is controllable", function()
 			local s = Sim.new(cfg, { enginesRunning = true, flaps = 3, gearDown = false, y = 400, speed = (cfg.speeds.v2 + 10) * U.MPS_PER_KT })

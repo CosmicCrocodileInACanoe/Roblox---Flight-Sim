@@ -10,8 +10,8 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 215 automated tests, all passing: aero, engines, gear, damage,
-grading, missions, audio mixing, airport geometry, terrain and 13 offline 6-DOF flights through the same
+engine-independent logic has 430 automated tests, all passing: aero, engines, gear, damage,
+grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy mode) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
 collisions) is unverified until someone works through `docs/PLAYTEST.md` in Studio.
@@ -118,7 +118,8 @@ Store audio asset ID there (just the number) and it plays. Empty slots stay sile
 error. What each slot does:
 
 - Engines: `jetWhine` (pitch and volume follow N1) and `jetRumble` (follows thrust and
-  reverse). The Kestrel 72 turboprop uses `propDrone` and `propRumble` instead (`AudioConfig.aircraftProfile`).
+  reverse). Propeller aircraft use `propDrone` and `propRumble` instead (each config's `soundProfile`,
+  with `AudioConfig.aircraftProfile` as a fallback).
   `engineStart` plays once when you start the engines.
 - `wind` grows with airspeed, louder with gear down or speedbrake out; `runwayRoll` rumbles
   with ground speed while the wheels are down.
@@ -146,7 +147,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Airports, WorldGen      airport layouts, deterministic terrain height field
   Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
   Stunts                  Stunts ring course, race rules (passes, misses, penalties, medals), race tune
-  GameConfig, AircraftRegistry, Aircraft/Meridian200
+  GameConfig, AircraftRegistry, Aircraft/*  one data file per aircraft; Aircraft/Kit has shared helpers
   AudioConfig, AudioMix   every sound asset ID in one file; pure loop/one-shot mixing
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build
 src/client/               input, flight controller, cameras, HUD, menu, weather, effects, sound
@@ -214,9 +215,36 @@ Two more layers on top, in `src/shared/SoftBody.luau`:
   APIs". With it off, skins switch themselves off after one warning in the output, and part
   dents and bending carry on.
 
+## Aircraft
+
+Sixteen original, unbranded aircraft, smallest to largest (the menu shows them in this order).
+All of them pass the same offline flight tests.
+
+| Aircraft | Type | Notes |
+|---|---|---|
+| Bumble | Vintage biplane | two wings with struts and wires, open cockpit behind a small windscreen |
+| Meadowlark 4 | Four-seat trainer | high wing with struts, fixed gear with wheel spats; the default and the gentlest |
+| Sprite | Aerobatic stunt plane | rolls very fast; Easy mode still levels it when you let go |
+| Ridgehopper | STOL bush plane | giant soft tyres, big flaps, takes off in about 200 m |
+| Puffin | Floatplane (amphibian) | lands and takes off on the sea, wheels in the floats for runways |
+| Breeze Twin | Light twin | two wing-mounted propellers |
+| Silverline 8 | Business jet | engines on the rear fuselage, T-tail, winglets |
+| Swiftlet J3 | Jet trainer | tandem two-seat canopy, side intakes |
+| Vector X1 | Light fighter | chin intake, bubble canopy with HUD |
+| Nightjar T2 | Twin-engine fighter | two canted fins, two nozzles |
+| Kestrel 72 | Regional turboprop | |
+| Meridian 200 | Narrow-body twin jet | |
+| Hauler 4 | Cargo freighter | four turboprops, T-tail, upswept tail with a ramp |
+| Atlas 400 | Wide-body twin jet | |
+| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines; the fastest |
+| Celestia 800 | Four-engine jumbo | |
+
+Adding one is a data file in `src/shared/Aircraft/` plus a line in `AircraftRegistry`. The
+builder reads everything from the config's `geometry` block (see the header of
+`src/server/AircraftBuilder.luau`), and `cfg.assist` can set per-aircraft Easy-mode limits.
+
 ## Known limits of this milestone
 
-- One aircraft. The registry and builder are generic, but only the Meridian 200 has data.
 - Sound ships with empty asset IDs, so the game is silent until they're filled in (see Sound).
 - Weather and time of day are chosen per player, so two players can see different wind.
 - StreamingEnabled is off so terrain can't vanish under a fast aircraft. The server logs the

@@ -113,14 +113,50 @@ return { name = "Aircraft builder (mock Roblox)", run = function(T)
 				local k = m:GetAttribute("Surface") or (if m:GetAttribute("GearName") then "Gear" elseif m:GetAttribute("EngineIndex") then "Fan" else "other")
 				counts[k] = (counts[k] or 0) + 1
 			end
-			T.check(counts.Flap == 2 and counts.Aileron == 2 and counts.Elevator == 2 and counts.Rudder == 1 and counts.Spoiler == 2,
+			local geo = cfg.geometry
+			local spoilers = if geo.wing.spoilers == false then nil else 2
+			local rudders = geo.vstab.count or 1
+			T.check(counts.Flap == 2 and counts.Aileron == 2 and counts.Elevator == 2 and counts.Rudder == rudders and counts.Spoiler == spoilers,
 				string.format("surfaces F%s A%s E%s R%s S%s", tostring(counts.Flap), tostring(counts.Aileron), tostring(counts.Elevator), tostring(counts.Rudder), tostring(counts.Spoiler)))
 			T.check(counts.Fan == #cfg.engines, "fans " .. tostring(counts.Fan))
 			T.check(counts.Gear == #cfg.gear.units, "gear " .. tostring(counts.Gear))
-			if not cfg.stuntsOnly then -- the stunt racer has a canopy, no cabin windows or titles
-				T.check(guis >= 4, "windows/titles " .. guis)
+			T.check(guis >= (if cfg.geometry.livery.airline then 4 else 1), "windows/titles " .. guis)
+		end)
+		T.test(name .. ": every engine faces forward: intake and fan at the front, exhaust behind", function()
+			-- body forward is -z. The spinning fan/propeller hub and the intake lip must sit
+			-- ahead of the exhaust, and the widest front ring ahead of the tapering tail.
+			local core = model.PrimaryPart.CFrame
+			local function bodyZ(part)
+				return core:PointToObjectSpace(part.CFrame.Position).Z
+			end
+			for _, e in cfg.engines do
+				local comp = model:FindFirstChild(e.component)
+				T.check(comp ~= nil, "no engine component " .. e.component)
+				local hubZ, exhaustZ, lipZ, aftZ
+				for _, d in comp:GetDescendants() do
+					if d:IsA("BasePart") then
+						local z = bodyZ(d)
+						if d.Name == "FanHub" then
+							hubZ = z
+						elseif d.Name == "Exhaust" then
+							exhaustZ = math.max(exhaustZ or -math.huge, z)
+						elseif d.Name == "IntakeLip" then
+							lipZ = math.min(lipZ or math.huge, z)
+						elseif d.Name == "NacelleAft" or d.Name == "ExhaustCone" then
+							aftZ = math.max(aftZ or -math.huge, z)
+						end
+					end
+				end
+				T.check(hubZ and exhaustZ, e.component .. ": fan hub and exhaust both exist")
+				T.check(hubZ < exhaustZ, string.format("%s: fan/prop (z %.1f) must be ahead of the exhaust (z %.1f)", e.component, hubZ, exhaustZ))
+				if lipZ and aftZ then
+					T.check(lipZ < aftZ, e.component .. ": intake lip must be at the front of the nacelle")
+				end
+				-- the engine's thrust axis points forward too
+				T.check(e.axis[3] < 0, e.component .. ": thrust must point forward (-z)")
 			end
 		end)
+
 		T.test(name .. ": overall shape matches the configured size", function()
 			local S = 1 / 0.28
 			local core = model.PrimaryPart.CFrame

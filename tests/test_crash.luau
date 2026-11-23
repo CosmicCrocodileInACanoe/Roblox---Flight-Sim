@@ -3,6 +3,12 @@ local Crash = require("../src/shared/Crash")
 local Damage = require("../src/shared/Damage")
 local FlightModel = require("../src/shared/FlightModel")
 local cfg = require("../src/shared/Aircraft/Meridian200")
+local fleet = {
+	require("../src/shared/Aircraft/Kestrel72"),
+	cfg,
+	require("../src/shared/Aircraft/Atlas400"),
+	require("../src/shared/Aircraft/Celestia800"),
+}
 
 -- A made-up four-engine aircraft with no geometry block and its own names, to prove
 -- new models plug in without code changes.
@@ -228,5 +234,54 @@ return { name = "Crash physics (dents, break points, breakup)", run = function(T
 		Damage.applyImpact(d, "RightWing", 30)
 		T.check(Damage.state(d, "RightWing") == "detached", "big hit takes the rest")
 		T.check(Damage.effectiveness(d, "RightWing") == 0)
+	end)
+	T.test("whole fleet: every component profiled, gear is gear, wings tear outboard", function()
+		for _, ac in fleet do
+			local P = Crash.profiles(ac)
+			for name in ac.components do
+				local p = P[name]
+				T.check(p ~= nil, ac.id .. "." .. name)
+				if string.find(name, "Gear") then
+					T.check(p.kind == "gear" and #p.sections == 0, ac.id .. "." .. name .. " is gear")
+				end
+				if string.find(name, "Engine") then
+					T.check(p.kind == "engine", ac.id .. "." .. name)
+				end
+				if p.kind == "gear" or p.kind == "wing" or p.kind == "engine" then
+					T.check(Damage.wearKind(name) == p.kind, ac.id .. "." .. name .. " wear kind agrees")
+				end
+			end
+			for _, wname in { "LeftWing", "RightWing" } do
+				local sec = P[wname].sections[1]
+				T.check(sec and sec.id == "Outer", ac.id .. " " .. wname .. " has a break point")
+				-- the plane never cuts through an engine or gear hanging off this wing
+				for _, other in ac.components do
+					if other.parent == wname then
+						T.check(not Crash.inSection(sec, other.ref), ac.id .. " " .. wname .. " plane clears children")
+					end
+				end
+				local d = Damage.new(ac.components)
+				T.check(Damage.breakSection(d, wname, sec.id, sec.lost))
+				T.check(Damage.isAttached(d, wname) and Damage.effectiveness(d, wname) < 0.75, ac.id .. " lift drops")
+			end
+		end
+	end)
+
+	T.test("T-tail: the fin can't lose its top when the tailplane sits on it", function()
+		local k = fleet[1]
+		T.check(k.components.HorizontalStab.parent == "VerticalStab", "Kestrel is a T-tail")
+		T.check(#Crash.profiles(k).VerticalStab.sections == 0)
+		T.check(#Crash.profiles(cfg).VerticalStab.sections == 1, "low tail keeps its fin break point")
+	end)
+
+	T.test("easy mode toughness: harder hits needed to dent, tear and split", function()
+		local base = Crash.profiles(cfg).LeftWing
+		local easy = Crash.profiles(cfg, 1.6).LeftWing
+		T.check(easy ~= base and Crash.profiles(cfg, 1.6) == Crash.profiles(cfg, 1.6), "cached per toughness")
+		T.near(easy.dentThreshold, base.dentThreshold * 1.6, 1e-9)
+		T.check(easy.sectionBreakDv > base.sectionBreakDv and easy.secondaryBreakDv > base.secondaryBreakDv)
+		local tip = { -15, 0, 8 }
+		local dv = base.sectionBreakDv + 2
+		T.check(Crash.sectionToBreak(base, tip, dv) ~= nil and Crash.sectionToBreak(easy, tip, dv) == nil)
 	end)
 end }

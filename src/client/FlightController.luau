@@ -56,7 +56,8 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 	local enginesRunning = model:GetAttribute("EnginesRunning") == true
 	local gearDown = model:GetAttribute("GearDown") ~= false
 	local flaps = (model:GetAttribute("Flaps") :: number?) or 1
-	self.fm = FlightModel.new(cfg, { enginesRunning = enginesRunning, gearDown = gearDown, flaps = flaps })
+	self.fm = FlightModel.new(cfg, { enginesRunning = enginesRunning, gearDown = gearDown, flaps = flaps, toughness = Assist.toughness(options.assist) })
+	self.toughness = Assist.toughness(options.assist)
 	self.env = FlightModel.newEnv(cfg)
 	self.ctl = FlightModel.newControls()
 	self.assist = Assist.new(options.assist)
@@ -227,10 +228,11 @@ function FlightController:command(name: string)
 			fm:startEngines()
 		end
 	elseif name == "assist" then
-		self.assist.mode = if self.assist.mode == "assisted" then "simulation" else "assisted"
+		local was = self.assist.mode
+		self.assist.mode = Assist.nextMode(was)
 		if self.assist.mode == "simulation" then
-			self.input.raw.trim = self.assist.autoTrim
-		else
+			self.input.raw.trim = self.assist.autoTrim -- hand the auto-trim to the pilot
+		elseif was == "simulation" then
 			self.assist.autoTrim = self.input.raw.trim
 			self.input.raw.trim = 0
 		end
@@ -494,7 +496,7 @@ end
 --   v, w: world velocity (m/s) and angular velocity (rad/s) of the aircraft.
 function FlightController:crashResponse(comp: string, point: Vector3, dvWorld: Vector3, dv: number, cf: CFrame, v: Vector3, w: Vector3, allowSection: boolean)
 	local fm = self.fm
-	local prof = Crash.profiles(self.cfg)[comp]
+	local prof = Crash.profiles(self.cfg, self.toughness)[comp]
 	if not prof then
 		return
 	end

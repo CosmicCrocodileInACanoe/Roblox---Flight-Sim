@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 69 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 162 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, airport geometry, terrain and 13 offline 6-DOF flights through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -53,10 +53,10 @@ runs, but progress is not saved; `ProgressService` logs a warning and carries on
 From the repo root:
 
 ```
-luau tests/run.luau
+sh tests/run.sh
 ```
 
-Expected: `69 passed, 0 failed`. These tests do not start Roblox.
+Expected: `162 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -74,12 +74,14 @@ Expected: `69 passed, 0 failed`. These tests do not start Roblox.
 | Z | Reverse thrust (hold, on the ground) |
 | X | Speedbrake |
 | [ / ] | Pitch trim (Simulation mode) |
-| T | Toggle Assisted / Simulation |
+| T | Cycle Easy (default) / Assisted / Simulation |
+| U | Show / hide the on-screen buttons (throttle lever, stick, gear, flaps, brakes...) |
 | C | Camera: chase / cockpit / tower |
 | Right mouse drag, wheel | Look around, camera distance |
 | H | Hide HUD |
+| N | Show / hide the minimap |
 | F3 | Debug panel |
-| M | Menu (aircraft, mode, spawn, weather, time, failures) |
+| M | Menu (aircraft, airport, mode, route, start point, weather, time, failures) |
 | R | Reset / respawn |
 
 A typical first flight: spawn at an HBR runway threshold, press I and wait for the engines,
@@ -94,15 +96,17 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Units, MathUtil         scale (1 stud = 0.28 m), ISA atmosphere, heading helpers
   Aero, Engine, Gear      lift/drag per panel, spool and lapse, raycast spring-dampers
   FlightModel             6-DOF forces and torques for one aircraft (the core of the game)
-  Assist                  Assisted mode: auto-trim, turn coordination, bank and stall protection
+  Assist                  Easy mode (self-levelling, pitch/bank limits, no stalls, speed floor, flare help,
+                          tougher airframe) and Assisted mode (auto-trim, turn coordination, protections)
   Damage                  component health, states, propagation, detachment, lost sections
   Crash                   crash feel: per-component profiles, dents, break points, debris breakup
   Grading, Mission        landing score, gate-to-gate mission state machine
   Airports, WorldGen      airport layouts, deterministic terrain height field
+  Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
   GameConfig, AircraftRegistry, Aircraft/Meridian200
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build
 src/client/               input, flight controller, cameras, HUD, menu, weather and effects
-tests/                    test runner, 6-DOF harness, seven suites
+tests/                    test runner, 6-DOF harness, Roblox mock, test suites
 docs/PLAN.md              architecture, schemas, boundaries, decisions, risks, roadmap
 docs/PLAYTEST.md          manual Studio checklist
 ```

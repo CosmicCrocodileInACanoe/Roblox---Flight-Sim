@@ -1,21 +1,28 @@
 --!strict
--- All aircraft types. Milestone 1 ships one polished type; the others are listed so the
--- menu can show the roadmap, and are locked until their profiles pass the same tests.
+-- All aircraft types. Each one must pass the offline fleet tests (tests/test_fleet.luau).
 
 local Registry = {}
 
+local function req(name: string): any
+	if script then
+		return (require :: any)((script :: any).Parent.Aircraft[name])
+	end
+	return (require :: any)("./Aircraft/" .. name)
+end
+
 Registry.types = {
-	meridian200 = require(script.Parent.Aircraft.Meridian200),
+	kestrel72 = req("Kestrel72"),
+	meridian200 = req("Meridian200"),
+	atlas400 = req("Atlas400"),
+	celestia800 = req("Celestia800"),
 }
 
-Registry.order = { "meridian200" }
+-- Smallest to largest; the menu shows them in this order.
+Registry.order = { "kestrel72", "meridian200", "atlas400", "celestia800" }
 
 Registry.planned = {
-	{ id = "turboprop", label = "Regional turboprop", milestone = 2 },
-	{ id = "regionaljet", label = "Regional twinjet", milestone = 2 },
-	{ id = "narrowbodyB", label = "Narrow-body twinjet B", milestone = 2 },
-	{ id = "widebody", label = "Wide-body twinjet", milestone = 2 },
-	{ id = "jumbo", label = "Four-engine jumbo", milestone = 2 },
+	{ id = "regionaljet", label = "Regional twinjet", milestone = 3 },
+	{ id = "widebodytwin", label = "Wide-body twinjet", milestone = 3 },
 }
 
 function Registry.get(id: string): any

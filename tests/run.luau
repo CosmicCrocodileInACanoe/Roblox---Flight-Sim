@@ -46,7 +46,13 @@ local suites = {
 	require("./test_crash"),
 	require("./test_world"),
 	require("./test_flight"),
+	require("./test_fleet"),
+	require("./test_easy"),
 	require("./test_controls"),
+	require("./test_geometry"),
+	require("./test_builder"),
+	require("./test_minimap"),
+	require("./test_selection"),
 }
 
 for _, suite in suites do

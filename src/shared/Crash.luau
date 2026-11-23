@@ -77,14 +77,15 @@ Crash.DEFAULTS = DEFAULTS
 
 -- Same name rules as Damage.wearKind, duplicated so this module has no requires.
 function Crash.kind(name: string): string
-	if string.find(name, "Engine") or string.find(name, "Prop") then
+	-- Gear first: "LeftWingGear" is landing gear, not a wing.
+	if string.find(name, "Gear") then
+		return "gear"
+	elseif string.find(name, "Engine") or string.find(name, "Prop") then
 		return "engine"
 	elseif string.find(name, "Wing") then
 		return "wing"
 	elseif string.find(name, "Stab") or string.find(name, "Fin") or string.find(name, "Tail") then
 		return "tail"
-	elseif string.find(name, "Gear") then
-		return "gear"
 	end
 	return "fuselage"
 end
@@ -106,6 +107,7 @@ end
 local WING_BREAK_AT = 0.55 -- fraction of semispan
 local STAB_BREAK_AT = 0.5
 local FIN_BREAK_AT = 0.55
+local CHILD_CLEARANCE = 2.5 -- metres a break plane keeps clear of a child component
 
 function Crash.deriveSections(cfg: any, name: string): { Section }
 	local geo = cfg.geometry
@@ -122,6 +124,8 @@ function Crash.deriveSections(cfg: any, name: string): { Section }
 			table.insert(out, {
 				id = "Outer", normal = { s, 0, 0 },
 				offset = w.rootLE[1] + w.span * WING_BREAK_AT, lost = 1 - WING_BREAK_AT * 0.85,
+				-- may slide outboard past an outer engine, up to here (the wing end)
+				maxOffset = w.rootLE[1] + w.span * 0.85, endOffset = w.rootLE[1] + w.span,
 			})
 		end
 	elseif kind == "tail" and (string.find(name, "Horizontal") or string.find(name, "HStab")) and geo.hstab then
@@ -146,7 +150,7 @@ end
 
 -- Profile for one component. `cfg.components[name].crash` overrides any field;
 -- `crash.sections = false` disables break points, a list replaces the derived ones.
-function Crash.profile(cfg: any, name: string): Profile
+function Crash.profile(cfg: any, name: string, toughness: number?): Profile
 	local compCfg = cfg.components and cfg.components[name] or {}
 	local kind = Crash.kind(name)
 	local base = DEFAULTS[kind]
@@ -170,23 +174,61 @@ function Crash.profile(cfg: any, name: string): Profile
 			})
 		end
 	else
-		p.sections = Crash.deriveSections(cfg, name)
+		-- Derived planes must not cut through a child component (a T-tail's stabiliser
+		-- sits on top of the fin, so the fin can't lose its top on its own).
+		p.sections = {}
+		-- Wing planes slide outboard past an outer engine if there's room for a tip.
+		for _, sec in Crash.deriveSections(cfg, name) do
+			local s2: any = sec
+			local furthest = -math.huge
+			for _, other in cfg.components or {} do
+				if other.parent == name and other.ref and Crash.inSection(sec, other.ref) then
+					local n = sec.normal
+					furthest = math.max(furthest, other.ref[1] * n[1] + other.ref[2] * n[2] + other.ref[3] * n[3])
+				end
+			end
+			if furthest > -math.huge then
+				local moved = furthest + CHILD_CLEARANCE
+				if s2.maxOffset and moved <= s2.maxOffset then
+					local span = s2.endOffset - sec.offset
+					sec.lost *= (s2.endOffset - moved) / span
+					sec.offset = moved
+				else
+					continue
+				end
+			end
+			table.insert(p.sections, { id = sec.id, normal = sec.normal, offset = sec.offset, lost = sec.lost })
+		end
+	end
+	-- Easy mode (toughness > 1) makes dents and tears need harder hits.
+	local tough = toughness or 1
+	if tough ~= 1 then
+		p.dentThreshold *= tough
+		p.sectionBreakDv *= tough
+		p.secondaryBreakDv *= tough
 	end
 	return p :: Profile
 end
 
 -- Profiles for every component, cached per config table.
-local cache: { [any]: { [string]: Profile } } = setmetatable({}, { __mode = "k" }) :: any
-function Crash.profiles(cfg: any): { [string]: Profile }
-	local c = cache[cfg]
+-- `toughness` is FlightModel's easy-mode multiplier (Assist.toughness); default 1.
+local cache: { [any]: { [number]: { [string]: Profile } } } = setmetatable({}, { __mode = "k" }) :: any
+function Crash.profiles(cfg: any, toughness: number?): { [string]: Profile }
+	local tough = toughness or 1
+	local byTough = cache[cfg]
+	if not byTough then
+		byTough = {}
+		cache[cfg] = byTough
+	end
+	local c = byTough[tough]
 	if c then
 		return c
 	end
 	c = {}
 	for name in cfg.components do
-		c[name] = Crash.profile(cfg, name)
+		c[name] = Crash.profile(cfg, name, tough)
 	end
-	cache[cfg] = c
+	byTough[tough] = c
 	return c
 end
 

@@ -158,14 +158,15 @@ local WEAR_PER_METRE = {
 Damage.WEAR_PER_METRE = WEAR_PER_METRE
 
 function Damage.wearKind(name: string): string
-	if string.find(name, "Engine") then
+	-- Gear first: "LeftWingGear" is landing gear, not a wing.
+	if string.find(name, "Gear") then
+		return "gear"
+	elseif string.find(name, "Engine") then
 		return "engine"
 	elseif string.find(name, "Wing") then
 		return "wing"
 	elseif string.find(name, "Stab") then
 		return "tail"
-	elseif string.find(name, "Gear") then
-		return "gear"
 	end
 	return "fuselage"
 end

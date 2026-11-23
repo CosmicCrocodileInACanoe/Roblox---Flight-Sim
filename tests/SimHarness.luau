@@ -64,7 +64,7 @@ Sim.mulMtV = mulMtV
 function Sim.new(cfg, opts)
 	local self = setmetatable({}, Sim)
 	self.cfg = cfg
-	self.model = FlightModel.new(cfg, { enginesRunning = opts.enginesRunning, gearDown = opts.gearDown, flaps = opts.flaps })
+	self.model = FlightModel.new(cfg, { enginesRunning = opts.enginesRunning, gearDown = opts.gearDown, flaps = opts.flaps, toughness = opts.toughness })
 	self.env = FlightModel.newEnv(cfg)
 	self.ctl = FlightModel.newControls()
 	self.ctl.flaps = opts.flaps or 1
@@ -85,14 +85,26 @@ function Sim.new(cfg, opts)
 	local m = cfg.mass
 	self.I = { cfg.inertia.pitch, cfg.inertia.yaw, cfg.inertia.roll } -- about body x, y, z
 	self.maxG = 0
+	-- belly height below the CoM (lowest fuselage hull point)
+	local floor = 1.9
+	for _, hp in cfg.hullPoints do
+		if hp[1] == 0 then
+			floor = math.max(floor, -hp[2])
+		end
+	end
+	self.hullFloor = floor
 	return self
+end
+
+-- CoM height above the ground with the main wheels just touching (metres).
+function Sim.restHeight(cfg)
+	local u = cfg.gear.units[2]
+	return -(u.pos[2] - u.strutLength - u.wheelRadius) - 0.02
 end
 
 -- Place the aircraft so its main wheels just touch the ground at rest.
 function Sim:settleOnGround()
-	local u = self.cfg.gear.units[2]
-	local h = -(u.pos[2] - u.strutLength - u.wheelRadius) - 0.02
-	self.py = self.groundY + h
+	self.py = self.groundY + Sim.restHeight(self.cfg)
 end
 
 function Sim:prepareEnv()
@@ -103,7 +115,7 @@ function Sim:prepareEnv()
 	env.ux, env.uy, env.uz = mulMtV(R, 0, 1, 0)
 	env.altitude = self.py
 	-- height of the wheels above ground, approximated as CoM height minus static gear height
-	env.agl = self.py - self.groundY - 3.9
+	env.agl = self.py - self.groundY - Sim.restHeight(cfg) + 0.2
 	local dxw, dyw, dzw = mulMV(R, 0, -1, 0)
 	local nbx, nby, nbz = mulMtV(R, 0, 1, 0)
 	for i, u in cfg.gear.units do
@@ -159,8 +171,9 @@ function Sim:frame()
 		self.wx, self.wy, self.wz = mulMV(self.R, bx, by, bz)
 	end
 	-- crude hard ground for the fuselage so a collapsed gear doesn't fall through
-	if self.py < self.groundY + 1.9 then
-		self.py = self.groundY + 1.9
+	local floor = self.hullFloor
+	if self.py < self.groundY + floor then
+		self.py = self.groundY + floor
 		if self.vy < 0 then
 			self.vy = 0
 		end

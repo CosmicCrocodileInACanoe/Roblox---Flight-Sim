@@ -30,6 +30,10 @@ These are the most likely places for first-run bugs, so check them first.
       clipping), and speed, altitude, heading and vertical speed tapes all update.
 - [ ] Menu: every dropdown works; the Fly button spawns an aircraft; M toggles the menu
       while parked and while flying.
+- [ ] Sound with every ID empty: no errors or `[Audio]` warnings in Output. With IDs filled
+      in: the engine whine rises and falls with throttle, wind grows with speed, the gear horn
+      sounds low with the gear up, touchdown thumps, cockpit view sounds muffled, and nothing
+      keeps playing after Reset or returning to the menu.
 - [ ] Reset (R) respawns cleanly, with no leftover aircraft and no error.
 - [ ] Progress: with API services on, fly one landing, leave, rejoin; the Flights and Best
       Landing leaderstats are kept. With API services off, there's a warning and no error.

@@ -22,6 +22,7 @@ local Effects = require(Client.Effects)
 local ControlsPopup = require(Client.ControlsPopup)
 local FlightPanel = require(Client.FlightPanel)
 local Minimap = require(Client.Minimap)
+local SoundController = require(Client.SoundController)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -32,6 +33,7 @@ local hud = Hud.new()
 local camera = CameraController.new()
 local controlsPopup = ControlsPopup.new()
 local minimap = Minimap.new()
+local sound = SoundController.new()
 
 local function command(name: string)
 	return function()
@@ -85,6 +87,7 @@ local function stopFlying()
 		fc:destroy()
 		fc = nil
 	end
+	sound:detach()
 	input:unbind()
 	camera:detach()
 	hud:setFlying(false)
@@ -126,6 +129,7 @@ end
 		fc:destroy()
 		fc = nil
 	end
+	sound:detach()
 	if not model then
 		return
 	end
@@ -133,6 +137,7 @@ end
 	local cfg = Registry.get(model:GetAttribute("AircraftId") :: string)
 	fc = FlightController.new(model, options, sp, remotes, input)
 	fc.windProvider = WorldFx.wind
+	sound:attach(fc)
 	destination = options.destination
 	input:bind()
 	camera:attach(model, cfg)
@@ -222,6 +227,9 @@ end)
 
 RunService.Heartbeat:Connect(function(dt)
 	WorldFx.update(dt, if fc then fc.model else nil)
+	if fc then
+		sound:update(dt, camera.mode)
+	end
 	if fc then
 		hud:update(fc.telemetry, destination)
 		flightPanel:update(fc.telemetry)

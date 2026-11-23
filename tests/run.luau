@@ -54,6 +54,7 @@ local suites = {
 	require("./test_minimap"),
 	require("./test_selection"),
 	require("./test_detail"),
+	require("./test_audio"),
 }
 
 for _, suite in suites do

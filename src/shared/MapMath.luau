@@ -9,7 +9,7 @@
 local MapMath = {}
 
 -- View radius (studs from the centre of the map to its edge) for each zoom step.
-MapMath.ZOOMS = { 2500, 5000, 10000, 20000, 40000 }
+MapMath.ZOOMS = { 2500, 5000, 10000, 20000, 40000, 80000 }
 MapMath.DEFAULT_ZOOM = 3
 
 export type Bounds = { minX: number, maxX: number, minZ: number, maxZ: number }

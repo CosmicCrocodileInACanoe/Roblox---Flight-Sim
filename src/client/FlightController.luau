@@ -196,6 +196,8 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 		self.compRefs[name] = Vector3.new(c.ref[1], c.ref[2], c.ref[3])
 	end
 	self.lastImpact = {} :: { [string]: number }
+	self.impactCount = 0 -- read by SoundController
+	self.impactDv = 0
 	self.lastTouchdownIndex = 0
 	self.systemsTimer = 0
 	self.lastSystems = ""
@@ -481,6 +483,10 @@ function FlightController:detectImpacts(dt: number, cf: CFrame, v: Vector3, w: V
 			maxDv = mag
 			self:crashResponse(best, self.compRefs[best], dvUnexpected, mag, cf, v, w, false)
 		end
+	end
+	if maxDv > 0 then
+		self.impactCount += 1
+		self.impactDv = maxDv
 	end
 	if maxDv > 5 then
 		Effects.shake(math.clamp(maxDv / 25, 0.1, 1.5))

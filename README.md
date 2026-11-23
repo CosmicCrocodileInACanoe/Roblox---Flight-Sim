@@ -10,8 +10,8 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 162 automated tests, all passing: aero, engines, gear, damage,
-grading, missions, airport geometry, terrain and 13 offline 6-DOF flights through the same
+engine-independent logic has 182 automated tests, all passing: aero, engines, gear, damage,
+grading, missions, audio mixing, airport geometry, terrain and 13 offline 6-DOF flights through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
 collisions) is unverified until someone works through `docs/PLAYTEST.md` in Studio.
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `162 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `182 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -88,6 +88,25 @@ A typical first flight: spawn at an HBR runway threshold, press I and wait for t
 set flaps 2 (press F twice), hold Shift for full throttle, pull back gently at about 145 kt,
 press G after a positive climb, then press V to bring the flaps up above 180 kt.
 
+## Sound
+
+All audio is set up in `src/shared/AudioConfig.luau`. Each slot has an `id`; paste a Creator
+Store audio asset ID there (just the number) and it plays. Empty slots stay silent and never
+error. What each slot does:
+
+- Engines: `jetWhine` (pitch and volume follow N1) and `jetRumble` (follows thrust and
+  reverse). A turboprop would use `propDrone` and `propRumble` instead (`AudioConfig.aircraftProfile`).
+  `engineStart` plays once when you start the engines.
+- `wind` grows with airspeed, louder with gear down or speedbrake out; `runwayRoll` rumbles
+  with ground speed while the wheels are down.
+- `gearMotor`, `flapMotor` loop while they move; `gearLock` clunks when the gear locks.
+- `touchdown` thump (louder on hard landings), `tyreSqueal` above 40 kt.
+- `impactLight`, `impactHeavy` for hits and parts breaking off, `crash` when the aircraft is destroyed.
+- `stallWarning`, `gearWarning` (gear not down below 1,000 ft with low throttle or landing flaps).
+
+In the cockpit view, outside sounds are muffled by an equaliser and warnings are at full
+volume. In the tower view, outside sounds fade with distance.
+
 ## Layout
 
 ```
@@ -104,8 +123,9 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Airports, WorldGen      airport layouts, deterministic terrain height field
   Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
   GameConfig, AircraftRegistry, Aircraft/Meridian200
+  AudioConfig, AudioMix   every sound asset ID in one file; pure loop/one-shot mixing
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build
-src/client/               input, flight controller, cameras, HUD, menu, weather and effects
+src/client/               input, flight controller, cameras, HUD, menu, weather, effects, sound
 tests/                    test runner, 6-DOF harness, Roblox mock, test suites
 docs/PLAN.md              architecture, schemas, boundaries, decisions, risks, roadmap
 docs/PLAYTEST.md          manual Studio checklist
@@ -140,7 +160,7 @@ Tunables shared by all aircraft are in `GameConfig.crash`.
 ## Known limits of this milestone
 
 - One aircraft. The registry and builder are generic, but only the Meridian 200 has data.
-- No audio. Engine and wind sound need original or licensed assets.
+- Sound ships with empty asset IDs, so the game is silent until they're filled in (see Sound).
 - Weather and time of day are chosen per player, so two players can see different wind.
 - StreamingEnabled is off so terrain can't vanish under a fast aircraft. The server logs the
   world part count at start (`[World] built N parts`); terrain alone is up to about 15,000

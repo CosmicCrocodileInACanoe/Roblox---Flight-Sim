@@ -29,8 +29,9 @@ return {
 				T.check(p.z - p.r >= b.minZ and p.z + p.r <= b.maxZ, "z outside")
 			end
 			-- a point far outside the terrain grows the bounds (a bigger world adapts)
-			local big = MapMath.worldBounds(WorldGen.BOUNDS, { { x = 200000, z = -90000, r = 500 } }, 0)
-			T.check(big.maxX == 200500 and big.minZ == -90500)
+			local fx, fz = WorldGen.BOUNDS.maxX + 50000, WorldGen.BOUNDS.minZ - 40000
+			local big = MapMath.worldBounds(WorldGen.BOUNDS, { { x = fx, z = fz, r = 500 } }, 0)
+			T.check(big.maxX == fx + 500 and big.minZ == fz - 500)
 		end)
 		T.test("base image keeps the world's aspect ratio", function()
 			local b = { minX = 0, maxX = 1000, minZ = 0, maxZ = 500 }

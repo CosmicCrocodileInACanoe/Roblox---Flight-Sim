@@ -57,8 +57,10 @@ AudioConfig.profiles = {
 	prop = { whine = "propDrone", rumble = "propRumble" },
 }
 AudioConfig.aircraftProfile = {
+	kestrel72 = "prop",
 	meridian200 = "jet",
-	turboprop = "prop",
+	atlas400 = "jet",
+	celestia800 = "jet",
 }
 AudioConfig.defaultProfile = "jet"
 

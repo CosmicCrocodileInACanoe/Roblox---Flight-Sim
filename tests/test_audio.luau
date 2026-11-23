@@ -53,7 +53,11 @@ return { name = "Audio", run = function(T)
 	end)
 	T.test("profiles: the jet uses turbine sounds, a turboprop uses prop sounds", function()
 		T.check(jet.whine == "jetWhine", "jet")
-		T.check(AudioMix.profileFor(AudioConfig, "turboprop", nil).whine == "propDrone", "prop")
+		T.check(AudioMix.profileFor(AudioConfig, "kestrel72", nil).whine == "propDrone", "Kestrel 72 is a turboprop")
+		local Registry = require("../src/shared/AircraftRegistry")
+		for id in Registry.types do
+			T.check(AudioConfig.aircraftProfile[id] ~= nil, id .. " has a sound profile")
+		end
 		T.check(AudioMix.profileFor(AudioConfig, "unknown", nil).whine == "jetWhine", "default")
 	end)
 	T.test("engine whine rises in pitch and level with N1; silent when off", function()

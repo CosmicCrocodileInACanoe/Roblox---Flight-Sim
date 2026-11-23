@@ -13,11 +13,14 @@ GameConfig.Remotes = {
 	"ReportDamage",
 	"ReportSystems",
 	"ReportTouchdown",
+	"ReportImpact", -- (model, component, pointBodyM: Vector3, dirBody: Vector3, dv)
+	"ReportSection", -- (model, component, sectionId, dv)
 	-- server -> client
 	"AircraftAssigned",
 	"MissionUpdate",
 	"LandingResult",
 	"Notify",
+	"CrashFx", -- (kind: "sparks"|"shards"|"dust", worldPos: Vector3, intensity, velocity: Vector3?)
 }
 
 GameConfig.CollisionGroups = {
@@ -35,6 +38,17 @@ GameConfig.debris = {
 	maxPiecesPerPlayer = 24,
 	maxPiecesTotal = 80,
 	lifetime = 75, -- seconds
+}
+
+-- BeamNG-style crash feel (see shared/Crash.luau for per-component profiles).
+GameConfig.crash = {
+	impactReportMinInterval = 0.12, -- s between dent reports for one component
+	maxCrumplesPerSecond = 12, -- server, per player
+	maxSplitsPerSecond = 6, -- server, debris secondary breakups across the game
+	splitPush = 6, -- m/s separation push for a freshly split piece
+	clientMaxShards = 60, -- client-only cosmetic shards alive at once
+	shardLifetime = 6, -- s
+	scuffDarken = 0.35, -- how much a fully dented part darkens
 }
 
 GameConfig.rateLimits = {

@@ -18,12 +18,17 @@ export type ComponentState = {
 	health: number,
 	state: string, -- "normal" | "degraded" | "failed" | "detached"
 	detachedWithParent: boolean,
+	-- Break points: sections torn off this component (outer wing, fin top, ...).
+	sectionsLost: { [string]: boolean },
+	lostFraction: number, -- 0..1 of the component's lift/mass gone with those sections
 }
+
+export type DamageEvent = { component: string, state: string, health: number, section: string? }
 
 export type DamageModel = {
 	components: { [string]: ComponentState },
 	order: { string },
-	events: { { component: string, state: string, health: number } },
+	events: { DamageEvent },
 	destroyed: boolean,
 	totalImpact: number,
 }
@@ -37,7 +42,10 @@ function Damage.new(componentsCfg: { [string]: any }): DamageModel
 	local comps = {}
 	local order = {}
 	for name, cfg in componentsCfg do
-		comps[name] = { name = name, cfg = cfg, health = 1, state = "normal", detachedWithParent = false }
+		comps[name] = {
+			name = name, cfg = cfg, health = 1, state = "normal", detachedWithParent = false,
+			sectionsLost = {}, lostFraction = 0,
+		}
 		table.insert(order, name)
 	end
 	table.sort(order)
@@ -150,14 +158,15 @@ local WEAR_PER_METRE = {
 Damage.WEAR_PER_METRE = WEAR_PER_METRE
 
 function Damage.wearKind(name: string): string
-	if string.find(name, "Engine") then
+	-- Gear first: "LeftWingGear" is landing gear, not a wing.
+	if string.find(name, "Gear") then
+		return "gear"
+	elseif string.find(name, "Engine") then
 		return "engine"
 	elseif string.find(name, "Wing") then
 		return "wing"
 	elseif string.find(name, "Stab") then
 		return "tail"
-	elseif string.find(name, "Gear") then
-		return "gear"
 	end
 	return "fuselage"
 end
@@ -216,17 +225,42 @@ function Damage.effectiveness(d: DamageModel, name: string): number
 	if not c then
 		return 1
 	end
+	local intact = 1 - c.lostFraction
 	if c.state == "detached" then
 		return 0
 	elseif c.state == "failed" then
-		return 0.35
+		return 0.35 * intact
 	elseif c.state == "degraded" then
-		return 0.55 + 0.45 * c.health
+		return (0.55 + 0.45 * c.health) * intact
 	end
-	return 1
+	return intact
 end
 
-function Damage.drainEvents(d: DamageModel): { { component: string, state: string, health: number } }
+-- Tear a section (a break point from Crash profiles) off a component. The component
+-- stays attached but loses `lost` of its lift and mass, and takes `hurtAmount` damage.
+-- Emits a "section" event (state = "section", section = id). Returns true if it broke.
+function Damage.breakSection(d: DamageModel, name: string, sectionId: string, lost: number, hurtAmount: number?): boolean
+	local c = d.components[name]
+	if not c or c.state == "detached" or c.sectionsLost[sectionId] then
+		return false
+	end
+	c.sectionsLost[sectionId] = true
+	c.lostFraction = math.clamp(c.lostFraction + lost, 0, 0.95)
+	table.insert(d.events, { component = name, state = "section", health = c.health, section = sectionId })
+	Damage.hurt(d, name, hurtAmount or 0.2)
+	return true
+end
+
+-- Mass (kg) a component has shed through lost sections while still attached.
+function Damage.sectionMassLost(d: DamageModel, name: string): number
+	local c = d.components[name]
+	if not c or c.state == "detached" then
+		return 0
+	end
+	return (c.cfg.mass or 0) * c.lostFraction
+end
+
+function Damage.drainEvents(d: DamageModel): { DamageEvent }
 	local ev = d.events
 	d.events = {}
 	return ev

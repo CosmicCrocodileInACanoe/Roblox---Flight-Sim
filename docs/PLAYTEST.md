@@ -57,6 +57,14 @@ These are the most likely places for first-run bugs, so check them first.
      the aircraft breaks up.
    - With a damaged wing (sandbox failure "Left wing damaged"): the aircraft still flies but
      needs right aileron.
+   - **Crash feel.** Clip a wingtip on the ground at about 70 kt: sparks, a few shards, and the
+     outer wing tears off while the inner wing stays on. The aircraft rolls toward that side.
+   - Belly-scrape a building corner: the panels near the contact visibly dent inward and
+     darken. Hitting the same spot again dents it a bit more, but it never caves in absurdly.
+   - Watch a torn-off wing tumble: it carries on in the direction the aircraft was moving and
+     splits again when it slams into the ground hard. A second player sees the same pieces.
+   - Look for hitches: the dent re-weld should not jerk the aircraft. If it does, lower
+     `GameConfig.crash.maxCrumplesPerSecond`.
 7. **Debris.** Crash ten times in a row with the sandbox. Frame rate recovers; debris
    disappears after about 75 s; the debris part count never exceeds 80 (in Explorer,
    Workspace > Debris).

@@ -18,6 +18,7 @@ local CameraController = require(Client.CameraController)
 local Hud = require(Client.Hud)
 local Menu = require(Client.Menu)
 local WorldFx = require(Client.WorldFx)
+local Effects = require(Client.Effects)
 local ControlsPopup = require(Client.ControlsPopup)
 local FlightPanel = require(Client.FlightPanel)
 local Minimap = require(Client.Minimap)
@@ -150,6 +151,19 @@ end)
 end)
 ;(remotes:WaitForChild("LandingResult") :: RemoteEvent).OnClientEvent:Connect(function(result: any)
 	hud:showLanding(result)
+end)
+;(remotes:WaitForChild("CrashFx") :: RemoteEvent).OnClientEvent:Connect(function(kind: any, pos: any, intensity: any, vel: any)
+	if type(kind) ~= "string" or typeof(pos) ~= "Vector3" or type(intensity) ~= "number" or intensity ~= intensity then
+		return
+	end
+	if vel ~= nil and typeof(vel) ~= "Vector3" then
+		return
+	end
+	local cam = workspace.CurrentCamera
+	if cam and (cam.CFrame.Position - pos).Magnitude > 4000 then
+		return
+	end
+	Effects.crashFx(kind, pos, intensity, vel)
 end)
 ;(remotes:WaitForChild("Notify") :: RemoteEvent).OnClientEvent:Connect(function(text: string)
 	hud:notify(text)

@@ -215,6 +215,8 @@ function FlightModel:currentMass(): number
 	for name, c in self.damage.components do
 		if c.state == "detached" then
 			m -= c.cfg.mass
+		else
+			m -= (c.cfg.mass or 0) * (c.lostFraction or 0)
 		end
 	end
 	return math.max(m, cfg.mass * 0.3)

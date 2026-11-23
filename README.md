@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 50 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 162 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, airport geometry, terrain and 13 offline 6-DOF flights through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -53,10 +53,10 @@ runs, but progress is not saved; `ProgressService` logs a warning and carries on
 From the repo root:
 
 ```
-luau tests/run.luau
+sh tests/run.sh
 ```
 
-Expected: `50 passed, 0 failed`. These tests do not start Roblox.
+Expected: `162 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -98,17 +98,44 @@ src/shared/               Pure Luau, used by the server, the client and the test
   FlightModel             6-DOF forces and torques for one aircraft (the core of the game)
   Assist                  Easy mode (self-levelling, pitch/bank limits, no stalls, speed floor, flare help,
                           tougher airframe) and Assisted mode (auto-trim, turn coordination, protections)
-  Damage                  component health, states, propagation, detachment
+  Damage                  component health, states, propagation, detachment, lost sections
+  Crash                   crash feel: per-component profiles, dents, break points, debris breakup
   Grading, Mission        landing score, gate-to-gate mission state machine
   Airports, WorldGen      airport layouts, deterministic terrain height field
   Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
   GameConfig, AircraftRegistry, Aircraft/Meridian200
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build
 src/client/               input, flight controller, cameras, HUD, menu, weather and effects
-tests/                    test runner, 6-DOF harness, five suites
+tests/                    test runner, 6-DOF harness, Roblox mock, test suites
 docs/PLAN.md              architecture, schemas, boundaries, decisions, risks, roadmap
 docs/PLAYTEST.md          manual Studio checklist
 ```
+
+## Crash physics
+
+Roblox has no soft bodies, so crashes fake one in three layers (`src/shared/Crash.luau` holds
+the maths, `src/server/CrashService.luau` applies it, the client adds local shards and sparks):
+
+1. **Dents.** Hard contacts push nearby parts inward along the hit and twist them a little,
+   scaled by impact speed, accumulating up to a cap. The server re-welds the moved parts, so
+   everyone sees the crumpled shape.
+2. **Break points.** Wings lose their outer section, stabilisers their tips and the fin its top
+   before the whole component lets go. The aircraft keeps flying, lopsided.
+3. **Debris breakup.** Torn pieces keep the aircraft's momentum (v + w x r) and split again
+   across their longest axis on hard secondary hits, until their integrity runs out. Total
+   pieces stay inside the existing debris caps.
+
+Adding an aircraft needs no crash code. Profiles come from each component's name
+(Wing/Engine/Prop/Stab/Fin/Tail/Gear, anything else is fuselage) and break planes from
+`geometry.wing/hstab/vstab`. Override any field per component:
+
+```lua
+LeftOuterEngine = { ..., crash = { maxDent = 0.5, secondaryBreakDv = 12 } },
+UpperDeck = { ..., crash = { sections = { { id = "Hump", normal = { 0, 1, 0 }, offset = 4.5, lost = 0.3 } } } },
+LeftWing = { ..., crash = { sections = false } }, -- no break point
+```
+
+Tunables shared by all aircraft are in `GameConfig.crash`.
 
 ## Known limits of this milestone
 

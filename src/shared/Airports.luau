@@ -223,19 +223,20 @@ function Airports.spawnPoints(id: string): { SpawnPoint }
 	local l = Airports.layout(id)
 	local ap = Airports.list[id]
 	local out = {}
-	for i, g in l.gates do
-		table.insert(out, {
-			id = `{id}-gate{i}`, label = `{ap.name}: Gate {i}`, airport = id, kind = "gate",
-			x = g.x, y = l.y, z = g.z, heading = g.heading, speed = 0,
-			enginesRunning = false, gearDown = true, flaps = 1, throttle = 0, pitchDeg = 0,
-		})
-	end
+	-- Runways first: every "Start at" list defaults to a runway.
 	for _, e in l.ends do
 		local start = 90 * SPM -- metres past the threshold
 		table.insert(out, {
 			id = `{id}-rwy{e.ident}`, label = `{ap.name}: Runway {e.ident}`, airport = id, kind = "runway",
 			x = e.thx + e.dx * start, y = l.y, z = e.thz + e.dz * start, heading = e.heading, speed = 0,
 			enginesRunning = true, gearDown = true, flaps = 3, throttle = 0, pitchDeg = 0,
+		})
+	end
+	for i, g in l.gates do
+		table.insert(out, {
+			id = `{id}-gate{i}`, label = `{ap.name}: Gate {i}`, airport = id, kind = "gate",
+			x = g.x, y = l.y, z = g.z, heading = g.heading, speed = 0,
+			enginesRunning = false, gearDown = true, flaps = 1, throttle = 0, pitchDeg = 0,
 		})
 	end
 	for _, e in l.ends do

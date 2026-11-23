@@ -104,7 +104,7 @@ local function sanitizeOptions(raw: any): any?
 	if not cfg or not cfg.unlocked then
 		return nil
 	end
-	local spawnId = if type(raw.spawnId) == "string" then raw.spawnId else "HBR-gate1"
+	local spawnId = if type(raw.spawnId) == "string" then raw.spawnId else "HBR-rwy09"
 	if not Airports.getSpawn(spawnId) then
 		return nil
 	end

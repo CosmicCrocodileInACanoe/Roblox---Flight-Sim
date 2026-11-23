@@ -523,18 +523,20 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 			local pvy = env.vgy + (wz * px - wx * pz)
 			local pvz = env.vgz + (wx * py - wy * px)
 			local d = math.min(depth, 1.5)
-			local b = floatBuoy * d
+			-- planing lift: moving floats ride higher than floating ones
+			local hump = (wf and wf.humpSpeed) or 9
+			local b = floatBuoy * d * (1 + 0.8 * math.min(1, (abs(env.vgz) / hump) ^ 2))
 			local bx, by, bz = env.ux * b, env.uy * b, env.uz * b
-			local keel = (wf and wf.keelDrag) or 0.05
+			local keel = (wf and wf.keelDrag) or 0.03
 			local side = (wf and wf.sideDrag) or 1.2
 			local heave = (wf and wf.heaveDamping) or 0.8
 			local speed = sqrt(pvx * pvx + pvy * pvy + pvz * pvz)
 			-- planing: past the hump speed the floats ride on the step and drag falls away
-			local plane = 1 / (1 + (abs(pvz) / ((wf and wf.humpSpeed) or 9)) ^ 2)
+			local plane = 1 / (1 + (abs(pvz) / hump) ^ 2)
 			local q = 0.5 * 1000 * speed * math.min(d, 1)
 			bx -= q * side * pvx
 			by -= q * heave * pvy
-			bz -= q * keel * (0.35 + plane) * pvz
+			bz -= q * keel * (0.15 + plane) * pvz
 			fx += bx
 			fy += by
 			fz += bz

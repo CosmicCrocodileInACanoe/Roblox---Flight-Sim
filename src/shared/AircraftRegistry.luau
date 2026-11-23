@@ -11,6 +11,9 @@ local function req(name: string): any
 end
 
 Registry.types = {
+	meadowlark4 = req("Meadowlark4"),
+	sprite = req("Sprite"),
+	puffin = req("Puffin"),
 	kestrel72 = req("Kestrel72"),
 	meridian200 = req("Meridian200"),
 	atlas400 = req("Atlas400"),
@@ -18,7 +21,7 @@ Registry.types = {
 }
 
 -- Smallest to largest; the menu shows them in this order.
-Registry.order = { "kestrel72", "meridian200", "atlas400", "celestia800" }
+Registry.order = { "meadowlark4", "sprite", "puffin", "kestrel72", "meridian200", "atlas400", "celestia800" }
 
 Registry.planned = {
 	{ id = "regionaljet", label = "Regional twinjet", milestone = 3 },

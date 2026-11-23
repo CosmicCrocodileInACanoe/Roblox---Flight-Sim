@@ -202,7 +202,9 @@ local function rod(ctx: Ctx, comp: string, name: string, p0: Vector3, p1: Vector
 	if d.Magnitude < 0.02 then
 		return nil
 	end
-	local cf = CFrame.lookAt((p0 + p1) / 2, p1) * ALONG_Z
+	-- (a vertical rod needs another "up" hint, or lookAt has no defined roll)
+	local upHint = if math.abs(d.Unit.Y) > 0.98 then Vector3.xAxis else Vector3.yAxis
+	local cf = CFrame.lookAt((p0 + p1) / 2, p1, upHint) * ALONG_Z
 	return add(ctx, comp, name, "cylinder", Vector3.new(d.Magnitude, diameter, diameter), cf, color, opts)
 end
 
@@ -454,7 +456,7 @@ local function buildFuselage(ctx: Ctx)
 	-- heights (ws.yLow / ws.yHigh, in the surface's own frame), so every pane meets the
 	-- surface at the right place whatever the nose shape.
 	local ws = g.windscreen
-	if ws ~= false and not g.canopy and not g.cabin then
+	if ws ~= false and not g.canopy and not (g.cabin and g.cabin.windscreen) then
 		ws = ws or {}
 		local cf, semi = noseCF, noseSemi
 		if ws.surface == "hump" and g.hump then
@@ -538,7 +540,8 @@ local function buildFuselage(ctx: Ctx)
 	-- solid cabin. The cockpit view swaps them for the interior glass.
 	if g.cabin then
 		local cb = g.cabin
-		local w = cb.windscreen
+		local w = cb.windscreen or false
+		if w then
 		local hwB, hwT = w.halfWidth, w.topHalfWidth or w.halfWidth * 0.85
 		local b0, b1 = Vector3.new(-hwB, w.yBottom, w.zBottom), Vector3.new(hwB, w.yBottom, w.zBottom)
 		local t0, t1 = Vector3.new(-hwT, w.yTop, w.zTop), Vector3.new(hwT, w.yTop, w.zTop)
@@ -552,6 +555,7 @@ local function buildFuselage(ctx: Ctx)
 			quad(ctx, "ForwardFuselage", "Windscreen", side[1] + off * 0.04, side[2] + off * 0.04, side[3] + off * 0.04, side[4] + off * 0.04, 0.03, GLASS, glassOpts())
 		end
 		rod(ctx, "ForwardFuselage", "WindscreenPost", mid0 + off * 0.06, mid1 + off * 0.06, 0.05, FRAME_BLACK, { tag = "HideInCockpit" })
+		end
 		for _, sw in cb.sideWindows or {} do
 			for _, sx in { -1, 1 } do
 				local z0, z1, y0, y1 = sw[1], sw[2], sw[3], sw[4]
@@ -858,7 +862,7 @@ local function buildWings(ctx: Ctx)
 			tri(ctx, comp, "Strake", A, B, C, thick(0) * 0.5, wingColor, { hull = true })
 		end
 		-- navigation lights: red left, green right
-		add(ctx, comp, "NavLight", "ball", Vector3.new(0.25, 0.25, 0.25), CFrame.new(tipEnd + Vector3.new(0, 0.05, 0.25)), if sx < 0 then Color3.fromRGB(255, 40, 40) else Color3.fromRGB(40, 255, 80), { material = Enum.Material.Neon })
+		add(ctx, comp, "NavLight", "ball", Vector3.one * math.clamp(w.span / 40, 0.12, 0.25), CFrame.new(tipEnd + Vector3.new(0, 0.05, 0.25)), if sx < 0 then Color3.fromRGB(255, 40, 40) else Color3.fromRGB(40, 255, 80), { material = Enum.Material.Neon })
 	end
 end
 
@@ -920,7 +924,7 @@ local function buildTail(ctx: Ctx)
 	local _, H = bodyHalf(geo.fuselage)
 	local topY = if geo.fuselage.hump then geo.fuselage.hump.top else H
 	local bz = if geo.fuselage.canopy then geo.fuselage.canopy.z1 + 1 else 2
-	add(ctx, "Fuselage", "Beacon", "ball", Vector3.new(0.3, 0.3, 0.3), CFrame.new(0, topY + 0.1, bz), Color3.fromRGB(255, 30, 30), { material = Enum.Material.Neon, tag = "Beacon" })
+	add(ctx, "Fuselage", "Beacon", "ball", Vector3.one * math.clamp(geo.fuselage.radius * 0.2, 0.12, 0.3), CFrame.new(0, topY + 0.1, bz), Color3.fromRGB(255, 30, 30), { material = Enum.Material.Neon, tag = "Beacon" })
 end
 
 -- Engines ----------------------------------------------------------------------------
@@ -1032,13 +1036,13 @@ local function buildTurbofan(ctx: Ctx, comp: string, index: number, p: Vector3, 
 	end
 	local lipZ = zf + R * 0.08
 	local inletLen = L * 0.26
-	torus(ctx, comp, "IntakeLip", at(lipZ), R * 0.925, R * 0.15, 16, METAL, { material = Enum.Material.Metal, reflectance = 0.15, hull = true })
-	tube(ctx, comp, "Inlet", at(lipZ + inletLen / 2), R * 0.95, R * 0.07, inletLen, 16, nac, { hull = true })
+	torus(ctx, comp, "IntakeLip", at(lipZ), R * 0.925, R * 0.15, 12, METAL, { material = Enum.Material.Metal, reflectance = 0.15, hull = true })
+	tube(ctx, comp, "Inlet", at(lipZ + inletLen / 2), R * 0.95, R * 0.07, inletLen, 12, nac, { hull = true })
 	-- fan face: dark case, spinner and blades
 	local fanZ = lipZ + inletLen * 0.72
 	add(ctx, comp, "FanCase", "cylinder", Vector3.new(0.04, R * 1.86, R * 1.86), CFrame.new(at(fanZ + 0.06)) * ALONG_Z, INTAKE_DARK)
 	local hub = spinAssembly(ctx, comp, index, at(fanZ - R * 0.1), Vector3.new(R * 0.42, R * 0.27, R * 0.27), Color3.fromRGB(235, 236, 240), { material = Enum.Material.Metal })
-	local nb = eg.fanBlades or 18
+	local nb = eg.fanBlades or 14
 	for b = 0, nb - 1 do
 		local a = 2 * math.pi * b / nb
 		local radial = Vector3.new(math.cos(a), math.sin(a), 0)
@@ -1214,6 +1218,13 @@ local function buildGear(ctx: Ctx)
 		m.C1 = CFrame.new(L / 2 * S, 0, 0) * CFrame.Angles(0, 0, -math.rad(90))
 		m:SetAttribute("GearName", u.name)
 		m.Parent = root
+		-- spring-steel leg / brace from the fuselage out to the attach point (light aircraft)
+		if u.brace then
+			local br = rod(ctx, comp, "GearBrace", v3(u.brace), attach, legD * 1.3, strutColor, { noWeld = true, material = Enum.Material.Metal })
+			if br then
+				weld(leg, br)
+			end
+		end
 		-- wheels: rows x across, axis along body X, on a bogie beam when there are two rows
 		local n = u.wheels or 2
 		local rows = u.rows or 1

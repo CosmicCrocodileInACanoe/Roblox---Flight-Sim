@@ -59,12 +59,14 @@ export type Controls = {
 	speedbrake: number, -- 0..1
 	reverse: boolean,
 	trim: number, -- -1..1
+	waterDrop: boolean, -- water bomber: tank doors open
 }
 
 function FlightModel.newControls(): Controls
 	return {
 		pitch = 0, roll = 0, yaw = 0, throttle = 0, flaps = 1, gearDown = true,
 		brake = 0, parkingBrake = false, speedbrake = 0, reverse = false, trim = 0,
+		waterDrop = false,
 	}
 end
 
@@ -94,6 +96,8 @@ function FlightModel.new(cfg: any, opts: any?)
 	local self = setmetatable({}, FlightModel) :: any
 	self.cfg = cfg
 	self.fuel = o.fuel or cfg.fuel.initial
+	-- water bomber tank (cfg.waterTank), kg on board
+	self.water = if cfg.waterTank then math.clamp(o.water or 0, 0, cfg.waterTank.capacity) else 0
 	self.engines = {}
 	for i, e in cfg.engines do
 		self.engines[i] = Engine.new(e, o.enginesRunning == true)
@@ -147,6 +151,7 @@ function FlightModel.new(cfg: any, opts: any?)
 		lift = 0, drag = 0, thrust = 0, gLoad = 1,
 		stall = false, stallWarning = false, wheelsOnGround = 0, onGround = false,
 		inWater = false, fault = false, waterImpact = 0,
+		water = 0, scooping = false, dropping = false, dropRate = 0, refilling = false,
 	}
 	return self
 end
@@ -211,7 +216,7 @@ end
 
 function FlightModel:currentMass(): number
 	local cfg = self.cfg
-	local m = cfg.mass - (cfg.fuel.initial - self.fuel)
+	local m = cfg.mass - (cfg.fuel.initial - self.fuel) + (self.water or 0)
 	for name, c in self.damage.components do
 		if c.state == "detached" then
 			m -= c.cfg.mass
@@ -299,6 +304,8 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 
 	-- Engines ---------------------------------------------------------------
 	local totalThrust, fuelFlow = 0, 0
+	-- afterburners light for the take-off run and with the gear up, never on an approach
+	local reheatAllowed = anyGround or not ctl.gearDown
 	local hasFuel = self.fuel > 0
 	for i, e in self.engines do
 		local ecfg = cfg.engines[i]
@@ -308,7 +315,7 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 		end
 		local thrust = 0
 		if compState ~= "detached" then
-			thrust = Engine.update(e, ctl.throttle, ctl.reverse, anyGround, sigmaRho, tas, hasFuel, dt)
+			thrust = Engine.update(e, ctl.throttle, ctl.reverse, anyGround, sigmaRho, tas, hasFuel, dt, reheatAllowed, tas / Units.speedOfSound(altitude))
 			if compState == "degraded" then
 				thrust *= 0.7
 			end
@@ -420,6 +427,30 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 	my += bpz * dfx - bpx * dfz
 	mz += bpx * dfy - bpy * dfx
 	totalDrag += sqrt(dfx * dfx + dfy * dfy + dfz * dfz)
+
+	-- Compressibility (wave) drag: past the critical Mach number drag climbs steeply up
+	-- to the sound barrier, then eases off a little once supersonic. Only aircraft built
+	-- for it (a low aero.waveDrag.peak) get through; everything else hits a wall.
+	local mach = tas / Units.speedOfSound(altitude)
+	r.mach = mach
+	local wd = aero.waveDrag
+	local mcrit = (wd and wd.mcrit) or 0.8
+	if mach > mcrit and tas > 0.1 then
+		local peak = (wd and wd.peak) or 0.06
+		local cdw
+		if mach < 1.05 then
+			local t = (mach - mcrit) / (1.05 - mcrit)
+			cdw = peak * t * t
+		else
+			cdw = peak * math.max(0.55, 1.05 / mach)
+		end
+		local dq = 0.5 * rho * tas * aero.wingArea * cdw
+		local wfx, wfy, wfz = -dq * vax, -dq * vay, -dq * vaz
+		fx += wfx
+		fy += wfy
+		fz += wfz
+		totalDrag += dq * tas
+	end
 
 	-- Small extra aerodynamic rotational damping
 	local ed = aero.extraDamping
@@ -537,6 +568,11 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 			bx -= q * side * pvx
 			by -= q * heave * pvy
 			bz -= q * keel * (0.15 + plane) * pvz
+			-- heavy hulls also need damping that does not vanish at low speed, or they bob
+			-- for ever (water.linearDamping: 1/s, shared over the float points)
+			if wf and wf.linearDamping then
+				by -= wf.linearDamping * mass / nFloat * pvy
+			end
 			fx += bx
 			fy += by
 			fz += bz
@@ -595,6 +631,39 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 	end
 	r.inWater = inWater
 	r.onFloats = onFloats
+
+	-- Water bomber tank (cfg.waterTank) -------------------------------------------------
+	-- Scooping: skimming the sea on the hull above scoopMinKt fills the tank through two
+	-- probes behind the step. Picking the water up costs its momentum, which shows up as
+	-- drag (mdot * v), so a scoop run needs power. Parked on the ground (env.refillAllowed,
+	-- at an airport) a hose refills it. Holding ctl.waterDrop with the tank doors open
+	-- dumps the load at dropRate.
+	local tank = cfg.waterTank
+	r.scooping, r.dropping, r.dropRate, r.refilling = false, false, 0, false
+	if tank then
+		local water = self.water
+		local fwd = -env.vgz -- m/s along the nose
+		local kt = fwd * Units.KTS_PER_MPS
+		local hullOk = Damage.isAttached(dmg, tank.component or "Fuselage")
+		if onFloats and not inWater and hullOk and kt >= tank.scoopMinKt and water < tank.capacity and not ctl.waterDrop then
+			local add = math.min(tank.scoopRate * dt, tank.capacity - water)
+			water += add
+			r.scooping = true
+			local mdot = add / dt
+			fz += mdot * fwd -- body +z is aft: drag
+		elseif r.onGround and gs < 1.5 and env.refillAllowed == true and water < tank.capacity then
+			water = math.min(tank.capacity, water + (tank.refillRate or 500) * dt)
+			r.refilling = true
+		end
+		if ctl.waterDrop and water > 0 and not r.onGround and not onFloats then
+			local out = math.min(tank.dropRate * dt, water)
+			water -= out
+			r.dropping = true
+			r.dropRate = out / dt
+		end
+		self.water = water
+	end
+	r.water = self.water
 
 	-- Load factor along body up (aero + thrust + gear, i.e. what the airframe feels)
 	local gLoad = fy / (mass * Units.G)

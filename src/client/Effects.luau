@@ -65,6 +65,38 @@ function Effects.spray(pos: Vector3, intensity: number)
 	burst(pos, Color3.fromRGB(220, 235, 245), math.clamp(math.floor(10 * intensity), 4, 50), 4, 30, 1.5)
 end
 
+-- Water bomber drop: a falling white curtain that keeps some of the aircraft's speed.
+--   vel: aircraft velocity (studs/s); intensity ~ 1 for a full-rate drop.
+function Effects.waterCurtain(pos: Vector3, vel: Vector3, intensity: number)
+	local dir = if vel.Magnitude > 1 then vel.Unit else Vector3.new(0, -1, 0)
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Transparency = 1
+	p.Size = Vector3.new(6, 1, 10)
+	-- the emitter's Front face points along the flight path, so the water leaves with
+	-- the aircraft's speed and then slows and falls
+	p.CFrame = CFrame.lookAt(pos, pos + dir)
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	e.Color = ColorSequence.new(Color3.fromRGB(235, 242, 250))
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 6), NumberSequenceKeypoint.new(1, 40) })
+	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.15), NumberSequenceKeypoint.new(0.7, 0.5), NumberSequenceKeypoint.new(1, 1) })
+	e.Lifetime = NumberRange.new(2.5, 4)
+	e.EmissionDirection = Enum.NormalId.Front
+	e.Speed = NumberRange.new(vel.Magnitude * 0.85, vel.Magnitude)
+	e.SpreadAngle = Vector2.new(6, 6)
+	e.Acceleration = Vector3.new(0, -Workspace.Gravity * 0.6, 0) -- drag: slower than free fall
+	e.Drag = 0.6
+	e.Rate = 0
+	e.Parent = p
+	p.Parent = getFolder()
+	e:Emit(math.clamp(math.floor(14 * intensity), 3, 30))
+	Debris:AddItem(p, 5)
+end
+
 function Effects.debrisPuff(pos: Vector3, intensity: number)
 	burst(pos, Color3.fromRGB(90, 86, 80), math.clamp(math.floor(10 * intensity), 4, 40), 5, 20, 2.2)
 end

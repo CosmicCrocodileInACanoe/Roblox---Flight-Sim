@@ -72,6 +72,7 @@ Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | B | Wheel brakes (hold) |
 | P | Parking brake |
 | Z | Reverse thrust (hold, on the ground) |
+| L | Drop water (hold; Rainmaker water bomber only) |
 | X | Speedbrake |
 | [ / ] | Pitch trim (Simulation mode) |
 | T | Cycle Easy (default) / Assisted / Simulation |
@@ -87,6 +88,26 @@ Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 A typical first flight: spawn at an HBR runway threshold, press I and wait for the engines,
 set flaps 2 (press F twice), hold Shift for full throttle, pull back gently at about 145 kt,
 press G after a positive climb, then press V to bring the flaps up above 180 kt.
+
+## Firefighting
+
+Pick the **Rainmaker** water bomber. Four wildfires burn on wooded hills around the map at
+once: look for the tall smoke, the orange "WILDFIRE" label (it shows from far away) and the
+pulsing orange dots on the minimap.
+
+1. **Scoop.** Fly to the sea (south of Harbor City), gear up, flaps 10 or 15, and touch the
+   hull down on the water. Keep it skimming at 50 kt or more and the tank fills in about
+   12 seconds (the HUD's WATER bar says SCOOP). Add power, the extra 6 tonnes make it
+   heavy, and climb away.
+2. **Drop.** Come in low (under about 150 ft is best) and slow over the fire and hold **L**
+   (or the DROP WATER button). The tank empties in about 3 seconds. The water carries
+   forward as it falls, so let go a little before the fire. Drops from high up mostly blow
+   away as mist.
+3. About one full load on target puts a fire out (it flares back up slowly if you leave
+   it half done). Everyone gets a message when a fire goes out, and a new one starts
+   somewhere else a minute or so later.
+
+Parked at an airport, a hose refills the tank too, more slowly.
 
 ## Stunts mode
 
@@ -160,6 +181,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Airports, WorldGen      airport layouts, deterministic terrain height field
   Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
   Stunts                  Stunts ring course, race rules (passes, misses, penalties, medals), race tune
+  Wildfire                fire sites, where dropped water lands, how much reaches a fire
   GameConfig, AircraftRegistry, Aircraft/*  one data file per aircraft; Aircraft/Kit has shared helpers
   AudioConfig, AudioMix   every sound asset ID in one file; pure loop/one-shot mixing
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build
@@ -231,7 +253,7 @@ Two more layers on top, in `src/shared/SoftBody.luau`:
 
 ## Aircraft
 
-Sixteen original, unbranded aircraft, smallest to largest (the menu shows them in this order).
+Seventeen original, unbranded aircraft, smallest to largest (the menu shows them in this order).
 All of them pass the same offline flight tests.
 
 | Aircraft | Type | Notes |
@@ -247,10 +269,11 @@ All of them pass the same offline flight tests.
 | Vector X1 | Light fighter | chin intake, bubble canopy with HUD |
 | Nightjar T2 | Twin-engine fighter | two canted fins, two nozzles |
 | Kestrel 72 | Regional turboprop | |
+| Rainmaker | Firefighting flying boat (amphibian) | boat hull, wingtip floats, wheels for runways; scoops 6 t of water from the sea and drops it on wildfires |
 | Meridian 200 | Narrow-body twin jet | |
 | Hauler 4 | Cargo freighter | four turboprops, T-tail, upswept tail with a ramp |
 | Atlas 400 | Wide-body twin jet | |
-| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines; the fastest |
+| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines with afterburners (full throttle, gear up); passes Mach 2 above about 20,000 ft, held near Mach 1 down low. The HUD shows the Mach number |
 | Celestia 800 | Four-engine jumbo | |
 
 Adding one is a data file in `src/shared/Aircraft/` plus a line in `AircraftRegistry`. The

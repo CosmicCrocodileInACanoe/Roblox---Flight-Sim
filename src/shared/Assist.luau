@@ -79,6 +79,7 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 	out.brake, out.parkingBrake, out.speedbrake = raw.brake, raw.parkingBrake, raw.speedbrake
 	out.reverse = raw.reverse
 	out.trim = raw.trim
+	out.waterDrop = raw.waterDrop == true
 
 	if st.mode == "simulation" then
 		st.autoTrim = raw.trim

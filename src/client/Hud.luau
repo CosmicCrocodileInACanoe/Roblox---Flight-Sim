@@ -412,8 +412,18 @@ function Hud:update(t: any, destId: string?)
 		self.objective.Text = if t.onGround and t.gs < 2 and not t.n1[1].running then "Free flight: press I to start engines, P to release the brake" else "Free flight: explore, land anywhere for a grade"
 		if t.waterTank and not (t.onGround and t.gs < 2 and not t.n1[1].running) then
 			local drop = Controls.firstKey("waterDrop") or "L"
-			self.objective.Text = if (t.water or 0) < 500 then "Firefighting: skim the sea at 50+ kt to scoop water (gear up)" else string.format("Firefighting: fly low over a wildfire (red on the map) and hold %s to drop", drop)
+			self.objective.Text = if (t.water or 0) < 500 then string.format("Firefighting: press %s to refill, %s for auto refill at sea, or skim the sea at 50+ kt", Controls.firstKey("refillWater") or "1", Controls.firstKey("autoScoop") or "2") else string.format("Firefighting: fly low over a wildfire (red on the map) and hold %s to drop", drop)
 		end
+	end
+	-- autopilot status wins over everything else
+	if t.autopilot then
+		local ap = t.autopilot
+		self.objective.Text = string.format("%s: %s  (move the stick to take over)", if ap.mode == "land" then "AUTOLAND" else "AUTO REFILL", ap.message)
+	end
+	-- one-off messages from the flight controller
+	if t.notice and t.notice.id ~= self.lastNoticeId then
+		self.lastNoticeId = t.notice.id
+		self:notify(t.notice.text, 5)
 	end
 
 	-- engines

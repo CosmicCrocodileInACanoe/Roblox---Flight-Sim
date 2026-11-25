@@ -163,6 +163,15 @@ These are the most likely places for first-run bugs, so check them first.
     nn%"; about one more load puts it out (steam, "FIRE OUT", a message to everyone), and a
     new fire appears elsewhere about a minute later. Also land it on a runway on its wheels.
     Note any Output errors from FireService or FlightController.
+17. **Realistic surfaces.** In Studio, check Lighting.Technology shows Future and
+    MaterialService.Use2022Materials is ticked. Fly low over the map. Check: grass, fields,
+    forest and rock show texture and patchy colour (no flat single-colour areas); steep
+    faces read as rock; beaches have darker wet sand at the water. On each runway, dark tyre
+    smears near both touchdown zones sit under the white markings with no flicker. Houses
+    show plaster walls with tile or shingle roofs; some city blocks are brick. On an
+    aircraft, tyres look like rubber, grey wing leading edges look like bare metal, and the
+    paint has a soft sheen that catches the sun. Note the frame rate before and after if a
+    low-end device struggles (Future lighting costs a little more).
 
 ## C. Report back
 

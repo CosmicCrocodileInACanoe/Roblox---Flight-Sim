@@ -41,7 +41,7 @@ function WorldFx.setTime(t: any)
 	Lighting.ClockTime = t.clock
 	local night = t.clock > 20 or t.clock < 6
 	Lighting.Brightness = if night then 0.6 else 2.6
-	Lighting.OutdoorAmbient = if night then Color3.fromRGB(40, 46, 60) else Color3.fromRGB(128, 132, 140)
+	Lighting.OutdoorAmbient = if night then Color3.fromRGB(40, 46, 60) else Color3.fromRGB(118, 122, 132)
 end
 
 -- Wind at a world position (m/s, world axes). Mean wind + gusts + turbulence that

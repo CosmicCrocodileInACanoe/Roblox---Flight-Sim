@@ -26,9 +26,24 @@ local LOW_COLORS = {
 	Color3.fromRGB(150, 140, 130), Color3.fromRGB(184, 150, 120), Color3.fromRGB(205, 190, 160),
 }
 local ROOF_COLORS = { Color3.fromRGB(150, 70, 60), Color3.fromRGB(90, 90, 96), Color3.fromRGB(120, 90, 70) }
+-- Real-world facade materials for low-rise blocks and houses, matched to the colour so
+-- warm browns read as brick, pale tones as render/plaster and greys as concrete.
+local function lowMaterial(c: Color3, house: boolean): Enum.Material
+	local warm = c.R - c.B
+	if warm > 0.2 then
+		return Enum.Material.Brick
+	elseif c.R + c.G + c.B > 2.3 or house then
+		return Enum.Material.Plaster
+	end
+	return Enum.Material.Concrete
+end
+local function roofMaterial(c: Color3): Enum.Material
+	-- terracotta reds are clay tiles; greys and browns are asphalt shingles
+	return if c.R - c.B > 0.25 then Enum.Material.ClayRoofTiles else Enum.Material.RoofShingles
+end
 
-local WINDOW_DARK = Color3.fromRGB(46, 62, 82)
-local WINDOW_LOW = Color3.fromRGB(92, 108, 124)
+local WINDOW_DARK = Color3.fromRGB(40, 54, 70)
+local WINDOW_LOW = Color3.fromRGB(66, 80, 94)
 
 -- Detail tiles ------------------------------------------------------------------------
 local detailRoot: Folder? = nil
@@ -79,8 +94,8 @@ local function windowBands(bx: number, bz: number, y0: number, fw: number, fd: n
 			Name = "Windows", Size = Vector3.new(fw + 0.8, bandH, fd + 0.8),
 			CFrame = CFrame.new(bx, y0 + gap * k, bz),
 			Color = if tall then WINDOW_DARK else WINDOW_LOW,
-			Material = if tall then Enum.Material.Glass else Enum.Material.SmoothPlastic,
-			Reflectance = if tall then 0.25 else 0, Parent = tile,
+			Material = Enum.Material.Glass,
+			Reflectance = if tall then 0.3 else 0.15, Parent = tile,
 		})
 	end
 	return bands
@@ -123,7 +138,7 @@ local function buildCity(c: any, parent: Instance)
 	-- street grid ground
 	local frame = CFrame.new(c.x, c.base, c.z)
 	Geometry.tiledRect(frame, -n * pitch - street, n * pitch + street, -n * pitch - street, n * pitch + street, 0.6, 2, {
-		Name = "Streets", Color = Color3.fromRGB(70, 72, 76), Material = Enum.Material.Asphalt,
+		Name = "Streets", Color = Color3.fromRGB(62, 63, 66), Material = Enum.Material.Asphalt,
 	}, model)
 	local count, detailCount = 0, 0
 	for i = -n, n do
@@ -138,7 +153,7 @@ local function buildCity(c: any, parent: Instance)
 			-- sidewalk / plot (detail)
 			Geometry.part({
 				Name = "Plot", Size = Vector3.new(block, 1, block), CFrame = CFrame.new(bx, c.base + 1.1, bz),
-				Color = Color3.fromRGB(150, 150, 146), Material = Enum.Material.Concrete, CastShadow = false, Parent = tile,
+				Color = Color3.fromRGB(156, 154, 148), Material = Enum.Material.Pavement, CastShadow = false, Parent = tile,
 			})
 			detailCount += 1
 			if rnd < 0.08 and d > r * 0.25 then
@@ -153,7 +168,7 @@ local function buildCity(c: any, parent: Instance)
 					local tz = bz + (WorldGen.rand(bx, bz, 80 + t) - 0.5) * (block - 60)
 					Geometry.part({
 						Name = "Canopy", Shape = Enum.PartType.Ball, Size = Vector3.one * 22,
-						CFrame = CFrame.new(tx, c.base + 14, tz), Color = Color3.fromRGB(66, 118, 56),
+						CFrame = CFrame.new(tx, c.base + 14, tz), Color = Color3.fromRGB(58, 98, 50),
 						Material = Enum.Material.Grass, Parent = tile,
 					})
 					detailCount += 1
@@ -173,7 +188,7 @@ local function buildCity(c: any, parent: Instance)
 			local y0 = c.base + 1.6
 			Geometry.part({
 				Name = "Building", Size = Vector3.new(fw, h, fd), CFrame = CFrame.new(bx, y0 + h / 2, bz),
-				Color = color, Material = if tall then Enum.Material.Glass else Enum.Material.Concrete,
+				Color = color, Material = if tall then Enum.Material.Glass else lowMaterial(color, false),
 				Reflectance = if tall then 0.12 else 0, Parent = model,
 			})
 			count += 1
@@ -197,7 +212,7 @@ local function buildCity(c: any, parent: Instance)
 			elseif not tall and WorldGen.rand(bx, bz, 28) > 0.5 then
 				Geometry.part({
 					Name = "RoofUnit", Size = Vector3.new(30, 12, 24), CFrame = CFrame.new(bx + 20, y0 + h + 6, bz - 15),
-					Color = Color3.fromRGB(120, 120, 124), Material = Enum.Material.Metal, Parent = tile,
+					Color = Color3.fromRGB(120, 120, 124), Material = Enum.Material.CorrodedMetal, Parent = tile,
 				})
 				detailCount += 1
 			end
@@ -258,7 +273,7 @@ local function buildSuburbs(c: any, worldFolder: Instance)
 					Geometry.part({
 						Name = "House", Size = Vector3.new(w, h, dpt), CFrame = base * CFrame.new(0, h / 2, 0),
 						Color = LOW_COLORS[1 + math.floor(WorldGen.rand(x, z, 38) * #LOW_COLORS) % #LOW_COLORS],
-						Material = Enum.Material.SmoothPlastic, Parent = tile,
+						Material = lowMaterial(LOW_COLORS[1 + math.floor(WorldGen.rand(x, z, 38) * #LOW_COLORS) % #LOW_COLORS], true), Parent = tile,
 					})
 					-- pitched roof from two wedges
 					local roofColor = ROOF_COLORS[1 + math.floor(WorldGen.rand(x, z, 39) * #ROOF_COLORS) % #ROOF_COLORS]
@@ -267,7 +282,7 @@ local function buildSuburbs(c: any, worldFolder: Instance)
 						Geometry.part({
 							ClassName = "WedgePart", Name = "Roof", Size = Vector3.new(w + 2, rh, dpt / 2 + 1),
 							CFrame = base * CFrame.new(0, h + rh / 2, s * (dpt / 4)) * CFrame.Angles(0, if s > 0 then 0 else math.pi, 0),
-							Color = roofColor, Parent = tile,
+							Color = roofColor, Material = roofMaterial(roofColor), Parent = tile,
 						})
 					end
 					count += 3
@@ -373,13 +388,13 @@ local function buildForests(worldFolder: Instance)
 						ClassName = "Part", Name = "Trunk", Shape = Enum.PartType.Cylinder,
 						Size = Vector3.new(trunkH, 3 * scale, 3 * scale),
 						CFrame = CFrame.new(tx, gy + trunkH / 2, tz) * CFrame.Angles(0, 0, math.rad(90)),
-						Color = Color3.fromRGB(96, 70, 50), Material = Enum.Material.Wood, Parent = model,
+						Color = Color3.fromRGB(88, 66, 48), Material = Enum.Material.Wood, Parent = model,
 					})
 					Geometry.part({
 						ClassName = "Part", Name = "Canopy", Shape = Enum.PartType.Ball,
 						Size = Vector3.one * (26 * scale),
 						CFrame = CFrame.new(tx, gy + trunkH + 9 * scale, tz),
-						Color = Color3.fromRGB(56 + math.floor(30 * WorldGen.rand(tx, tz, 61)), 100, 50),
+						Color = Color3.fromRGB(48 + math.floor(26 * WorldGen.rand(tx, tz, 61)), 84 + math.floor(16 * WorldGen.rand(tx, tz, 62)), 44),
 						Material = Enum.Material.Grass, Parent = model,
 					})
 					count += 2

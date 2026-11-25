@@ -30,6 +30,13 @@ These are the most likely places for first-run bugs, so check them first.
       clipping), and speed, altitude, heading and vertical speed tapes all update.
 - [ ] Menu: every dropdown works; the Fly button spawns an aircraft; M toggles the menu
       while parked and while flying.
+- [ ] Voice callouts (text-to-speech, no IDs needed): dive at the ground with the gear up and
+      hear "terrain" then "whoop whoop, pull up"; slow down until the stall and hear "stall";
+      fly a normal approach with gear and landing flaps down and hear nothing. If Output shows
+      `[Audio] text-to-speech isn't available`, note it: callouts then need recorded clip IDs.
+- [ ] ATC chatter: in 3 minutes of flight you hear no more than 9 short transmissions, none
+      longer than 15 s. Takeoff gives "eighty knots" and "rotate"; an approach counts down
+      "one thousand" to "ten".
 - [ ] Sound with every ID empty: no errors or `[Audio]` warnings in Output. With IDs filled
       in: the engine whine rises and falls with throttle, wind grows with speed, the gear horn
       sounds low with the gear up, touchdown thumps, cockpit view sounds muffled, and nothing
@@ -70,11 +77,13 @@ These are the most likely places for first-run bugs, so check them first.
      the aircraft breaks up.
    - With a damaged wing (sandbox failure "Left wing damaged"): the aircraft still flies but
      needs right aileron.
-   - **No breaking apart (default).** Fly nose-first into a building at speed: the plane
-     crumples, bends and comes to rest in one piece. The nose is shortened and the fuselage
-     sags. Nothing should fall off unless you hit something very hard (100 kt or more).
-   - Land at over 1,400 fpm: the gear folds up under the plane, and it slides on its belly.
-   - Drag a wing along the ground until it's wrecked: it droops from the root and stays on.
+   - **Breaking apart (default).** Fly nose-first into a building at speed: the nose crumples
+     and bends, then the plane breaks up. Wings, engines and tail come off as debris that
+     keeps moving and breaks again when it hits the ground.
+   - Land at over 1,400 fpm: the gear tears off and the plane slides on its belly.
+   - Clip a wingtip hard: the outer wing tears off and the rest of the wing stays on.
+   - Set `GameConfig.crash.breakApart = false` and repeat: the plane should crumple,
+     droop and stay in one piece.
    - **Bending.** Hit a wingtip hard on a hangar or the ground: the outer wing visibly bends up
      or down and stays bent. A second hit on the same wing bends it further, up to about 28°.
      A nose-first hit into a building shortens the nose (crush) rather than bending it.
@@ -137,6 +146,23 @@ These are the most likely places for first-run bugs, so check them first.
     with time, medal and best time; FLY AGAIN and R restart at the start; touching the ground
     shows "CRASHED!". With two players, both race at once and pass through each other.
     Note any Output errors from StuntsHud or MissionService.
+
+15. **Mach 2 jet.** Fly the Arrowstar from HBR. Full throttle on the runway lights the
+    afterburners (orange flames behind the engines, "AB" next to each engine). Climb above
+    20,000 ft with the gear up and full throttle: the HUD shows the Mach number next to GS
+    and it passes M2.00 within a few minutes. Down low it should sit around Mach 1. With the
+    gear down in the air the flames go out. Note anything that shakes, jitters or tears
+    apart at that speed.
+
+16. **Firefighting.** Fly the Rainmaker from HBR. Check: orange fire dots on the minimap and
+    "WILDFIRE nn%" labels far away; flames, glow and a smoke column at a fire. Fly south to
+    the sea, gear up, touch the hull down and skim at 50+ kt: white spray at the hull, the
+    WATER bar says SCOOP and fills in about 12 s; the plane floats level and the wingtip
+    floats only touch in a bank. Climb away loaded, fly low over a fire and hold L: a white
+    curtain falls and the bar empties in about 3 s. A good hit shows "Direct hit! Fire at
+    nn%"; about one more load puts it out (steam, "FIRE OUT", a message to everyone), and a
+    new fire appears elsewhere about a minute later. Also land it on a runway on its wheels.
+    Note any Output errors from FireService or FlightController.
 
 ## C. Report back
 

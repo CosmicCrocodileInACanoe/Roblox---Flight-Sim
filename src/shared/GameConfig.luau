@@ -15,6 +15,7 @@ GameConfig.Remotes = {
 	"ReportTouchdown",
 	"ReportImpact", -- (model, component, pointBodyM: Vector3, dirBody: Vector3, dv)
 	"ReportSection", -- (model, component, sectionId, dv)
+	"WaterDrop", -- (model, impactX, impactZ (studs), kg, dropHeightM) water bomber drops
 	-- server -> client
 	"AircraftAssigned",
 	"MissionUpdate",
@@ -44,10 +45,11 @@ GameConfig.debris = {
 
 -- BeamNG-style crash feel (see shared/Crash.luau for per-component profiles).
 GameConfig.crash = {
-	-- Off (default): planes bend, crumple and collapse but stay in one piece. Parts tear
-	-- off only in truly extreme hits (Damage.EXTREME_FACTOR x their destroy speed).
-	-- On: the old behaviour, components detach when their health runs out.
-	breakApart = false,
+	-- On (default): parts dent and bend first, then tear off when their health runs out,
+	-- so a real crash breaks the plane apart (wings, engines, tail, nose and tail sections).
+	-- Off: planes bend, crumple and collapse but stay in one piece; parts tear off only in
+	-- truly extreme hits (Damage.EXTREME_FACTOR x their destroy speed).
+	breakApart = true,
 	extremeSectionFactor = 2.0, -- break-apart off: tearing a section needs this x the dv
 	impactReportMinInterval = 0.12, -- s between dent reports for one component
 	maxCrumplesPerSecond = 12, -- server, per player

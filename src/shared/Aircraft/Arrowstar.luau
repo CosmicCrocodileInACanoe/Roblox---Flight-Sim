@@ -19,6 +19,8 @@ local function engine(name: string, x: number): any
 		pos = { x, -1.55, 6.5 }, axis = { 0, 0, -1 },
 		maxThrust = 125000, idleN1 = 22, spoolUpTau = 2.2, spoolDownTau = 1.4,
 		startTime = 12, reverseFraction = 0.3, lapseSpeed = 900,
+		-- supersonic intakes: thrust grows with speed; full throttle lights the afterburners
+		ramGain = 2.0, afterburner = { above = 0.95, thrustMul = 1.35, fuelMul = 3 },
 		fuelFlowIdle = 0.15, fuelFlowMax = 2.6,
 	}
 end
@@ -27,7 +29,7 @@ local config = {
 	id = "arrowstar",
 	displayName = "Arrowstar",
 	class = "Supersonic airliner",
-	description = "Super-fast delta-wing airliner with a needle nose. The quickest way across the map.",
+	description = "Super-fast delta-wing airliner with a needle nose. Full throttle lights the afterburners; climb above 20,000 ft and it passes Mach 2.",
 	unlocked = true,
 	seats = 100,
 	difficulty = 4,
@@ -41,7 +43,7 @@ local config = {
 	fuel = { capacity = 60000, initial = 30000 },
 
 	speeds = {
-		rotate = 170, v2 = 195, approach = 165, vref = 155, cruise = 340, vmo = 560,
+		rotate = 170, v2 = 195, approach = 165, vref = 155, cruise = 340, vmo = 800,
 		flapLimits = { 999, 230 }, gearLimit = 270,
 	},
 
@@ -74,6 +76,8 @@ local config = {
 		},
 		speedbrake = { dCl = -0.1, dCd = 0.03 },
 		groundEffect = true,
+		-- a thin, sharp delta built for Mach 2: little drag rise through the sound barrier
+		waveDrag = { mcrit = 0.95, peak = 0.012 },
 	},
 
 	engines = {

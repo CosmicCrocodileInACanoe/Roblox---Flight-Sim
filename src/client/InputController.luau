@@ -213,6 +213,7 @@ function InputController:update(dt: number): Raw
 	raw.throttle = math.clamp(raw.throttle + thr * 0.45 * dt, 0, 1)
 	raw.brake = if h.brake then 1 else 0
 	raw.reverse = h.reverse == true
+	raw.waterDrop = h.waterDrop == true
 	raw.trim = math.clamp(raw.trim + axis("trimDown", "trimUp") * 0.25 * dt, -1, 1)
 	return raw
 end

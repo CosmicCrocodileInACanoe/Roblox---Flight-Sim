@@ -6,7 +6,9 @@
 --   n1 (average engine N1, percent), anyStarting, reverser (0..1), throttle (0..1),
 --   ias, gs (knots), onGround, gearExt (0..1), flapPos (notch, 1 = up), speedbrake (0..1),
 --   stallWarning, raFt, vsFpm, crashed, touchdownCount, touchdownVsFpm,
---   impactCount, impactDv (m/s), detachedCount, time (s)
+--   impactCount, impactDv (m/s), detachedCount, time (s),
+--   stall (wing actually stalled), terrainAheadSec (seconds until the flight path meets
+--   the ground, math.huge when clear), altFt, rotateKts
 --
 -- loops() returns, per looping slot, { level = 0..1, effect = 0..1 }: level scales the
 -- slot's volume and effect picks the pitch between pitchMin and pitchMax.
@@ -52,18 +54,19 @@ function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: an
 	end
 	-- Silence every loop once the aircraft is destroyed; one-shots carry the crash.
 	if snap.crashed then
-		for _, slot in { profile.whine, profile.rumble, "wind", "runwayRoll", "gearMotor", "flapMotor", "stallWarning", "gearWarning" } do
+		for _, slot in { profile.whine, profile.rumble, "wind", "runwayRoll", "gearMotor", "flapMotor", "stallWarning", "stickShaker", "gearWarning", "cockpitAmbience" } do
 			set(slot, 0, 0)
 		end
 		return out
 	end
 
-	-- Engines: the whine follows N1 (pitch and level), the rumble follows thrust.
+	-- Engines: the whine follows N1 (pitch and level), the rumble follows thrust, so the
+	-- engines are quiet at idle and loud at full power.
 	local n = clamp01(snap.n1 / 100)
 	local fadeIn = clamp01(n / 0.15) -- spooling up from zero fades in
-	set(profile.whine, fadeIn * (0.2 + 0.8 * n), n)
+	set(profile.whine, fadeIn * (0.15 + 0.85 * n ^ 1.3), n)
 	local thrust = clamp01((n - 0.2) / 0.8)
-	local rumble = 0.15 * clamp01(n / 0.2) + 0.85 * thrust ^ 1.5 + 0.4 * snap.reverser * fadeIn
+	local rumble = 0.1 * clamp01(n / 0.2) + 0.9 * thrust ^ 1.5 + 0.4 * snap.reverser * fadeIn
 	set(profile.rumble, rumble, thrust)
 
 	-- Wind grows with the square of airspeed; gear and speedbrake add buffet.
@@ -83,17 +86,59 @@ function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: an
 
 	-- Warnings
 	local airborne = not snap.onGround
-	set("stallWarning", if airborne and snap.stallWarning then 1 else 0, 0.5)
+	set("stallWarning", if airborne and (snap.stallWarning or snap.stall) then 1 else 0, 0.5)
+	set("stickShaker", if airborne and snap.stall then 1 else 0, 0.5)
 	local lowAndSlow = airborne
 		and snap.raFt < mix.gearWarningFt
 		and snap.gearExt < 0.99
 		and (snap.throttle < mix.gearWarningThrottle or snap.flapPos >= mix.gearWarningFlap - 0.05)
 	set("gearWarning", if lowAndSlow then 1 else 0, 0.5)
+	set("cockpitAmbience", 1, 0.5)
 	return out
 end
 
+-- Ground proximity warning: the most urgent callout for this moment, or nil.
+-- Order of priority: pull up, terrain, stall, sink rate, too low gear.
+function AudioMix.gpws(snap: any, mix: any): string?
+	if snap.crashed or snap.onGround then
+		return nil
+	end
+	local ra = snap.raFt
+	local sink = math.max(0, -snap.vsFpm)
+	local landingConfig = snap.gearExt >= 0.99 and snap.flapPos >= mix.gearWarningFlap - 0.05
+	local ahead = snap.terrainAheadSec or math.huge
+	local inBand = ra >= mix.gpwsMinFt
+	-- Time until the ground below at the current sink rate.
+	local belowSec = if sink > 1 then ra / sink * 60 else math.huge
+	local limit = mix.sinkRateBaseFpm + mix.sinkRatePerFt * ra
+	local excessiveSink = inBand and ra <= mix.gpwsMaxFt and sink > limit
+	-- A normal approach in landing configuration flies at the runway on purpose, so the
+	-- look-ahead check only counts when the aircraft is not set up to land.
+	local aheadCounts = inBand and not landingConfig
+
+	if (excessiveSink and (sink > limit * mix.pullUpSinkFactor or belowSec < mix.pullUpBelowSec))
+		or (aheadCounts and ahead < mix.pullUpAheadSec)
+	then
+		return "calloutPullUp"
+	end
+	if aheadCounts and ahead < mix.terrainAheadSec then
+		return "calloutTerrain"
+	end
+	if snap.stall then
+		return "calloutStall"
+	end
+	if excessiveSink then
+		return "calloutSinkRate"
+	end
+	if inBand and ra < mix.tooLowGearFt and snap.gearExt < 0.99 and snap.vsFpm < 0 then
+		return "calloutTooLowGear"
+	end
+	return nil
+end
+
 -- `memo` keeps cooldowns between frames; pass the same table every call.
-function AudioMix.events(snap: any, prev: any?, mix: any, memo: any): { { slot: string, gain: number } }
+-- `sounds` (AudioConfig.sounds) supplies each callout's repeatEvery; optional.
+function AudioMix.events(snap: any, prev: any?, mix: any, memo: any, sounds: any?): { { slot: string, gain: number } }
 	local out = {}
 	if not prev then
 		return out
@@ -137,7 +182,97 @@ function AudioMix.events(snap: any, prev: any?, mix: any, memo: any): { { slot: 
 	if snap.crashed and not prev.crashed then
 		play("crash", 1)
 	end
+
+	-- Voice callouts repeat while their condition lasts; a change of callout plays at once.
+	local callout = AudioMix.gpws(snap, mix)
+	if callout then
+		local every = (sounds and sounds[callout] and sounds[callout].repeatEvery) or 2.5
+		local since = snap.time - (memo.lastCalloutTime or -math.huge)
+		-- A new callout waits at least 1 s so flickering conditions don't stutter.
+		if (callout ~= memo.lastCallout and since >= 1) or since >= every then
+			memo.lastCallout = callout
+			memo.lastCalloutTime = snap.time
+			play(callout, 1)
+		end
+	else
+		memo.lastCallout = nil
+	end
+
+	-- Normal callouts give way to a warning this frame.
+	if not callout then
+		local airborne = not snap.onGround
+		-- Takeoff roll
+		if snap.onGround and prev.onGround and snap.throttle >= mix.takeoffMinThrottle then
+			if prev.ias < 80 and snap.ias >= 80 then
+				play("calloutEightyKnots", 1)
+			elseif snap.rotateKts and prev.ias < snap.rotateKts and snap.ias >= snap.rotateKts then
+				play("calloutRotate", 1)
+			end
+		end
+		-- Radio altitude on approach: the lowest height crossed this frame.
+		if airborne and snap.gearExt >= 0.99 and snap.vsFpm < 0 then
+			local crossed = nil
+			for _, h in mix.altitudeCallouts do
+				if prev.raFt > h and snap.raFt <= h then
+					crossed = h
+				end
+			end
+			if crossed then
+				play("calloutAlt" .. tostring(crossed), 1)
+			end
+		end
+	end
+
+	-- Cabin chime through 10,000 ft either way.
+	if snap.altFt and prev.altFt and not snap.onGround then
+		local c = mix.chimeAltFt
+		if (prev.altFt < c and snap.altFt >= c) or (prev.altFt > c and snap.altFt <= c) then
+			play("cabinChime", 1)
+		end
+	end
 	return out
+end
+
+-- Background ATC ----------------------------------------------------------------------
+-- Seconds to wait before the next transmission (rand01: a 0..1 random number). Never less
+-- than mix.atcMinGap, so there are at most 60 / atcMinGap transmissions a minute.
+function AudioMix.atcDelay(rand01: number, mix: any): number
+	return mix.atcMinGap + (mix.atcMaxGap - mix.atcMinGap) * clamp01(rand01)
+end
+
+local AIRLINES = { "Skyline", "Coastal", "Northwind", "Bluejay", "Summit", "Harbor", "Redtail", "Polar" }
+local NUMBERS = { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine" }
+
+-- A short made-up exchange between a controller and another aircraft (well under 15 s
+-- of speech). randInt(a, b) returns a whole number in a..b.
+function AudioMix.atcPhrase(randInt: (number, number) -> number): string
+	local function digits(n: number): string
+		local out = {}
+		for i = 1, n do
+			out[i] = NUMBERS[randInt(if i == 1 then 2 else 1, 10)]
+		end
+		return table.concat(out, " ")
+	end
+	local cs = AIRLINES[randInt(1, #AIRLINES)] .. " " .. digits(randInt(2, 3))
+	if randInt(1, 4) == 1 then
+		cs ..= " heavy"
+	end
+	local fl = NUMBERS[randInt(2, 4)] .. " " .. NUMBERS[randInt(1, 10)] .. " zero"
+	local hdg = NUMBERS[randInt(1, 4)] .. " " .. NUMBERS[randInt(1, 10)] .. " zero"
+	local alt = NUMBERS[randInt(4, 9)]
+	local freq = "one two " .. NUMBERS[randInt(1, 10)] .. " point " .. NUMBERS[randInt(1, 10)]
+	local templates = {
+		{ cs .. ", climb and maintain flight level " .. fl .. ".", "Up to flight level " .. fl .. ", " .. cs .. "." },
+		{ cs .. ", turn left heading " .. hdg .. ".", "Left heading " .. hdg .. ", " .. cs .. "." },
+		{ cs .. ", turn right heading " .. hdg .. ".", "Right " .. hdg .. ", " .. cs .. "." },
+		{ cs .. ", descend and maintain " .. alt .. " thousand.", "Down to " .. alt .. " thousand, " .. cs .. "." },
+		{ cs .. ", contact approach " .. freq .. ". Good day.", "Approach " .. freq .. ", " .. cs .. ", good day." },
+		{ cs .. ", traffic two o'clock, five miles, opposite direction.", "Looking for traffic, " .. cs .. "." },
+		{ cs .. ", cleared to land, wind calm.", "Cleared to land, " .. cs .. "." },
+		{ cs .. ", reduce speed to two one zero knots.", "Two one zero knots, " .. cs .. "." },
+	}
+	local t = templates[randInt(1, #templates)]
+	return t[1] .. " ... " .. t[2]
 end
 
 -- Pitch for a looping slot from its 0..1 effect.

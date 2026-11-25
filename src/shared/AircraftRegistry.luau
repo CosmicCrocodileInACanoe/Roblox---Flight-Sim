@@ -27,11 +27,12 @@ Registry.types = {
 	atlas400 = req("Atlas400"),
 	arrowstar = req("Arrowstar"),
 	celestia800 = req("Celestia800"),
+	rainmaker = req("Rainmaker"),
 	-- Stunts-mode placeholder; not in `order`, so the airliner fleet checks skip it.
 }
 
 -- Smallest to largest; the menu shows them in this order.
-Registry.order = { "bumble", "meadowlark4", "sprite", "ridgehopper", "puffin", "breezetwin", "silverline8", "swiftletj3", "vectorx1", "nightjart2", "kestrel72", "meridian200", "hauler4", "atlas400", "arrowstar", "celestia800" }
+Registry.order = { "bumble", "meadowlark4", "sprite", "ridgehopper", "puffin", "breezetwin", "silverline8", "swiftletj3", "vectorx1", "nightjart2", "kestrel72", "rainmaker", "meridian200", "hauler4", "atlas400", "arrowstar", "celestia800" }
 
 Registry.planned = {
 	{ id = "regionaljet", label = "Regional twinjet", milestone = 3 },

@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 430 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 431 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy mode) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `199 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -72,6 +72,7 @@ Expected: `199 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | B | Wheel brakes (hold) |
 | P | Parking brake |
 | Z | Reverse thrust (hold, on the ground) |
+| L | Drop water (hold; Rainmaker water bomber only) |
 | X | Speedbrake |
 | [ / ] | Pitch trim (Simulation mode) |
 | T | Cycle Easy (default) / Assisted / Simulation |
@@ -87,6 +88,26 @@ Expected: `199 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 A typical first flight: spawn at an HBR runway threshold, press I and wait for the engines,
 set flaps 2 (press F twice), hold Shift for full throttle, pull back gently at about 145 kt,
 press G after a positive climb, then press V to bring the flaps up above 180 kt.
+
+## Firefighting
+
+Pick the **Rainmaker** water bomber. Four wildfires burn on wooded hills around the map at
+once: look for the tall smoke, the orange "WILDFIRE" label (it shows from far away) and the
+pulsing orange dots on the minimap.
+
+1. **Scoop.** Fly to the sea (south of Harbor City), gear up, flaps 10 or 15, and touch the
+   hull down on the water. Keep it skimming at 50 kt or more and the tank fills in about
+   12 seconds (the HUD's WATER bar says SCOOP). Add power, the extra 6 tonnes make it
+   heavy, and climb away.
+2. **Drop.** Come in low (under about 150 ft is best) and slow over the fire and hold **L**
+   (or the DROP WATER button). The tank empties in about 3 seconds. The water carries
+   forward as it falls, so let go a little before the fire. Drops from high up mostly blow
+   away as mist.
+3. About one full load on target puts a fire out (it flares back up slowly if you leave
+   it half done). Everyone gets a message when a fire goes out, and a new one starts
+   somewhere else a minute or so later.
+
+Parked at an airport, a hose refills the tank too, more slowly.
 
 ## Stunts mode
 
@@ -126,7 +147,20 @@ error. What each slot does:
 - `gearMotor`, `flapMotor` loop while they move; `gearLock` clunks when the gear locks.
 - `touchdown` thump (louder on hard landings), `tyreSqueal` above 40 kt.
 - `impactLight`, `impactHeavy` for hits and parts breaking off, `crash` when the aircraft is destroyed.
-- `stallWarning`, `gearWarning` (gear not down below 1,000 ft with low throttle or landing flaps).
+- `stallWarning` (about to stall, and while stalled), `stickShaker` (while stalled), `gearWarning` (gear not down below 1,000 ft with low throttle or landing flaps).
+- Voice callouts, like a real ground proximity warning system: `calloutPullUp` ("whoop whoop,
+  pull up"), `calloutTerrain`, `calloutSinkRate`, `calloutTooLowGear` and `calloutStall`. They
+  repeat while the danger lasts. Terrain ahead is found by a ray along the flight path, and
+  sink rate is checked against height. A normal approach with the gear and landing flaps down
+  stays quiet. A callout slot without an id is spoken with Roblox text-to-speech
+  (`AudioConfig.useTextToSpeech`). If that isn't available, it stays silent.
+- Pilot callouts: "eighty knots" and "rotate" on the takeoff roll, and radio-altitude callouts
+  on approach (1000, 500, 100, 50, 40, 30, 20, 10).
+- `cabinChime` through 10,000 ft, `cockpitAmbience` (avionics hum loop).
+- Background ATC chatter, never constant: one transmission every 20 to 55 s (at most 3 a
+  minute), each cut off at 15 s, held back while a warning is talking. Fill `atcChatter1..5`
+  with radio clips. With none filled, made-up exchanges are spoken with text-to-speech in a
+  thin radio tone.
 
 In the cockpit view, outside sounds are muffled by an equaliser and warnings are at full
 volume. In the tower view, outside sounds fade with distance.
@@ -147,6 +181,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Airports, WorldGen      airport layouts, deterministic terrain height field
   Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
   Stunts                  Stunts ring course, race rules (passes, misses, penalties, medals), race tune
+  Wildfire                fire sites, where dropped water lands, how much reaches a fire
   GameConfig, AircraftRegistry, Aircraft/*  one data file per aircraft; Aircraft/Kit has shared helpers
   AudioConfig, AudioMix   every sound asset ID in one file; pure loop/one-shot mixing
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build
@@ -182,16 +217,17 @@ LeftWing = { ..., crash = { sections = false } }, -- no break point
 
 Tunables shared by all aircraft are in `GameConfig.crash`.
 
-### Planes stay in one piece by default
+### Breaking apart
 
-`GameConfig.crash.breakApart = false` (the default). A wrecked component stays attached
-and collapses instead of falling off: wings and tailplanes droop from the root, the fin
-leans over, gear folds up under the plane, and a wrecked centre fuselage breaks its back,
-so the nose and tail sag. Outer wing sections and stabiliser tips tear off only on hits
-twice as hard as normal (`extremeSectionFactor`). A whole component comes off only in a
-truly extreme hit: `Damage.EXTREME_FACTOR` (2.2) times its destroy speed, which is a
-50 m/s (about 100 kt) smash into something solid for a wing. Set `breakApart = true` to
-get the old behaviour back, where parts detach as soon as their health runs out.
+`GameConfig.crash.breakApart = true` (the default). Parts dent and bend first. When a
+component's health runs out it tears off as debris that keeps its momentum, taking its
+children with it: a wing takes its engines and gear. A wrecked centre fuselage breaks the
+plane into pieces. Outer wing sections and stabiliser tips can tear off before the whole
+wing goes, and debris splits again on hard secondary hits.
+
+Set `breakApart = false` to keep planes in one piece. A wrecked component then stays
+attached and collapses instead: wings droop, gear folds and the fuselage sags. Parts come
+off only in truly extreme hits, at `Damage.EXTREME_FACTOR` (2.2) times their destroy speed.
 
 ### Bending metal (soft-body look)
 
@@ -217,7 +253,7 @@ Two more layers on top, in `src/shared/SoftBody.luau`:
 
 ## Aircraft
 
-Sixteen original, unbranded aircraft, smallest to largest (the menu shows them in this order).
+Seventeen original, unbranded aircraft, smallest to largest (the menu shows them in this order).
 All of them pass the same offline flight tests.
 
 | Aircraft | Type | Notes |
@@ -233,10 +269,11 @@ All of them pass the same offline flight tests.
 | Vector X1 | Light fighter | chin intake, bubble canopy with HUD |
 | Nightjar T2 | Twin-engine fighter | two canted fins, two nozzles |
 | Kestrel 72 | Regional turboprop | |
+| Rainmaker | Firefighting flying boat (amphibian) | boat hull, wingtip floats, wheels for runways; scoops 6 t of water from the sea and drops it on wildfires |
 | Meridian 200 | Narrow-body twin jet | |
 | Hauler 4 | Cargo freighter | four turboprops, T-tail, upswept tail with a ramp |
 | Atlas 400 | Wide-body twin jet | |
-| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines; the fastest |
+| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines with afterburners (full throttle, gear up); passes Mach 2 above about 20,000 ft, held near Mach 1 down low. The HUD shows the Mach number |
 | Celestia 800 | Four-engine jumbo | |
 
 Adding one is a data file in `src/shared/Aircraft/` plus a line in `AircraftRegistry`. The

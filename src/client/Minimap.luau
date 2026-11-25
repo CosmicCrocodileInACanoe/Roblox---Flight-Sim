@@ -471,6 +471,43 @@ function Minimap:_scanOthers(ownModel: Model?)
 	end
 end
 
+-- Wildfires (Workspace.Wildfires, from the server): a pulsing orange dot while burning.
+function Minimap:_scanFires()
+	local folder = Workspace:FindFirstChild("Wildfires")
+	self.fires = self.fires or {}
+	local seen = {}
+	if folder then
+		for _, m in folder:GetChildren() do
+			if m:IsA("Model") and m.PrimaryPart then
+				seen[m] = true
+				local mk = self.fires[m]
+				if not mk then
+					local dot = make("Frame", {
+						Parent = self.layer, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(14, 14),
+						BackgroundColor3 = Color3.fromRGB(255, 110, 30), BorderSizePixel = 0, ZIndex = 7,
+					})
+					round(dot, UDim.new(0.5, 0))
+					make("UIStroke", { Parent = dot, Color = Color3.fromRGB(255, 230, 120), Thickness = 2 })
+					local p = m.PrimaryPart.Position
+					dot.Position = self.at(p.X, p.Z)
+					mk = { dot = dot }
+					self.fires[m] = mk
+				end
+				local burning = m:GetAttribute("Burning") ~= false
+				mk.dot.Visible = burning
+				local pulse = 12 + 5 * math.abs(math.sin(os.clock() * 4))
+				mk.dot.Size = UDim2.fromOffset(pulse, pulse)
+			end
+		end
+	end
+	for m, mk in self.fires do
+		if not seen[m] then
+			mk.dot:Destroy()
+			self.fires[m] = nil
+		end
+	end
+end
+
 -- Call every frame with the flight telemetry (position, heading), the destination
 -- airport id (or nil) and the local aircraft model (so it is not drawn twice).
 function Minimap:update(t: any, destination: string?, ownModel: Model?)
@@ -506,6 +543,7 @@ function Minimap:update(t: any, destination: string?, ownModel: Model?)
 	end
 	self.nextScan = now + SCAN_INTERVAL
 	self:_scanOthers(ownModel)
+	self:_scanFires()
 	for _, mk in self.others do
 		mk.name.Rotation = -rot
 	end

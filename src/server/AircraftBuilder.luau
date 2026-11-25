@@ -21,6 +21,7 @@
 --   engine.kind          "turbofan" | "turboprop" | "piston" (nose propeller) | "jet" (buried)
 --   engine.mount         "wing" (default) | "fuselage" (rear-mounted, bizjet)
 --   wing.spoilers/strut/strake, vstab.count/spacing/cantDeg, floats, cockpit.style
+--   fuselage.boatHull    flying-boat V bottom, step, spray rails, tank doors, scoop probes
 -- Parts tagged HideInCockpit vanish in the cockpit view; CockpitOnly parts appear there,
 -- at their CockpitTransparency attribute (glass) or fully opaque.
 
@@ -648,6 +649,76 @@ local function buildFuselage(ctx: Ctx)
 		add(ctx, "Fuselage", "WingCentreSection", "block", Vector3.new(wl[1] * 2 + 0.1, th + 0.35 * math.min(1, R), w.rootChord), CFrame.new(0, wl[2] - 0.17 * math.min(1, R), wl[3] + w.rootChord / 2), rgb(liv.wing), { hull = true })
 	end
 
+	-- Boat hull (flying boats): a V bottom from the bow to the planing step, a flatter
+	-- afterbody rising to the tail, spray rails on the chines, tank doors and scoop probes.
+	if g.boatHull then
+		local bh = g.boatHull
+		local hullColor = belly
+		local function keelAt(z: number): number
+			if z <= bh.stepZ then
+				local t = math.clamp((z - bh.bowZ) / 2.8, 0, 1)
+				return bh.keelY + (bh.chineY - bh.keelY) * (1 - t) ^ 2 * 0.85
+			end
+			local t = math.clamp((z - bh.stepZ) / (bh.tailZ - bh.stepZ), 0, 1)
+			return bh.keelY + 0.18 + (bh.chineY - bh.keelY - 0.25) * t
+		end
+		local function chineXAt(z: number): number
+			local t = math.clamp((z - bh.bowZ) / 3.2, 0, 1)
+			local tailT = math.clamp((z - bh.stepZ) / (bh.tailZ - bh.stepZ), 0, 1)
+			return bh.chineX * (0.35 + 0.65 * math.sqrt(t)) * (1 - 0.55 * tailT)
+		end
+		local function chineYAt(z: number): number
+			local tailT = math.clamp((z - bh.stepZ) / (bh.tailZ - bh.stepZ), 0, 1)
+			return bh.chineY + tailT * 0.25
+		end
+		-- stations: dense near the bow, split at the structural joints and the step
+		local zs = { bh.bowZ, bh.bowZ + 0.6, bh.bowZ + 1.3, bh.bowZ + 2.2, bh.bowZ + 3.2 }
+		for _, z in { g.forwardSplitZ, bh.stepZ - 0.001, bh.stepZ + 0.001, g.aftSplitZ, (g.aftSplitZ + bh.tailZ) / 2, bh.tailZ } do
+			if z > zs[#zs] + 0.05 then
+				table.insert(zs, z)
+			end
+		end
+		for k = 1, #zs - 1 do
+			local za, zb = zs[k], zs[k + 1]
+			if zb - za < 0.01 then
+				continue
+			end
+			local comp = compAt((za + zb) / 2)
+			local ka, kb = Vector3.new(0, keelAt(za), za), Vector3.new(0, keelAt(zb), zb)
+			for _, sx in { -1, 1 } do
+				local ca = Vector3.new(sx * chineXAt(za), chineYAt(za), za)
+				local cb = Vector3.new(sx * chineXAt(zb), chineYAt(zb), zb)
+				quad(ctx, comp, "HullBottom", ca, ka, kb, cb, 0.06, hullColor, { hull = true })
+			end
+		end
+		-- the step: a squared-off drop in the bottom just behind the tank
+		local cx = chineXAt(bh.stepZ)
+		add(ctx, "Fuselage", "HullStep", "block", Vector3.new(cx * 2, 0.2, 0.1), CFrame.new(0, keelAt(bh.stepZ + 0.01) - 0.05, bh.stepZ), darker(hullColor, 0.3))
+		-- spray rails along the forward chines
+		for _, sx in { -1, 1 } do
+			local z0, z1 = bh.bowZ + 0.8, g.forwardSplitZ - 0.05
+			rod(ctx, "ForwardFuselage", "SprayRail", Vector3.new(sx * (chineXAt(z0) + 0.04), chineYAt(z0), z0), Vector3.new(sx * (chineXAt(z1) + 0.04), chineYAt(z1), z1), 0.09, darker(hullColor, 0.2))
+			rod(ctx, "Fuselage", "SprayRail", Vector3.new(sx * (chineXAt(g.forwardSplitZ) + 0.04), chineYAt(g.forwardSplitZ), g.forwardSplitZ), Vector3.new(sx * (chineXAt(bh.stepZ) + 0.04), chineYAt(bh.stepZ), bh.stepZ), 0.09, darker(hullColor, 0.2))
+		end
+		-- water tank doors (one each side of the keel) and the two scoop probes
+		if bh.doors then
+			local z0, z1 = bh.doors[1], bh.doors[2]
+			local zc = (z0 + z1) / 2
+			local kY = keelAt(zc)
+			local slope = math.atan2(chineYAt(zc) - kY, chineXAt(zc))
+			for _, sx in { -1, 1 } do
+				local w = chineXAt(zc) * 0.55
+				add(ctx, "Fuselage", "TankDoor", "block", Vector3.new(w, 0.03, z1 - z0), CFrame.new(sx * w * 0.6, kY + math.tan(slope) * w * 0.6 - 0.02, zc) * CFrame.Angles(0, 0, sx * slope), DARK_METAL, { attrs = { TankDoorSide = sx } })
+			end
+		end
+		if bh.probesZ then
+			for _, sx in { -1, 1 } do
+				local top = Vector3.new(sx * 0.35, keelAt(bh.probesZ) + 0.25, bh.probesZ)
+				rod(ctx, "Fuselage", "ScoopProbe", top, top + Vector3.new(0, -0.45, 0.25), 0.12, DARK_METAL)
+			end
+		end
+	end
+
 	-- Main-gear sponsons (high-wing aircraft keep the main gear in fuselage side pods).
 	if g.sponsons then
 		local sp = g.sponsons
@@ -1227,6 +1298,20 @@ local function buildEngines(ctx: Ctx)
 		else
 			buildTurbofan(ctx, comp, i, p, eg, nac)
 		end
+		-- afterburner flame behind the nozzle (hidden; the client fades it in with reheat)
+		if e.afterburner and kind == "turbofan" then
+			local L, R = eg.length, eg.radius
+			local flameLen = L * 0.9
+			local z = p.Z + L * 0.42 + flameLen / 2
+			local outer = ellipsoid(ctx, comp, "AfterburnerFlame", CFrame.new(p.X, p.Y, z), Vector3.new(R * 0.5, R * 0.5, flameLen / 2), Color3.fromRGB(255, 140, 50), { material = Enum.Material.Neon, transparency = 1, noShadow = true, attrs = { AfterburnerIndex = i } })
+			ellipsoid(ctx, comp, "AfterburnerCore", CFrame.new(p.X, p.Y, z - flameLen * 0.2), Vector3.new(R * 0.3, R * 0.3, flameLen * 0.3), Color3.fromRGB(255, 230, 170), { material = Enum.Material.Neon, transparency = 1, noShadow = true, attrs = { AfterburnerIndex = i } })
+			local light = Instance.new("PointLight")
+			light.Name = "AfterburnerLight"
+			light.Color = Color3.fromRGB(255, 150, 70)
+			light.Range = 30
+			light.Brightness = 0
+			light.Parent = outer
+		end
 		-- smoke emitter (enabled by the client when the engine is failed/on fire)
 		failureSmoke(ctx, comp)
 	end
@@ -1335,16 +1420,22 @@ local function buildFloats(ctx: Ctx)
 		ellipsoid(ctx, comp, "FloatStern", CFrame.new(x, f.y + hh * 0.2, midEnd) * CFrame.Angles(math.rad(4), 0, 0), Vector3.new(hw * 0.95, hh * 0.8, len * 0.38), color, { hull = true })
 		-- deck stripe and the planing step
 		add(ctx, comp, "FloatDeck", "block", Vector3.new(hw * 0.9, 0.04, midEnd - bowZ), CFrame.new(x, f.y + hh - 0.01, (bowZ + midEnd) / 2), top)
-		add(ctx, comp, "FloatStep", "block", Vector3.new(hw * 1.6, hh * 0.35, 0.12), CFrame.new(x, f.y - hh * 0.7, midEnd), darker(color, 0.25))
+		if f.step ~= false then
+			add(ctx, comp, "FloatStep", "block", Vector3.new(hw * 1.6, hh * 0.35, 0.12), CFrame.new(x, f.y - hh * 0.7, midEnd), darker(color, 0.25))
+		end
 		-- struts: front and rear pairs up to the fuselage, plus a cross brace
 		for _, st in f.struts do
 			local foot = Vector3.new(x, f.y + hh * 0.9, st.z)
 			local head = Vector3.new(sx * st.x, st.y, st.z + (st.lean or 0))
 			rod(ctx, comp, "FloatStrut", foot, head, 0.08, rgb(liv.wing), { hull = true })
-			rod(ctx, comp, "FloatStrut", foot, Vector3.new(sx * 0.1, st.y, st.z + 0.4), 0.05, rgb(liv.wing))
+			if f.brace ~= false then
+				rod(ctx, comp, "FloatStrut", foot, Vector3.new(sx * 0.1, st.y, st.z + 0.4), 0.05, rgb(liv.wing))
+			end
 		end
 		-- water rudder at the stern
-		add(ctx, comp, "WaterRudder", "block", Vector3.new(0.03, hh * 0.9, 0.25), CFrame.new(x, f.y, f.z1 - 0.05), DARK_METAL)
+		if f.waterRudder ~= false then
+			add(ctx, comp, "WaterRudder", "block", Vector3.new(0.03, hh * 0.9, 0.25), CFrame.new(x, f.y, f.z1 - 0.05), DARK_METAL)
+		end
 	end
 end
 

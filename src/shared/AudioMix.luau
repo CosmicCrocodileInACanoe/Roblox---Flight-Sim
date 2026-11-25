@@ -343,6 +343,15 @@ function AudioMix.atcExchange(randInt: (number, number) -> number): any
 		{ { P, "Tower, " .. cs .. ", holding short runway " .. rwy .. ", ready." }, { A, cs .. ", runway " .. rwy .. ", cleared for takeoff." } },
 		{ { P, fac .. ", " .. cs .. ", request direct to the field." }, { A, cs .. ", proceed direct, descend at your discretion." } },
 		{ { P, fac .. ", " .. cs .. ", we're getting some light chop up here." }, { A, cs .. ", roger, smoother rides reported lower." } },
+		{ { P, fac .. ", " .. cs .. ", passing " .. alt .. " thousand for flight level " .. fl .. "." }, { A, cs .. ", " .. fac .. ", radar contact." } },
+		{ { P, "Tower, " .. cs .. ", ten miles out, inbound for landing." }, { A, cs .. ", Tower, continue, number two following traffic." } },
+		{ { P, fac .. ", " .. cs .. ", request descent." }, { A, cs .. ", descend and maintain " .. alt .. " thousand." } },
+		{ { P, fac .. ", " .. cs .. ", request heading " .. hdg .. " for weather." }, { A, cs .. ", heading " .. hdg .. " approved, advise when clear." } },
+		{ { P, "Ground, " .. cs .. ", at the gate, ready to taxi." }, { A, cs .. ", Ground, taxi to runway " .. rwy .. " via alpha." } },
+		{ { P, fac .. ", " .. cs .. ", we have the traffic in sight." }, { A, cs .. ", thanks, maintain visual separation." } },
+		{ { P, "Tower, " .. cs .. ", going around." }, { A, cs .. ", roger, fly runway heading, climb to three thousand." } },
+		{ { P, fac .. ", " .. cs .. ", say again the frequency?" }, { A, cs .. ", contact Center " .. freq .. "." } },
+		{ { P, fac .. ", " .. cs .. ", any reports of ice up here?" }, { A, cs .. ", negative, no reports." } },
 	}
 	local t = templates[randInt(1, #templates)]
 	return {

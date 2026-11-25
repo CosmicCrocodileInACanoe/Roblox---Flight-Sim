@@ -80,6 +80,7 @@ Expected: `599 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | C | Camera: chase / cockpit / tower |
 | Right mouse drag, wheel | Look around (re-centres after 10 s), camera distance |
 | H | Hide HUD |
+| O | Background music on / off |
 | N | Show / hide the minimap |
 | J | Failures and weather events menu (also the red **Events** button, top right) |
 | F3 | Debug panel |
@@ -200,12 +201,15 @@ stays silent and never errors.
 - Background ATC chatter, never constant. Exchanges are a call and a reply: some start
   with the controller, some with a pilot. Controllers and pilots use different
   text-to-speech voices, and each callsign keeps its own voice and pitch. After each
-  exchange there are 5 to 16 s of quiet, so about 3 to 5 exchanges a minute, each cut off
-  at 15 s. Roblox limits text-to-speech to about 7 requests a minute, so new exchanges are
+  exchange there are a random 5 to 35 s of quiet, and each exchange is cut off at 15 s.
+  Most calls are other pilots calling ATC. Roblox limits text-to-speech to about 7 requests a minute, so new exchanges are
   generated slowly (warnings first) and reused. Recorded chatter clips in `atcChatter1..5`
   are mixed in.
-- Cockpit alarms: GPWS "whoop whoop, pull up" (a recorded clip, or the whoop siren then a
-  spoken "pull up"), "bank angle", the stall alarm and stick shaker, a fire bell while an
+- Background music: soft, upbeat tracks from Roblox's licensed music library
+  (`AudioConfig.music`), shuffled at low volume. It ducks under warnings, callouts and ATC.
+  Press O to turn it on or off.
+- Cockpit alarms: GPWS "whoop whoop, pull up" (the whoop is a siren sound, then a spoken
+  "pull up" in the warning voice), "bank angle", the stall alarm and stick shaker, a fire bell while an
   engine burns, an overspeed clacker above Vmo, and master warning and caution chimes.
   The warning chime sounds for fire, a part failing or breaking off, and overspeed. The
   caution chime sounds for an engine out, jammed controls, hydraulics, a fuel leak, low

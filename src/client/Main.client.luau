@@ -99,6 +99,9 @@ local input = InputController.new({
 	controls = function()
 		controlsPopup:toggle()
 	end,
+	music = function()
+		sound:toggleMusic()
+	end,
 	panel = function()
 		if flightPanel then
 			flightPanel:toggle()
@@ -291,7 +294,7 @@ local function keysFor(action: string): { [Enum.KeyCode]: boolean }
 	end
 	return set
 end
-local menuKeys, controlsKeys = keysFor("menu"), keysFor("controls")
+local menuKeys, controlsKeys, musicKeys = keysFor("menu"), keysFor("controls"), keysFor("music")
 UserInputService.InputBegan:Connect(function(io, processed)
 	if processed or fc then
 		return
@@ -304,6 +307,8 @@ UserInputService.InputBegan:Connect(function(io, processed)
 		end
 	elseif controlsKeys[io.KeyCode] then
 		controlsPopup:toggle()
+	elseif musicKeys[io.KeyCode] then
+		sound:toggleMusic()
 	end
 end)
 
@@ -329,6 +334,7 @@ RunService.Heartbeat:Connect(function(dt)
 	if fc then
 		sound:update(dt, camera.mode)
 	end
+	sound:updateMusic(dt)
 	if fc then
 		hud:update(fc.telemetry, destination)
 		flightPanel:update(fc.telemetry)

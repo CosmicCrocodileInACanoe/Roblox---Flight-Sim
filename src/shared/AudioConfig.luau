@@ -60,9 +60,9 @@ AudioConfig.sounds = {
 
 	-- Cockpit warnings (not muffled) ----------------------------------------------------
 	-- stallWarning: about to stall (within a couple of degrees of the stall angle) and while stalled
-	stallWarning = { id = { "4112829784", "9113083860" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	stallWarning = { id = { "9113083860" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 	-- stickShaker: rattle while the wing is actually stalled
-	stickShaker = { id = { "9114890677", "rbxasset://sounds/clickfast.wav" }, volume = 0.7, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	stickShaker = { id = { "9114890677" }, volume = 0.7, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 	-- fireBell: classic fire bell while an engine burns; overspeedClacker: above Vmo
 	fireBell = { id = { "130821037", "250244656" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 	overspeedClacker = { id = { "rbxasset://sounds/clickfast.wav", "9114651987" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
@@ -70,19 +70,19 @@ AudioConfig.sounds = {
 	-- caution (amber: engine out, jammed controls, hydraulics, fuel leak, low fuel, damage)
 	masterWarning = { id = { "9113086365", "9113085665" }, volume = 0.7, looped = false, group = "cockpit" },
 	masterCaution = { id = { "7149373060", "2909601104" }, volume = 0.6, looped = false, group = "cockpit" },
-	-- The GPWS "whoop whoop" siren. Only used when the pull-up callout is spoken by
-	-- text-to-speech; the recorded pull-up clips above already contain the whoop.
+	-- The GPWS "whoop whoop" siren, played just before the spoken "pull up" (the whoop is a
+	-- sound, never a spoken word).
 	gpwsWhoop = { id = { "386179883", "224090283" }, volume = 0.8, looped = false, group = "cockpit", maxSeconds = 1.3 },
-	gearWarning = { id = { "2124207508", "9113085665" }, volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	gearWarning = { id = { "9113086365" }, volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 
 	-- Voice callouts (one-shots, repeated while the danger lasts) -----------------------
 	-- `text` is spoken with Roblox text-to-speech when the slot has no id (see
 	-- useTextToSpeech below). A recorded clip in `id` always wins.
-	calloutPullUp = { id = { "4119192112", "7363264916", "139545781", "71134116968565" }, volume = 1.0, looped = false, group = "cockpit", text = "Pull up! Pull up!", repeatEvery = 2.6 },
+	calloutPullUp = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Pull up! Pull up!", repeatEvery = 3.2 },
 	calloutTerrain = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Terrain, terrain!", repeatEvery = 2.5 },
 	calloutSinkRate = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Sink rate!", repeatEvery = 2.5 },
 	calloutTooLowGear = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Too low. Gear!", repeatEvery = 3 },
-	calloutBankAngle = { id = { "4896248758" }, volume = 0.9, looped = false, group = "cockpit", text = "Bank angle! Bank angle!", repeatEvery = 3 },
+	calloutBankAngle = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Bank angle! Bank angle!", repeatEvery = 3 },
 	calloutStall = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Stall! Stall!", repeatEvery = 2 },
 
 	-- Pilot and automatic callouts (one each time the moment happens) ------------------
@@ -111,6 +111,18 @@ AudioConfig.sounds = {
 	atcChatter5 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
 }
 
+-- Background music: soft, upbeat tracks from Roblox's licensed music library, played in
+-- a shuffled loop at low volume. It ducks under warnings, callouts and ATC. Toggle in
+-- game with O. Swap in any Creator Store music IDs you like.
+AudioConfig.music = {
+	enabled = true, -- on when the game starts
+	tracks = { "9043887091", "9046862738", "9046863579", "1837768517", "9046866578" },
+	volume = 0.12, -- low: background only
+	duckedVolume = 0.035, -- while a warning, callout or ATC is talking
+	fade = 1.5, -- seconds to fade in or out
+	gapSeconds = 4, -- quiet between tracks
+}
+
 -- Volume of spoken ATC chatter when no clips are filled in.
 AudioConfig.atcVoiceVolume = 0.35
 
@@ -118,14 +130,14 @@ AudioConfig.atcVoiceVolume = 0.35
 -- callouts silent until recorded clips are added.
 AudioConfig.useTextToSpeech = true
 -- Voice for text-to-speech (see the Roblox "list of artificial voices"; "1" and "2" are valid).
-AudioConfig.ttsVoiceId = "5" -- warnings and callouts: United States male #2
+AudioConfig.ttsVoiceId = "1" -- warnings and callouts: British male (the voice from the first sound build)
 
 -- Radio voices (Roblox voice IDs: 1 British male, 2 British female, 3 US male, 4 US
 -- female, 5 US male #2, 6 US female #2, 7 Australian male, 8 Australian female).
 -- Controllers and pilots use different voices; each pilot also gets a small pitch shift
 -- so two pilots on the same voice still sound like different people.
 AudioConfig.atcControllerVoices = { "4", "3" }
-AudioConfig.atcPilotVoices = { "1", "2", "6", "7", "8" }
+AudioConfig.atcPilotVoices = { "2", "5", "6", "7", "8" } -- not "1": that is the warning voice
 AudioConfig.atcPilotPitch = 2.5 -- +/- semitones
 
 -- Engine sound types. Each has a main "whine" layer (pitch and level follow N1) and a
@@ -226,10 +238,10 @@ AudioConfig.mix = {
 	chimeAltFt = 10000, -- cabin chime when crossing this altitude
 
 	-- Background ATC chatter: never constant. After an exchange ends, the next one waits
-	-- atcMinGap..atcMaxGap seconds (about 3 to 5 exchanges a minute). Each exchange is
+	-- a random atcMinGap..atcMaxGap seconds. Each exchange is
 	-- cut off after atcMaxSeconds.
 	atcMinGap = 5,
-	atcMaxGap = 16,
+	atcMaxGap = 35,
 	atcMaxSeconds = 15,
 	atcPoolMax = 16, -- spoken exchanges kept and reused (each new one costs 2 TTS requests)
 	atcLineGap = 0.6, -- s between a call and its reply

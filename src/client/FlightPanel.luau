@@ -349,7 +349,7 @@ function FlightPanel:update(t: any)
 		end
 	end
 	local mode = t.assist or "easy"
-	paint(b.Assist, string.upper(mode), if mode == "easy" then ON elseif mode == "assisted" then BLUE else OFF)
+	paint(b.Assist, string.upper(mode), if mode == "easy" then ON elseif mode == "free" then WARN elseif mode == "assisted" then BLUE else OFF)
 end
 
 function FlightPanel:destroy()

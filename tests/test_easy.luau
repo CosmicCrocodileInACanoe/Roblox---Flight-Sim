@@ -30,9 +30,10 @@ local function fly(s, a, raw, seconds, each)
 end
 
 return { name = "Easy mode", run = function(T)
-	T.test("easy is the default assist mode and cycles through all three", function()
+	T.test("easy is the default assist mode and cycles through all four", function()
 		T.check(Assist.new().mode == "easy")
-		T.check(Assist.nextMode("easy") == "assisted")
+		T.check(Assist.nextMode("easy") == "free")
+		T.check(Assist.nextMode("free") == "assisted")
 		T.check(Assist.nextMode("assisted") == "simulation")
 		T.check(Assist.nextMode("simulation") == "easy")
 		T.check(Assist.toughness("easy") > 1 and Assist.toughness("simulation") == 1)

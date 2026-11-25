@@ -10,8 +10,8 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 431 automated tests, all passing: aero, engines, gear, damage,
-grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy mode) through the same
+engine-independent logic has 574 automated tests, all passing: aero, engines, gear, damage,
+grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
 collisions) is unverified until someone works through `docs/PLAYTEST.md` in Studio.
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `574 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -64,7 +64,7 @@ Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | --- | --- |
 | W / S | Pitch down / up |
 | A / D | Roll left / right |
-| Q / E | Rudder and nose-wheel steering |
+| Q / E | Rudder and nose-wheel steering (in the air: a steady yaw that eases back when released) |
 | Shift / Ctrl | Throttle up / down |
 | I | Start / stop engines |
 | G | Landing gear |
@@ -75,10 +75,10 @@ Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | L | Drop water (hold; Rainmaker water bomber only) |
 | X | Speedbrake |
 | [ / ] | Pitch trim (Simulation mode) |
-| T | Cycle Easy (default) / Assisted / Simulation |
+| T | Cycle Easy (default) / Free / Assisted / Simulation |
 | U | Show / hide the on-screen buttons (throttle lever, stick, gear, flaps, brakes...) |
 | C | Camera: chase / cockpit / tower |
-| Right mouse drag, wheel | Look around, camera distance |
+| Right mouse drag, wheel | Look around (re-centres after 10 s), camera distance |
 | H | Hide HUD |
 | N | Show / hide the minimap |
 | F3 | Debug panel |
@@ -174,7 +174,9 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Aero, Engine, Gear      lift/drag per panel, spool and lapse, raycast spring-dampers
   FlightModel             6-DOF forces and torques for one aircraft (the core of the game)
   Assist                  Easy mode (self-levelling, pitch/bank limits, no stalls, speed floor, flare help,
-                          tougher airframe) and Assisted mode (auto-trim, turn coordination, protections)
+                          tougher airframe), Free mode (roll/pitch rate commands, holds bank and pitch,
+                          75 deg bank, extra authority) and Assisted mode (auto-trim, turn coordination,
+                          protections); Q/E yaw-rate control with a yaw damper in all three
   Damage                  component health, states, propagation, detachment, lost sections
   Crash                   crash feel: per-component profiles, dents, break points, debris breakup
   Grading, Mission        landing score, gate-to-gate mission state machine

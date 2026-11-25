@@ -164,6 +164,16 @@ These are the most likely places for first-run bugs, so check them first.
     new fire appears elsewhere about a minute later. Also land it on a runway on its wheels.
     Note any Output errors from FireService or FlightController.
 
+17. **Rudder and Free mode.** In the Meridian 200 at cruise in Easy mode, hold Q for 4 s:
+    the nose swings left and keeps going left (a slight bank into it is fine), with no
+    back-and-forth wobble. Let go: the nose eases back in about a second and the wings
+    level. Press T until the HUD says FREE. Roll hard right and let go: the aircraft
+    rolls faster than in Easy and stays at the bank you left it (up to about 75 deg),
+    turning without you having to pull. Pull up and let go: the nose stays where you left
+    it. Flaps, gear, throttle and brakes behave exactly as in Easy. Then right-drag the
+    camera to look sideways, let go and wait: after 10 s it drifts back behind the aircraft
+    (also in the cockpit view).
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

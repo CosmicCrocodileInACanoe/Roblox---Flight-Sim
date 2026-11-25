@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Units = require(Shared.Units)
+local MathUtil = require(Shared.MathUtil)
 local Airports = require(Shared.Airports)
 local Effects = require(script.Parent.Effects)
 
@@ -18,6 +19,13 @@ local CameraController = {}
 CameraController.__index = CameraController
 
 CameraController.MODES = { "chase", "cockpit", "tower" }
+-- Seconds without looking around (right mouse drag or right stick) before the chase and
+-- cockpit views ease back to straight ahead.
+CameraController.RECENTER_DELAY = 10
+
+local function defaultPitch(mode: string): number
+	return if mode == "cockpit" then math.rad(-4) else math.rad(-8)
+end
 
 function CameraController.new()
 	local self = setmetatable({}, CameraController) :: any
@@ -29,6 +37,7 @@ function CameraController.new()
 	self.zoom = 1
 	self.camCF = nil :: CFrame?
 	self.dragging = false
+	self.lastLook = os.clock()
 	self.towerPos = nil :: Vector3?
 	self.connections = {}
 	-- Right-mouse look is polled every frame in update() (see lookInput), so it works even
@@ -43,6 +52,7 @@ function CameraController.new()
 		elseif input.KeyCode == Enum.KeyCode.Thumbstick2 then
 			local p = input.Position
 			if p.Magnitude > 0.15 then
+				self.lastLook = os.clock()
 				self.yaw -= p.X * 0.05
 				self.pitch = math.clamp(self.pitch + p.Y * 0.04, math.rad(-80), math.rad(70))
 			end
@@ -121,7 +131,7 @@ end
 function CameraController:setMode(mode: string)
 	self.mode = mode
 	self.yaw = 0
-	self.pitch = if mode == "cockpit" then math.rad(-4) else math.rad(-8)
+	self.pitch = defaultPitch(mode)
 	self:applyCockpitVisibility(mode == "cockpit")
 	self.towerPos = nil
 	if mode == "tower" and self.model and self.model.PrimaryPart then
@@ -160,6 +170,7 @@ function CameraController:lookInput()
 			d = loc - self.lastMouse
 		end
 		self.lastMouse = loc
+		self.lastLook = os.clock() -- holding the look button counts as looking, even if still
 		self.yaw -= d.X * 0.006
 		self.pitch = math.clamp(self.pitch - d.Y * 0.006, math.rad(-80), math.rad(70))
 	elseif self.dragging then
@@ -186,6 +197,10 @@ function CameraController:update(dt: number)
 	local cam = Workspace.CurrentCamera
 	local cf = core.CFrame
 	self:lookInput()
+	-- nobody has looked around for a while: drift back to straight ahead
+	local idle = os.clock() - self.lastLook
+	self.yaw = MathUtil.recenter(self.yaw, 0, idle, CameraController.RECENTER_DELAY, dt)
+	self.pitch = MathUtil.recenter(self.pitch, defaultPitch(self.mode), idle, CameraController.RECENTER_DELAY, dt)
 	local shake = Effects.shakeAmount
 	Effects.shakeAmount = math.max(0, shake - dt * 1.8)
 	local shakeCF = CFrame.new()

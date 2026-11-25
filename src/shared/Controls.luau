@@ -42,7 +42,7 @@ Controls.KEYMAP = {
 	{ action = "waterDrop", kind = "hold", group = "Aircraft systems", label = "Drop water (water bomber; skim the sea to refill)", keys = { "L" } },
 	-- Camera and game
 	{ action = "camera", kind = "press", group = "Camera and game", label = "Camera: chase / cockpit / tower", keys = { "C", "ButtonSelect" } },
-	{ action = "assist", kind = "press", group = "Camera and game", label = "Easy / Assisted / Simulation mode", keys = { "T" } },
+	{ action = "assist", kind = "press", group = "Camera and game", label = "Easy / Free / Assisted / Simulation mode", keys = { "T" } },
 	{ action = "controls", kind = "press", group = "Camera and game", label = "Show / hide this controls list", keys = { "K" } },
 	{ action = "panel", kind = "press", group = "Camera and game", label = "Show / hide on-screen buttons", keys = { "U" } },
 	{ action = "minimap", kind = "press", group = "Camera and game", label = "Show / hide the map", keys = { "N" } },

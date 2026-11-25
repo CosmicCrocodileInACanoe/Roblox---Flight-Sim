@@ -280,6 +280,13 @@ function FlightPanel.new(input: any, callbacks: { [string]: () -> () })
 	rev.TextSize = 12
 	pressButton("Assist", "EASY", "assist")
 	pressButton("Camera", "CAMERA", "camera")
+	-- water bombers only: a big hold-to-drop button above the others
+	local drop = holdButton(root, "WaterDrop", "DROP WATER (hold)", "waterDrop", UDim2.new(1, -184, 1, -190), UDim2.fromOffset(120, 52))
+	drop.AnchorPoint = Vector2.new(1, 1)
+	drop.TextSize = 13
+	drop.TextWrapped = true
+	drop.Visible = false
+	self.buttons.WaterDrop = drop
 	return self
 end
 
@@ -334,6 +341,13 @@ function FlightPanel:update(t: any)
 	local sb = t.speedbrake or 0
 	paint(b.Speedbrake, if sb > 0.75 then "AIR BRAKE\nFULL" elseif sb > 0.2 then "AIR BRAKE\nHALF" else "AIR BRAKE\nOFF", if sb > 0.2 then WARN else OFF)
 	paint(b.Parking, "PARK\nBRAKE", if t.parkingBrake then RED else OFF)
+	if b.WaterDrop then
+		b.WaterDrop.Visible = t.waterTank ~= nil
+		if t.waterTank then
+			local pct = math.floor(math.clamp((t.water or 0) / t.waterTank.capacity, 0, 1) * 100 + 0.5)
+			paint(b.WaterDrop, if t.dropping then "DROPPING..." else string.format("DROP WATER\n(hold) %d%%", pct), if t.dropping then WARN elseif pct > 0 then BLUE else OFF)
+		end
+	end
 	local mode = t.assist or "easy"
 	paint(b.Assist, string.upper(mode), if mode == "easy" then ON elseif mode == "assisted" then BLUE else OFF)
 end

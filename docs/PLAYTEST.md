@@ -138,6 +138,23 @@ These are the most likely places for first-run bugs, so check them first.
     shows "CRASHED!". With two players, both race at once and pass through each other.
     Note any Output errors from StuntsHud or MissionService.
 
+15. **Mach 2 jet.** Fly the Arrowstar from HBR. Full throttle on the runway lights the
+    afterburners (orange flames behind the engines, "AB" next to each engine). Climb above
+    20,000 ft with the gear up and full throttle: the HUD shows the Mach number next to GS
+    and it passes M2.00 within a few minutes. Down low it should sit around Mach 1. With the
+    gear down in the air the flames go out. Note anything that shakes, jitters or tears
+    apart at that speed.
+
+16. **Firefighting.** Fly the Rainmaker from HBR. Check: orange fire dots on the minimap and
+    "WILDFIRE nn%" labels far away; flames, glow and a smoke column at a fire. Fly south to
+    the sea, gear up, touch the hull down and skim at 50+ kt: white spray at the hull, the
+    WATER bar says SCOOP and fills in about 12 s; the plane floats level and the wingtip
+    floats only touch in a bank. Climb away loaded, fly low over a fire and hold L: a white
+    curtain falls and the bar empties in about 3 s. A good hit shows "Direct hit! Fire at
+    nn%"; about one more load puts it out (steam, "FIRE OUT", a message to everyone), and a
+    new fire appears elsewhere about a minute later. Also land it on a runway on its wheels.
+    Note any Output errors from FireService or FlightController.
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

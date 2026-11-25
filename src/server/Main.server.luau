@@ -16,6 +16,7 @@ local Server = script.Parent
 local AircraftService = require(Server.AircraftService)
 local MissionService = require(Server.MissionService)
 local ProgressService = require(Server.ProgressService)
+local FireService = require(Server.FireService)
 local TerrainBuilder = require(Server.World.TerrainBuilder)
 local AirportBuilder = require(Server.World.AirportBuilder)
 local CityBuilder = require(Server.World.CityBuilder)
@@ -95,6 +96,7 @@ AircraftService.init(remotes)
 MissionService.init(remotes, ProgressService)
 AircraftService.setTelemetryHandler(MissionService.onTelemetry)
 AircraftService.setSpawnHandler(MissionService.onSpawned)
+FireService.init(remotes)
 
 -- World -------------------------------------------------------------------------------
 ReplicatedStorage:SetAttribute("WorldReady", false)

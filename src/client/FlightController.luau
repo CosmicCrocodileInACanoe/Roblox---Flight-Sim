@@ -25,6 +25,8 @@ local GameConfig = require(Shared.GameConfig)
 local Registry = require(Shared.AircraftRegistry)
 local WorldGen = require(Shared.WorldGen)
 local Stunts = require(Shared.Stunts)
+local Airports = require(Shared.Airports)
+local Wildfire = require(Shared.Wildfire)
 local Effects = require(script.Parent.Effects)
 
 local MPS = Units.METERS_PER_STUD
@@ -212,6 +214,12 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 	self.touchdownFlash = nil :: any
 	self.telemetry = {}
 	self.nav = { destination = options.destination }
+	-- water bomber: drops are batched and reported a few times a second
+	self.dropKg = 0
+	self.dropTimer = 0
+	self.fxTimer = 0
+	self.airportTimer = 0
+	self.groundY = 0
 
 	remotes.ControllerReady:FireServer(model)
 	return self
@@ -310,6 +318,7 @@ function FlightController:step(dt: number)
 	local mainGear = cfg.gear.units[2] or cfg.gear.units[1]
 	local restH = -(mainGear.pos[2] - mainGear.strutLength - mainGear.wheelRadius)
 	env.agl = if hit then (cf.Position.Y - hit.Position.Y) * MPS - restH else 1e4
+	self.groundY = if hit then hit.Position.Y else WorldGen.SEA_LEVEL
 	-- over the sea the water surface counts as the ground (seaplanes, ditching)
 	env.agl = math.min(env.agl, (cf.Position.Y - WorldGen.SEA_LEVEL) * MPS - restH)
 
@@ -343,8 +352,26 @@ function FlightController:step(dt: number)
 		env.hullDepth[i] = d
 	end
 
+	-- water bombers refill from a hose when parked at an airport
+	if cfg.waterTank then
+		self.airportTimer -= dt
+		if self.airportTimer <= 0 then
+			self.airportTimer = 0.5
+			local inside = false
+			for _, id in Airports.order do
+				if Airports.isInsideAirport(Airports.layout(id), cf.Position.X, cf.Position.Z) then
+					inside = true
+				end
+			end
+			env.refillAllowed = inside
+		end
+	end
+
 	Assist.apply(self.assist, raw, self.ctl, env, fm, dt)
 	local r = fm:step(env, self.ctl, dt)
+	if cfg.waterTank then
+		self:waterBomber(dt, cf, r)
+	end
 
 	-- Apply forces (SI body -> Roblox world units)
 	local mass = fm:currentMass()
@@ -553,6 +580,35 @@ function FlightController:crashResponse(comp: string, point: Vector3, dvWorld: V
 	end
 end
 
+-- Water bomber: show the curtain or the scoop spray, and tell the server where the
+-- water lands (it decides which fires that reaches).
+function FlightController:waterBomber(dt: number, cf: CFrame, r: any)
+	local core = self.core
+	local vel = core.AssemblyLinearVelocity
+	self.fxTimer -= dt
+	local bh = self.cfg.geometry.fuselage.boatHull
+	local belly = cf:PointToWorldSpace(Vector3.new(0, (bh and bh.keelY or -1.5) - 0.3, 0) * SPM)
+	if r.dropping then
+		self.dropKg += r.dropRate * dt
+		if self.fxTimer <= 0 then
+			self.fxTimer = 0.08
+			Effects.waterCurtain(belly, vel, r.dropRate / self.cfg.waterTank.dropRate)
+		end
+	elseif r.scooping and self.fxTimer <= 0 then
+		self.fxTimer = 0.12
+		local probes = cf:PointToWorldSpace(Vector3.new(0, bh and bh.keelY or -1.5, (bh and bh.probesZ) or 2) * SPM)
+		Effects.spray(probes, 1.2)
+	end
+	self.dropTimer += dt
+	if self.dropKg > 0 and (self.dropTimer >= 0.25 or not r.dropping) then
+		self.dropTimer = 0
+		local x, z = Wildfire.impactPoint(belly.X, belly.Y, belly.Z, vel.X, vel.Z, self.groundY)
+		local heightM = math.max(0, (belly.Y - self.groundY) * MPS)
+		self.remotes.WaterDrop:FireServer(self.model, x, z, self.dropKg, heightM)
+		self.dropKg = 0
+	end
+end
+
 local SYS_RATE = 0.25
 function FlightController:reportSystems(dt: number)
 	self.systemsTimer += dt
@@ -621,6 +677,9 @@ function FlightController:updateTelemetry(cf: CFrame, v: Vector3, r: any, raw: a
 	t.assist = self.assist.mode
 	t.fuel = fm.fuel
 	t.fuelFlow = r.fuelFlow
+	t.waterTank = self.cfg.waterTank
+	t.water = fm.water
+	t.scooping, t.dropping, t.refilling = r.scooping, r.dropping, r.refilling
 	t.crashed = self.crashed
 	t.fault = r.fault
 	t.ownership = if self.core.ReceiveAge == 0 then "client (local)" else "server/other"

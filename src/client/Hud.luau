@@ -10,6 +10,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Units = require(Shared.Units)
 local Airports = require(Shared.Airports)
 local Damage = require(Shared.Damage)
+local Controls = require(Shared.Controls)
 
 local SPM = Units.STUDS_PER_METER
 
@@ -162,6 +163,14 @@ function Hud.new()
 	self.engineCount = 0
 	self.throttle = label(en, "", UDim2.fromOffset(12, 86), UDim2.new(1, -24, 0, 16), MONO, WHITE, Enum.TextXAlignment.Left, 14)
 	self.fuel = label(en, "", UDim2.fromOffset(12, 104), UDim2.new(1, -24, 0, 16), MONO, DIM, Enum.TextXAlignment.Left, 13)
+
+	-- Water tank (water bombers only), above the engines
+	local wp = panel(root, UDim2.new(0, 12, 1, -148), UDim2.fromOffset(230, 50), Vector2.new(0, 1))
+	wp.Visible = false
+	label(wp, "WATER", UDim2.fromOffset(12, 5), UDim2.new(1, -24, 0, 14), FONT, DIM, Enum.TextXAlignment.Left, 11)
+	local wbg = make("Frame", { Parent = wp, Position = UDim2.fromOffset(12, 24), Size = UDim2.fromOffset(120, 16), BackgroundColor3 = Color3.fromRGB(40, 44, 50), BorderSizePixel = 0 }, { corner(4) })
+	local wfill = make("Frame", { Parent = wbg, Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(80, 170, 255), BorderSizePixel = 0 }, { corner(4) })
+	self.water = { panel = wp, fill = wfill, text = label(wp, "", UDim2.fromOffset(140, 23), UDim2.fromOffset(84, 18), MONO, WHITE, Enum.TextXAlignment.Left, 13) }
 
 	-- Configuration strip (bottom centre-left)
 	local cfgp = panel(root, UDim2.new(0, 252, 1, -12), UDim2.fromOffset(250, 128), Vector2.new(0, 1))
@@ -401,6 +410,10 @@ function Hud:update(t: any, destId: string?)
 		self.objective.Text = "Crash sandbox: try failures from the menu (M). R resets instantly."
 	else
 		self.objective.Text = if t.onGround and t.gs < 2 and not t.n1[1].running then "Free flight: press I to start engines, P to release the brake" else "Free flight: explore, land anywhere for a grade"
+		if t.waterTank and not (t.onGround and t.gs < 2 and not t.n1[1].running) then
+			local drop = Controls.firstKey("waterDrop") or "L"
+			self.objective.Text = if (t.water or 0) < 500 then "Firefighting: skim the sea at 50+ kt to scoop water (gear up)" else string.format("Firefighting: fly low over a wildfire (red on the map) and hold %s to drop", drop)
+		end
 	end
 
 	-- engines
@@ -434,6 +447,17 @@ function Hud:update(t: any, destId: string?)
 	end
 	self.throttle.Text = string.format("THR %3d%%", math.floor(t.throttle * 100 + 0.5))
 	self.fuel.Text = string.format("FUEL %s kg  (%.1f kg/s)", fmtThousands(t.fuel), t.fuelFlow or 0)
+
+	-- water tank
+	local tank = t.waterTank
+	self.water.panel.Visible = tank ~= nil
+	if tank then
+		local frac = math.clamp((t.water or 0) / tank.capacity, 0, 1)
+		self.water.fill.Size = UDim2.fromScale(frac, 1)
+		local status = if t.dropping then "DROP" elseif t.scooping then "SCOOP" elseif t.refilling then "FILL" elseif frac >= 0.999 then "FULL" else string.format("%d%%", math.floor(frac * 100 + 0.5))
+		self.water.text.Text = status
+		self.water.text.TextColor3 = if t.dropping or t.scooping then AMBER else WHITE
+	end
 
 	-- configuration
 	self.flaps.Text = if t.flapCmd ~= t.flapLabel then string.format("FLAPS %s > %s", t.flapLabel, t.flapCmd) else string.format("FLAPS %s", t.flapLabel)

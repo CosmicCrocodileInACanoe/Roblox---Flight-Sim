@@ -8,7 +8,8 @@
 --   stallWarning, raFt, vsFpm, crashed, touchdownCount, touchdownVsFpm,
 --   impactCount, impactDv (m/s), detachedCount, time (s),
 --   stall (wing actually stalled), terrainAheadSec (seconds until the flight path meets
---   the ground, math.huge when clear), altFt, rotateKts
+--   the ground, math.huge when clear), altFt, rotateKts, bank (degrees),
+--   fire, overspeed, warnCount and cautionCount (master warning / caution items)
 --
 -- loops() returns, per looping slot, { level = 0..1, effect = 0..1 }: level scales the
 -- slot's volume and effect picks the pitch between pitchMin and pitchMax.
@@ -76,7 +77,7 @@ function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: an
 	end
 	-- Silence every loop once the aircraft is destroyed; one-shots carry the crash.
 	if snap.crashed then
-		for _, slot in { profile.whine, profile.rumble, "wind", "runwayRoll", "gearMotor", "flapMotor", "stallWarning", "stickShaker", "gearWarning", "cockpitAmbience" } do
+		for _, slot in { profile.whine, profile.rumble, "wind", "runwayRoll", "gearMotor", "flapMotor", "stallWarning", "stickShaker", "gearWarning", "cockpitAmbience", "fireBell", "overspeedClacker" } do
 			set(slot, 0, 0)
 		end
 		return out
@@ -116,11 +117,13 @@ function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: an
 		and (snap.throttle < mix.gearWarningThrottle or snap.flapPos >= mix.gearWarningFlap - 0.05)
 	set("gearWarning", if lowAndSlow then 1 else 0, 0.5)
 	set("cockpitAmbience", 1, 0.5)
+	set("fireBell", if snap.fire then 1 else 0, 0.5)
+	set("overspeedClacker", if snap.overspeed then 1 else 0, 0.5)
 	return out
 end
 
 -- Ground proximity warning: the most urgent callout for this moment, or nil.
--- Order of priority: pull up, terrain, stall, sink rate, too low gear.
+-- Order of priority: pull up, terrain, stall, sink rate, too low gear, bank angle.
 function AudioMix.gpws(snap: any, mix: any): string?
 	if snap.crashed or snap.onGround then
 		return nil
@@ -154,6 +157,9 @@ function AudioMix.gpws(snap: any, mix: any): string?
 	end
 	if inBand and ra < mix.tooLowGearFt and snap.gearExt < 0.99 and snap.vsFpm < 0 then
 		return "calloutTooLowGear"
+	end
+	if ra >= 30 and math.abs(snap.bank or 0) > mix.bankAngleDeg then
+		return "calloutBankAngle"
 	end
 	return nil
 end
@@ -203,6 +209,15 @@ function AudioMix.events(snap: any, prev: any?, mix: any, memo: any, sounds: any
 	end
 	if snap.crashed and not prev.crashed then
 		play("crash", 1)
+	end
+
+	-- Master warning / caution chimes when something new goes wrong.
+	if not snap.crashed then
+		if (snap.warnCount or 0) > (prev.warnCount or 0) then
+			play("masterWarning", 1)
+		elseif (snap.cautionCount or 0) > (prev.cautionCount or 0) then
+			play("masterCaution", 1)
+		end
 	end
 
 	-- Voice callouts repeat while their condition lasts; a change of callout plays at once.
@@ -256,18 +271,20 @@ function AudioMix.events(snap: any, prev: any?, mix: any, memo: any, sounds: any
 end
 
 -- Background ATC ----------------------------------------------------------------------
--- Seconds to wait before the next transmission (rand01: a 0..1 random number). Never less
--- than mix.atcMinGap, so there are at most 60 / atcMinGap transmissions a minute.
+-- Seconds of quiet after one exchange before the next (rand01: a 0..1 random number).
 function AudioMix.atcDelay(rand01: number, mix: any): number
 	return mix.atcMinGap + (mix.atcMaxGap - mix.atcMinGap) * clamp01(rand01)
 end
 
-local AIRLINES = { "Skyline", "Coastal", "Northwind", "Bluejay", "Summit", "Harbor", "Redtail", "Polar" }
+local AIRLINES = { "Skyline", "Coastal", "Northwind", "Bluejay", "Summit", "Harbor", "Redtail", "Polar", "Meadow", "Falcon" }
 local NUMBERS = { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine" }
+local FACILITIES = { "Approach", "Center", "Tower", "Departure" }
 
--- A short made-up exchange between a controller and another aircraft (well under 15 s
--- of speech). randInt(a, b) returns a whole number in a..b.
-function AudioMix.atcPhrase(randInt: (number, number) -> number): string
+-- A short made-up exchange between a controller and another aircraft. Returns
+-- { callsign, lines = { { who = "atc" | "pilot", text } x2 } }, well under 15 s of
+-- speech. Some calls start with the pilot, some with the controller.
+-- randInt(a, b) returns a whole number in a..b.
+function AudioMix.atcExchange(randInt: (number, number) -> number): any
 	local function digits(n: number): string
 		local out = {}
 		for i = 1, n do
@@ -279,22 +296,42 @@ function AudioMix.atcPhrase(randInt: (number, number) -> number): string
 	if randInt(1, 4) == 1 then
 		cs ..= " heavy"
 	end
+	local fac = FACILITIES[randInt(1, #FACILITIES)]
 	local fl = NUMBERS[randInt(2, 4)] .. " " .. NUMBERS[randInt(1, 10)] .. " zero"
 	local hdg = NUMBERS[randInt(1, 4)] .. " " .. NUMBERS[randInt(1, 10)] .. " zero"
 	local alt = NUMBERS[randInt(4, 9)]
 	local freq = "one two " .. NUMBERS[randInt(1, 10)] .. " point " .. NUMBERS[randInt(1, 10)]
+	local rwy = NUMBERS[randInt(1, 4)] .. " " .. NUMBERS[randInt(1, 10)]
+	local A, P = "atc", "pilot"
 	local templates = {
-		{ cs .. ", climb and maintain flight level " .. fl .. ".", "Up to flight level " .. fl .. ", " .. cs .. "." },
-		{ cs .. ", turn left heading " .. hdg .. ".", "Left heading " .. hdg .. ", " .. cs .. "." },
-		{ cs .. ", turn right heading " .. hdg .. ".", "Right " .. hdg .. ", " .. cs .. "." },
-		{ cs .. ", descend and maintain " .. alt .. " thousand.", "Down to " .. alt .. " thousand, " .. cs .. "." },
-		{ cs .. ", contact approach " .. freq .. ". Good day.", "Approach " .. freq .. ", " .. cs .. ", good day." },
-		{ cs .. ", traffic two o'clock, five miles, opposite direction.", "Looking for traffic, " .. cs .. "." },
-		{ cs .. ", cleared to land, wind calm.", "Cleared to land, " .. cs .. "." },
-		{ cs .. ", reduce speed to two one zero knots.", "Two one zero knots, " .. cs .. "." },
+		{ { A, cs .. ", climb and maintain flight level " .. fl .. "." }, { P, "Up to flight level " .. fl .. ", " .. cs .. "." } },
+		{ { A, cs .. ", turn left heading " .. hdg .. "." }, { P, "Left heading " .. hdg .. ", " .. cs .. "." } },
+		{ { A, cs .. ", turn right heading " .. hdg .. ", vectors for the approach." }, { P, "Right " .. hdg .. ", " .. cs .. "." } },
+		{ { A, cs .. ", descend and maintain " .. alt .. " thousand." }, { P, "Down to " .. alt .. " thousand, " .. cs .. "." } },
+		{ { A, cs .. ", contact " .. fac .. " " .. freq .. ". Good day." }, { P, freq .. ", " .. cs .. ", good day." } },
+		{ { A, cs .. ", traffic two o'clock, five miles, opposite direction." }, { P, "Looking for the traffic, " .. cs .. "." } },
+		{ { A, cs .. ", runway " .. rwy .. ", cleared to land, wind calm." }, { P, "Cleared to land " .. rwy .. ", " .. cs .. "." } },
+		{ { A, cs .. ", reduce speed to two one zero knots." }, { P, "Two one zero knots, " .. cs .. "." } },
+		{ { P, fac .. ", " .. cs .. ", with you at flight level " .. fl .. "." }, { A, cs .. ", " .. fac .. ", roger." } },
+		{ { P, fac .. ", " .. cs .. ", request higher." }, { A, cs .. ", climb and maintain flight level " .. fl .. "." } },
+		{ { P, "Tower, " .. cs .. ", holding short runway " .. rwy .. ", ready." }, { A, cs .. ", runway " .. rwy .. ", cleared for takeoff." } },
+		{ { P, fac .. ", " .. cs .. ", request direct to the field." }, { A, cs .. ", proceed direct, descend at your discretion." } },
+		{ { P, fac .. ", " .. cs .. ", we're getting some light chop up here." }, { A, cs .. ", roger, smoother rides reported lower." } },
 	}
 	local t = templates[randInt(1, #templates)]
-	return t[1] .. " ... " .. t[2]
+	return {
+		callsign = cs,
+		lines = { { who = t[1][1], text = t[1][2] }, { who = t[2][1], text = t[2][2] } },
+	}
+end
+
+-- Stable pick for a callsign, so the same flight keeps the same voice.
+function AudioMix.voiceFor(name: string, choices: { string }): (string, number)
+	local h = 0
+	for i = 1, #name do
+		h = (h * 31 + string.byte(name, i)) % 1000003
+	end
+	return choices[(h % #choices) + 1], (h % 7) / 6 -- voice, 0..1 for pitch
 end
 
 -- Pitch for a looping slot from its 0..1 effect.

@@ -29,7 +29,10 @@ end
 return { name = "Audio", run = function(T)
 	T.test("every sound slot has a valid shape", function()
 		for slot, sc in AudioConfig.sounds do
-			T.check(type(sc.id) == "string" or type(sc.id) == "number", slot .. " id type")
+			T.check(type(sc.id) == "string" or type(sc.id) == "number" or type(sc.id) == "table", slot .. " id type")
+			if type(sc.id) == "table" then
+				T.check(#AudioMix.assetUrls(sc.id) == #sc.id, slot .. ": every candidate id is valid")
+			end
 			T.check(type(sc.volume) == "number" and sc.volume >= 0, slot .. " volume")
 			T.check(sc.group == "exterior" or sc.group == "cockpit", slot .. " group")
 			if sc.looped then
@@ -50,6 +53,10 @@ return { name = "Audio", run = function(T)
 		T.check(AudioMix.assetUrl(" 123 ") == "rbxassetid://123", "padded")
 		T.check(AudioMix.assetUrl(123) == "rbxassetid://123", "number")
 		T.check(AudioMix.assetUrl("rbxassetid://456") == "rbxassetid://456", "full url")
+		T.check(AudioMix.assetUrl("rbxasset://sounds/electronicpingshort.wav") ~= nil, "built-in sound")
+		local list = AudioMix.assetUrls({ "1", "", "junk", 2, "1" })
+		T.check(#list == 2 and list[1] == "rbxassetid://1" and list[2] == "rbxassetid://2", "candidate list")
+		T.check(#AudioMix.assetUrls("") == 0, "empty list")
 	end)
 	T.test("profiles: the jet uses turbine sounds, a turboprop uses prop sounds", function()
 		T.check(jet.whine == "jetWhine", "jet")

@@ -48,8 +48,6 @@ function SoundController.new()
 	self.lastCallout = nil :: Instance?
 	self.aheadSec = math.huge
 	self.aheadTimer = 0
-	self.atcVoice = nil :: Instance?
-	self.atcClips = {} :: { any }
 	self.atcTimer = 0
 	return self
 end
@@ -66,6 +64,7 @@ local function makeVoice(parent: Instance, name: string, text: string, radio: bo
 		local tts = Instance.new("AudioTextToSpeech" :: any) :: any
 		tts.Name = name
 		tts.Text = text
+		tts.VoiceId = AudioConfig.ttsVoiceId
 		local out = Instance.new("AudioDeviceOutput" :: any) :: any
 		out.Parent = tts
 		local source: any = tts
@@ -99,21 +98,28 @@ local function makeVoice(parent: Instance, name: string, text: string, radio: bo
 	return nil
 end
 
+-- AudioTextToSpeech has Play and Pause but no Stop: rewind with TimePosition.
+local voiceWarned = false
 local function playVoice(v: any, volume: number)
 	local ok, err = pcall(function()
-		v.Volume = volume
-		v:Stop()
+		v.Volume = math.clamp(volume, 0, 3)
+		v:Pause()
 		v.TimePosition = 0
 		v:Play()
 	end)
-	if not ok then
+	if not ok and not voiceWarned then
+		voiceWarned = true
 		warn("[Audio] voice callout failed: " .. tostring(err))
 	end
 end
 
 local function stopAny(inst: any)
 	pcall(function()
-		inst:Stop()
+		if inst:IsA("Sound") then
+			inst:Stop()
+		else
+			inst:Pause()
+		end
 	end)
 end
 
@@ -125,6 +131,153 @@ local function makeGroup(parent: Instance, name: string): SoundGroup
 	return g
 end
 
+-- Module-level state that survives between flights, so assets and text-to-speech are
+-- only fetched once per session (TTS is throttled to about 7 requests a minute solo).
+local resolved: { [string]: string | false } = {} -- slot -> working asset URL, or false
+local resolving = false
+local voiceCache: { [string]: Instance } = {}
+local voiceFolderInst: Folder? = nil
+local ttsWarmDone = false
+
+local function voiceFolder(): Folder
+	if voiceFolderInst and voiceFolderInst.Parent then
+		return voiceFolderInst
+	end
+	local f = Instance.new("Folder")
+	f.Name = "AircraftVoices"
+	f.Parent = SoundService
+	voiceFolderInst = f
+	return f
+end
+
+local function getVoice(slot: string, text: string, radio: boolean?): Instance?
+	local v = voiceCache[slot]
+	if v and v.Parent then
+		return v
+	end
+	local nv = makeVoice(voiceFolder(), slot, text, radio)
+	if nv then
+		voiceCache[slot] = nv
+	end
+	return nv
+end
+
+-- Generate the most important voices ahead of time, one every few seconds, so a
+-- "pull up" never waits on (or is refused by) the text-to-speech service.
+local WARM_ORDER = {
+	"calloutPullUp", "calloutTerrain", "calloutStall", "calloutSinkRate", "calloutTooLowGear",
+	"calloutEightyKnots", "calloutRotate", "calloutAlt1000", "calloutAlt500", "calloutAlt100",
+	"calloutAlt50", "calloutAlt40", "calloutAlt30", "calloutAlt20", "calloutAlt10",
+}
+local warming = false
+local function warmVoices()
+	if warming or ttsBroken then
+		return
+	end
+	warming = true
+	task.spawn(function()
+		for _, slot in WARM_ORDER do
+			local v: any = voiceCache[slot]
+			if v and v.Parent then
+				pcall(function()
+					if not v.IsLoaded then
+						v:LoadAsync()
+					end
+				end)
+				task.wait(AudioConfig.mix.ttsWarmInterval)
+			end
+		end
+		ttsWarmDone = true
+	end)
+end
+
+function SoundController:_makeSound(slot: string, sc: any, url: string)
+	local s = Instance.new("Sound")
+	s.Name = slot
+	s.SoundId = url
+	s.Looped = sc.looped == true
+	s.Volume = 0
+	s.SoundGroup = self.groups[sc.group] or self.groups.exterior
+	s.Parent = self.folder
+	if sc.looped then
+		self.loops[slot] = { sound = s, cfg = sc, volume = 0, pitch = AudioMix.pitch(sc, 0) }
+	else
+		self.oneShots[slot] = { sound = s, cfg = sc }
+	end
+end
+
+-- After the asset check: point the slot at the first ID that loaded, or drop it (and
+-- fall back to text-to-speech for callouts) when none did.
+function SoundController:_applyResolved(slot: string)
+	if not self.folder then
+		return
+	end
+	local sc = AudioConfig.sounds[slot]
+	local url = resolved[slot]
+	local entry = self.loops[slot] or self.oneShots[slot]
+	if url then
+		if entry then
+			entry.sound.SoundId = url
+		else
+			self:_makeSound(slot, sc, url)
+		end
+		self.voices[slot] = nil
+	else
+		if entry then
+			entry.sound:Destroy()
+			self.loops[slot] = nil
+			self.oneShots[slot] = nil
+		end
+		if sc.text and AudioConfig.useTextToSpeech then
+			local v = getVoice(slot, sc.text)
+			if v then
+				self.voices[slot] = { tts = v, cfg = sc }
+			end
+		end
+	end
+end
+
+-- Check every configured ID once with ContentProvider and keep the first that loads.
+function SoundController:_resolveAssets()
+	if resolving then
+		return
+	end
+	resolving = true
+	task.spawn(function()
+		local ContentProvider = game:GetService("ContentProvider")
+		local okSlots, failed = 0, {}
+		for slot, sc in AudioConfig.sounds do
+			local urls = AudioMix.assetUrls(sc.id)
+			if #urls == 0 then
+				continue
+			end
+			local status: { [string]: boolean } = {}
+			pcall(function()
+				ContentProvider:PreloadAsync(urls, function(contentId: string, st: Enum.AssetFetchStatus)
+					status[contentId] = st == Enum.AssetFetchStatus.Success
+				end)
+			end)
+			local pick: string | false = false
+			for _, u in urls do
+				if status[u] then
+					pick = u
+					break
+				end
+			end
+			resolved[slot] = pick
+			if pick then
+				okSlots += 1
+			else
+				table.insert(failed, slot)
+			end
+			self:_applyResolved(slot)
+		end
+		table.sort(failed)
+		print(string.format("[Audio] %d sounds loaded%s", okSlots,
+			if #failed > 0 then "; no working ID for: " .. table.concat(failed, ", ") else ""))
+	end)
+end
+
 function SoundController:attach(fc: any)
 	self:detach()
 	self.fc = fc
@@ -134,6 +287,7 @@ function SoundController:attach(fc: any)
 	local ok, err = pcall(function()
 		local folder = Instance.new("Folder")
 		folder.Name = "AircraftAudio"
+		self.folder = folder
 		self.groups.exterior = makeGroup(folder, "Exterior")
 		self.groups.cockpit = makeGroup(folder, "Cockpit")
 		local eq = Instance.new("EqualizerSoundEffect")
@@ -145,44 +299,39 @@ function SoundController:attach(fc: any)
 		self.eq = eq
 
 		for slot, sc in AudioConfig.sounds do
-			local url = AudioMix.assetUrl(sc.id)
-			if not url then
-				if sc.text and AudioConfig.useTextToSpeech then
-					local v = makeVoice(folder, slot, sc.text)
-					if v then
-						self.voices[slot] = { tts = v, cfg = sc }
-					end
+			local urls = AudioMix.assetUrls(sc.id)
+			local r = resolved[slot]
+			local url = if r then r elseif r == nil then urls[1] else nil
+			if url then
+				self:_makeSound(slot, sc, url)
+			elseif sc.text and AudioConfig.useTextToSpeech then
+				local v = getVoice(slot, sc.text)
+				if v then
+					self.voices[slot] = { tts = v, cfg = sc }
 				end
-				continue
 			end
-			local s = Instance.new("Sound")
-			s.Name = slot
-			s.SoundId = url
-			s.Looped = sc.looped == true
-			s.Volume = 0
-			s.SoundGroup = self.groups[sc.group] or self.groups.exterior
-			s.Parent = folder
-			if sc.looped then
-				self.loops[slot] = { sound = s, cfg = sc, volume = 0, pitch = AudioMix.pitch(sc, 0) }
-			else
-				self.oneShots[slot] = { sound = s, cfg = sc }
-			end
-		end
-		for slot, o in self.oneShots do
-			if string.sub(slot, 1, 10) == "atcChatter" then
-				table.insert(self.atcClips, o)
-			end
-		end
-		if #self.atcClips == 0 and AudioConfig.useTextToSpeech then
-			self.atcVoice = makeVoice(folder, "AtcVoice", "", true)
 		end
 		self.atcTimer = AudioMix.atcDelay(math.random(), AudioConfig.mix)
 		folder.Parent = SoundService
-		self.folder = folder
+		local clips, voices = 0, 0
+		for _ in self.loops do
+			clips += 1
+		end
+		for _ in self.oneShots do
+			clips += 1
+		end
+		for _ in self.voices do
+			voices += 1
+		end
+		print(string.format("[Audio] %d sound clips, %d spoken callouts%s", clips, voices,
+			if ttsBroken then " (text-to-speech unavailable)" else ""))
 	end)
 	if not ok then
 		warn("[Audio] could not set up sounds, continuing silently: " .. tostring(err))
+		return
 	end
+	self:_resolveAssets()
+	warmVoices()
 end
 
 function SoundController:detach()
@@ -196,8 +345,6 @@ function SoundController:detach()
 	self.oneShots = {}
 	self.voices = {}
 	self.lastCallout = nil
-	self.atcVoice = nil
-	self.atcClips = {}
 	self.atcTimer = 0
 	self.aheadSec = math.huge
 	self.aheadTimer = 0
@@ -384,7 +531,7 @@ end
 -- Background ATC: one transmission every atcMinGap..atcMaxGap seconds, cut at atcMaxSeconds.
 function SoundController:_atc(dt: number, snap: any, cockpitVol: number)
 	local mix = AudioConfig.mix
-	if snap.crashed or (#self.atcClips == 0 and not self.atcVoice) then
+	if snap.crashed then
 		return
 	end
 	self.atcTimer -= dt
@@ -398,8 +545,14 @@ function SoundController:_atc(dt: number, snap: any, cockpitVol: number)
 	end
 	self.atcTimer = AudioMix.atcDelay(math.random(), mix)
 	local maxSec = mix.atcMaxSeconds
-	if #self.atcClips > 0 then
-		local o = self.atcClips[math.random(1, #self.atcClips)]
+	local clips = {}
+	for slot, o in self.oneShots do
+		if string.sub(slot, 1, 10) == "atcChatter" then
+			table.insert(clips, o)
+		end
+	end
+	if #clips > 0 then
+		local o = clips[math.random(1, #clips)]
 		local s = o.sound:Clone()
 		s.Volume = o.cfg.volume * AudioConfig.masterVolume
 		s.Parent = oneShotFolder()
@@ -407,8 +560,12 @@ function SoundController:_atc(dt: number, snap: any, cockpitVol: number)
 		task.delay(maxSec, function()
 			s:Destroy()
 		end)
-	elseif self.atcVoice then
-		local v: any = self.atcVoice
+	elseif AudioConfig.useTextToSpeech and ttsWarmDone then
+		-- Spoken chatter waits until the warning voices are ready (TTS is rate-limited).
+		local v: any = getVoice("AtcVoice", "", true)
+		if not v then
+			return
+		end
 		local ok = pcall(function()
 			v.Text = AudioMix.atcPhrase(math.random)
 		end)

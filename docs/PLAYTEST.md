@@ -37,6 +37,9 @@ These are the most likely places for first-run bugs, so check them first.
 - [ ] ATC chatter: in 3 minutes of flight you hear no more than 9 short transmissions, none
       longer than 15 s. Takeoff gives "eighty knots" and "rotate"; an approach counts down
       "one thousand" to "ten".
+- [ ] Sound check: after spawning, Output shows `[Audio] N sounds loaded` (write down N and
+      any slot it lists with no working ID). The engines get louder with throttle, and wind
+      grows with speed.
 - [ ] Sound with every ID empty: no errors or `[Audio]` warnings in Output. With IDs filled
       in: the engine whine rises and falls with throttle, wind grows with speed, the gear horn
       sounds low with the gear up, touchdown thumps, cockpit view sounds muffled, and nothing

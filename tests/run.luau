@@ -58,6 +58,7 @@ local suites = {
 	require("./test_audio"),
 	require("./test_stunts"),
 	require("./test_firefighting"),
+	require("./test_hazards"),
 }
 
 for _, suite in suites do

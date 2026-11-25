@@ -46,6 +46,7 @@ Controls.KEYMAP = {
 	{ action = "controls", kind = "press", group = "Camera and game", label = "Show / hide this controls list", keys = { "K" } },
 	{ action = "panel", kind = "press", group = "Camera and game", label = "Show / hide on-screen buttons", keys = { "U" } },
 	{ action = "minimap", kind = "press", group = "Camera and game", label = "Show / hide the map", keys = { "N" } },
+	{ action = "events", kind = "press", group = "Camera and game", label = "Failures and weather events menu", keys = { "J" } },
 	{ action = "hud", kind = "press", group = "Camera and game", label = "Hide / show HUD", keys = { "H" } },
 	{ action = "debug", kind = "press", group = "Camera and game", label = "Debug panel", keys = { "F3" } },
 	{ action = "menu", kind = "press", group = "Camera and game", label = "Menu", keys = { "M", "ButtonStart" } },

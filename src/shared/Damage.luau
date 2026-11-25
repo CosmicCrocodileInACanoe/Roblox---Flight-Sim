@@ -178,6 +178,25 @@ function Damage.applyImpact(d: DamageModel, name: string, dv: number): number
 	return r
 end
 
+-- Tear a component off right now (failures from the HUD's Events button), whether or not
+-- break-apart is on. Children go with it. Non-detachable parts (the centre fuselage) are
+-- crushed instead. Returns true if it detached.
+function Damage.forceDetach(d: DamageModel, name: string): boolean
+	local c = d.components[name]
+	if not c or c.state == "detached" then
+		return false
+	end
+	if not c.cfg.detachable then
+		Damage.hurt(d, name, 1, false)
+		return false
+	end
+	d.extremeNow[name] = true
+	c.health = 0
+	setState(d, c, "detached")
+	d.extremeNow[name] = nil
+	return c.state == "detached"
+end
+
 -- True if this component has been crushed to nothing but is still attached
 -- (break-apart off): wings droop, gear folds, the fuselage sags.
 function Damage.isCollapsed(d: DamageModel, name: string): boolean

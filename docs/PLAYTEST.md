@@ -176,6 +176,20 @@ These are the most likely places for first-run bugs, so check them first.
     paint has a soft sheen that catches the sun. Note the frame rate before and after if a
     low-end device struggles (Future lighting costs a little more).
 
+## Failures and weather events (J, or the red Events button top right)
+
+In free flight at a few thousand feet in the Meridian 200, open the menu and try each
+button. Watch for: Engine fire shows flames on that engine and its N1 drops; Engine
+falls off drops the engine away as debris (other players see it too); Wing snaps tears
+the outer wing off and rolls you toward it; Tail damage breaks part of the fin or
+tailplane; Gear collapse folds one leg (land on it). Tornado: a grey funnel appears ahead
+and drifts across your path; fly near it and the aircraft gets pushed, lifted and spun,
+and "You're in the tornado's winds!" shows; inside the core parts get dented and torn
+off. Lightning: a bolt and a white flash; often an engine flames out, and I relights it.
+Bird strike: a flock flies into the nose a second or two later. Strong winds: you drift
+sideways and sink in the downburst halfway through. Clear weather removes them; R resets.
+Note any Output errors from HazardController, HazardPanel or FlightController.
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

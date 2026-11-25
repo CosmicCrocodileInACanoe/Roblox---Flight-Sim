@@ -72,7 +72,7 @@ Expected: `629 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | B | Wheel brakes (hold) |
 | P | Parking brake |
 | Z | Reverse thrust (hold, on the ground) |
-| O | Autoland on / off (any aircraft) |
+| 3 | Autoland on / off (any aircraft) |
 | L | Drop water (hold; Rainmaker water bomber only) |
 | 1 | Refill the water tank right away (Rainmaker) |
 | 2 | Auto refill: fly to the sea, scoop, take off and climb out (Rainmaker) |
@@ -152,11 +152,11 @@ is.
 
 ## Autoland
 
-Press **O** (or the AUTOLAND button) in the air with the engines running, in any aircraft.
+Press **3** (or the AUTOLAND button) in the air with the engines running, in any aircraft.
 The autopilot picks the nearest runway end it can reach without a big turn, flies out and
 turns in if it has to, follows a 3 degree glide path at the approach speed with the gear and
 flaps out, flares, touches down, brakes and reverses to a stop and sets the parking brake.
-It goes around and tries again if it isn't lined up close in. Move the stick (or press O
+It goes around and tries again if it isn't lined up close in. Move the stick (or press 3
 again) to take over at any time. The HUD shows what it is doing.
 
 ## Stunts mode

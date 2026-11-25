@@ -320,7 +320,7 @@ function FlightController:engageAutoland()
 		return
 	end
 	self.autopilot = Autopilot.newLand(self.cfg, rw, self.ctl.trim)
-	self:say(string.format("Autoland on: runway %s. Move the stick or press %s to take over", rw.id, "O"))
+	self:say(string.format("Autoland on: runway %s. Move the stick or press %s to take over", rw.id, "3"))
 end
 
 function FlightController:engageAutoScoop()

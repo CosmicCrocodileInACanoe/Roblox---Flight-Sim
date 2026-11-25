@@ -302,7 +302,7 @@ function FlightPanel.new(input: any, callbacks: { [string]: () -> () })
 		self.buttons[name] = b
 		return b
 	end
-	tapButton("Autoland", "AUTOLAND (O)", "autoland", -248)
+	tapButton("Autoland", "AUTOLAND (3)", "autoland", -248)
 	tapButton("RefillWater", "REFILL WATER (1)", "refillWater", -300).Visible = false
 	tapButton("AutoScoop", "AUTO REFILL AT SEA (2)", "autoScoop", -352).Visible = false
 	return self
@@ -360,7 +360,7 @@ function FlightPanel:update(t: any)
 	paint(b.Speedbrake, if sb > 0.75 then "AIR BRAKE\nFULL" elseif sb > 0.2 then "AIR BRAKE\nHALF" else "AIR BRAKE\nOFF", if sb > 0.2 then WARN else OFF)
 	paint(b.Parking, "PARK\nBRAKE", if t.parkingBrake then RED else OFF)
 	local ap = t.autopilot
-	paint(b.Autoland, if ap and ap.mode == "land" then "AUTOLAND ON\n(tap to stop)" else "AUTOLAND (O)", if ap and ap.mode == "land" then ON else OFF)
+	paint(b.Autoland, if ap and ap.mode == "land" then "AUTOLAND ON\n(tap to stop)" else "AUTOLAND (3)", if ap and ap.mode == "land" then ON else OFF)
 	if b.RefillWater then
 		b.RefillWater.Visible = t.waterTank ~= nil
 		b.AutoScoop.Visible = t.waterTank ~= nil

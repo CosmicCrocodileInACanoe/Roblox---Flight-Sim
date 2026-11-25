@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 599 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 630 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `599 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `630 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -72,7 +72,10 @@ Expected: `599 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | B | Wheel brakes (hold) |
 | P | Parking brake |
 | Z | Reverse thrust (hold, on the ground) |
+| 3 | Autoland on / off (any aircraft) |
 | L | Drop water (hold; Rainmaker water bomber only) |
+| 1 | Refill the water tank right away (Rainmaker) |
+| 2 | Auto refill: fly to the sea, scoop, take off and climb out (Rainmaker) |
 | X | Speedbrake |
 | [ / ] | Pitch trim (Simulation mode) |
 | T | Cycle Easy (default) / Free / Assisted / Simulation |
@@ -80,6 +83,7 @@ Expected: `599 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | C | Camera: chase / cockpit / tower |
 | Right mouse drag, wheel | Look around (re-centres after 10 s), camera distance |
 | H | Hide HUD |
+| O | Background music on / off |
 | N | Show / hide the minimap |
 | J | Failures and weather events menu (also the red **Events** button, top right) |
 | F3 | Debug panel |
@@ -141,7 +145,20 @@ pulsing orange dots on the minimap.
    it half done). Everyone gets a message when a fire goes out, and a new one starts
    somewhere else a minute or so later.
 
-Parked at an airport, a hose refills the tank too, more slowly.
+Parked at an airport, a hose refills the tank too, more slowly. In a hurry, press **1**
+(or REFILL WATER) to fill it straight away, or press **2** (AUTO REFILL AT SEA) and the
+autopilot flies to the nearest open sea, lands on the hull, scoops a full tank, takes off and
+climbs to about 800 ft, then hands back to you. Each wildfire's label shows how far away it
+is.
+
+## Autoland
+
+Press **3** (or the AUTOLAND button) in the air with the engines running, in any aircraft.
+The autopilot picks the nearest runway end it can reach without a big turn, flies out and
+turns in if it has to, follows a 3 degree glide path at the approach speed with the gear and
+flaps out, flares, touches down, brakes and reverses to a stop and sets the parking brake.
+It goes around and tries again if it isn't lined up close in. Move the stick (or press 3
+again) to take over at any time. The HUD shows what it is doing.
 
 ## Stunts mode
 
@@ -175,10 +192,13 @@ checks them and uses the first one that loads. Output then prints
 paste another Creator Store audio ID (just the number) into that slot's `id`. An empty slot
 stays silent and never errors.
 
-- Engines: `jetWhine` (pitch and volume follow N1) and `jetRumble` (follows thrust and
-  reverse). Propeller aircraft use `propDrone` and `propRumble` instead (each config's `soundProfile`,
-  with `AudioConfig.aircraftProfile` as a fallback).
-  `engineStart` plays once when you start the engines.
+- Engines: every plane has its own engine sound. There are nine types in
+  `AudioConfig.profiles`: airliner turbofan, jumbo (deeper, more rumble), business jet
+  (higher whine), fighter (turbojet roar), supersonic (roar, plus an `afterburner` layer
+  while the afterburners are lit), turboprop (prop drone with a turbine hum), piston,
+  vintage radial and stunt. `AudioConfig.aircraftPitch` gives planes of the same type
+  their own pitch. Each layer's pitch and volume follow N1 and thrust. `engineStart`
+  plays once when you start the engines.
 - `wind` grows with airspeed, louder with gear down or speedbrake out; `runwayRoll` rumbles
   with ground speed while the wheels are down.
 - `gearMotor`, `flapMotor` loop while they move; `gearLock` clunks when the gear locks.
@@ -197,12 +217,15 @@ stays silent and never errors.
 - Background ATC chatter, never constant. Exchanges are a call and a reply: some start
   with the controller, some with a pilot. Controllers and pilots use different
   text-to-speech voices, and each callsign keeps its own voice and pitch. After each
-  exchange there are 5 to 16 s of quiet, so about 3 to 5 exchanges a minute, each cut off
-  at 15 s. Roblox limits text-to-speech to about 7 requests a minute, so new exchanges are
+  exchange there are a random 5 to 35 s of quiet, and each exchange is cut off at 15 s.
+  Most calls are other pilots calling ATC. Roblox limits text-to-speech to about 7 requests a minute, so new exchanges are
   generated slowly (warnings first) and reused. Recorded chatter clips in `atcChatter1..5`
   are mixed in.
-- Cockpit alarms: GPWS "whoop whoop, pull up" (a recorded clip, or the whoop siren then a
-  spoken "pull up"), "bank angle", the stall alarm and stick shaker, a fire bell while an
+- Background music: soft, upbeat tracks from Roblox's licensed music library
+  (`AudioConfig.music`), shuffled at low volume. It ducks under warnings, callouts and ATC.
+  Press O to turn it on or off.
+- Cockpit alarms: GPWS "whoop whoop, pull up" (the whoop is a siren sound, then a spoken
+  "pull up" in the warning voice), "bank angle", the stall alarm and stick shaker, a fire bell while an
   engine burns, an overspeed clacker above Vmo, and master warning and caution chimes.
   The warning chime sounds for fire, a part failing or breaking off, and overspeed. The
   caution chime sounds for an engine out, jammed controls, hydraulics, a fuel leak, low
@@ -230,6 +253,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Selection               what the menu offers and the server accepts: aircraft, airport, starts, routes
   Stunts                  Stunts ring course, race rules (passes, misses, penalties, medals), race tune
   Wildfire                fire sites, where dropped water lands, how much reaches a fire
+  Autopilot               autoland and the water bomber's auto refill (writes the flight controls)
   GameConfig, AircraftRegistry, Aircraft/*  one data file per aircraft; Aircraft/Kit has shared helpers
   AudioConfig, AudioMix   every sound asset ID in one file; pure loop/one-shot mixing
 src/server/               spawn, ownership, damage validation, debris, missions, saves, world build
@@ -320,9 +344,9 @@ All of them pass the same offline flight tests.
 | Rainmaker | Firefighting flying boat (amphibian) | boat hull, wingtip floats, wheels for runways; scoops 6 t of water from the sea and drops it on wildfires |
 | Meridian 200 | Narrow-body twin jet | |
 | Hauler 4 | Cargo freighter | four turboprops, T-tail, upswept tail with a ramp |
-| Atlas 400 | Wide-body twin jet | |
-| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines with afterburners (full throttle, gear up); passes Mach 2 above about 20,000 ft, held near Mach 1 down low. The HUD shows the Mach number |
-| Celestia 800 | Four-engine jumbo | |
+| Atlas 400 | Four-engine jumbo | upper-deck hump |
+| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines with afterburners (full throttle, gear up); passes Mach 2 above about 1,200 ft, held near Mach 1 right down low. The HUD shows the Mach number |
+| Celestia 800 | Double-deck superjumbo | four engines, the biggest wing in the game |
 
 Adding one is a data file in `src/shared/Aircraft/` plus a line in `AircraftRegistry`. The
 builder reads everything from the config's `geometry` block (see the header of
@@ -330,7 +354,7 @@ builder reads everything from the config's `geometry` block (see the header of
 
 ## Known limits of this milestone
 
-- Sound ships with empty asset IDs, so the game is silent until they're filled in (see Sound).
+- Sound uses starter Creator Store IDs; any that fail to load stay silent and are named in Output (see Sound).
 - Weather and time of day are chosen per player, so two players can see different wind.
 - StreamingEnabled is off so terrain can't vanish under a fast aircraft. The server logs the
   world part count at start (`[World] built N parts`); terrain alone is up to about 15,000

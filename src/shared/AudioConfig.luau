@@ -27,11 +27,18 @@ AudioConfig.masterVolume = 1.0
 
 AudioConfig.sounds = {
 	-- Engines: jets (turbofan) -------------------------------------------------------
-	jetWhine = { id = { "183339994", "123172515633498", "9116932100" }, volume = 0.7, pitchMin = 0.55, pitchMax = 1.35, looped = true, group = "exterior" },
+	jetWhine = { id = { "183339994", "11124180820", "123172515633498", "9116932100" }, volume = 0.7, pitchMin = 0.55, pitchMax = 1.35, looped = true, group = "exterior" },
 	jetRumble = { id = { "169572883", "9113060656" }, volume = 0.9, pitchMin = 0.8, pitchMax = 1.1, looped = true, group = "exterior" },
 	-- Engines: propellers (turboprop) --------------------------------------------------
 	propDrone = { id = { "8907185231", "142317661", "117380424798601" }, volume = 0.8, pitchMin = 0.6, pitchMax = 1.25, looped = true, group = "exterior" },
 	propRumble = { id = { "117380424798601", "142317661" }, volume = 0.6, pitchMin = 0.85, pitchMax = 1.1, looped = true, group = "exterior" },
+	-- Engines: fighters and supersonic (turbojet roar, afterburner) ----------------------
+	jetRoar = { id = { "169572883", "9113060656" }, volume = 0.9, pitchMin = 0.75, pitchMax = 1.2, looped = true, group = "exterior" },
+	afterburner = { id = { "169572883" }, volume = 1.0, pitchMin = 0.7, pitchMax = 0.85, looped = true, group = "exterior" },
+	-- Engines: pistons and turbine hum --------------------------------------------------
+	pistonEngine = { id = { "141268701", "6596052671", "8907185231" }, volume = 0.8, pitchMin = 0.55, pitchMax = 1.3, looped = true, group = "exterior" },
+	stuntEngine = { id = { "117380424798601", "8907185231", "141268701" }, volume = 0.8, pitchMin = 0.6, pitchMax = 1.45, looped = true, group = "exterior" },
+	turbineHum = { id = { "11124180820", "183339994" }, volume = 0.5, pitchMin = 0.7, pitchMax = 1.3, looped = true, group = "exterior" },
 	-- Engine start (one-shot, plays once when you press the start key)
 	engineStart = { id = { "4686865643" }, volume = 0.7, looped = false, group = "exterior" },
 
@@ -53,9 +60,9 @@ AudioConfig.sounds = {
 
 	-- Cockpit warnings (not muffled) ----------------------------------------------------
 	-- stallWarning: about to stall (within a couple of degrees of the stall angle) and while stalled
-	stallWarning = { id = { "4112829784", "9113083860" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	stallWarning = { id = { "9113083860" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 	-- stickShaker: rattle while the wing is actually stalled
-	stickShaker = { id = { "9114890677", "rbxasset://sounds/clickfast.wav" }, volume = 0.7, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	stickShaker = { id = { "9114890677" }, volume = 0.7, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 	-- fireBell: classic fire bell while an engine burns; overspeedClacker: above Vmo
 	fireBell = { id = { "130821037", "250244656" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 	overspeedClacker = { id = { "rbxasset://sounds/clickfast.wav", "9114651987" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
@@ -63,19 +70,19 @@ AudioConfig.sounds = {
 	-- caution (amber: engine out, jammed controls, hydraulics, fuel leak, low fuel, damage)
 	masterWarning = { id = { "9113086365", "9113085665" }, volume = 0.7, looped = false, group = "cockpit" },
 	masterCaution = { id = { "7149373060", "2909601104" }, volume = 0.6, looped = false, group = "cockpit" },
-	-- The GPWS "whoop whoop" siren. Only used when the pull-up callout is spoken by
-	-- text-to-speech; the recorded pull-up clips above already contain the whoop.
+	-- The GPWS "whoop whoop" siren, played just before the spoken "pull up" (the whoop is a
+	-- sound, never a spoken word).
 	gpwsWhoop = { id = { "386179883", "224090283" }, volume = 0.8, looped = false, group = "cockpit", maxSeconds = 1.3 },
-	gearWarning = { id = { "2124207508", "9113085665" }, volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	gearWarning = { id = { "9113086365" }, volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 
 	-- Voice callouts (one-shots, repeated while the danger lasts) -----------------------
 	-- `text` is spoken with Roblox text-to-speech when the slot has no id (see
 	-- useTextToSpeech below). A recorded clip in `id` always wins.
-	calloutPullUp = { id = { "4119192112", "7363264916", "139545781", "71134116968565" }, volume = 1.0, looped = false, group = "cockpit", text = "Pull up! Pull up!", repeatEvery = 2.6 },
+	calloutPullUp = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Pull up! Pull up!", repeatEvery = 3.2 },
 	calloutTerrain = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Terrain, terrain!", repeatEvery = 2.5 },
 	calloutSinkRate = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Sink rate!", repeatEvery = 2.5 },
 	calloutTooLowGear = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Too low. Gear!", repeatEvery = 3 },
-	calloutBankAngle = { id = { "4896248758" }, volume = 0.9, looped = false, group = "cockpit", text = "Bank angle! Bank angle!", repeatEvery = 3 },
+	calloutBankAngle = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Bank angle! Bank angle!", repeatEvery = 3 },
 	calloutStall = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Stall! Stall!", repeatEvery = 2 },
 
 	-- Pilot and automatic callouts (one each time the moment happens) ------------------
@@ -104,6 +111,18 @@ AudioConfig.sounds = {
 	atcChatter5 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
 }
 
+-- Background music: soft, upbeat tracks from Roblox's licensed music library, played in
+-- a shuffled loop at low volume. It ducks under warnings, callouts and ATC. Toggle in
+-- game with O. Swap in any Creator Store music IDs you like.
+AudioConfig.music = {
+	enabled = true, -- on when the game starts
+	tracks = { "9043887091", "9046862738", "9046863579", "1837768517", "9046866578" },
+	volume = 0.12, -- low: background only
+	duckedVolume = 0.035, -- while a warning, callout or ATC is talking
+	fade = 1.5, -- seconds to fade in or out
+	gapSeconds = 4, -- quiet between tracks
+}
+
 -- Volume of spoken ATC chatter when no clips are filled in.
 AudioConfig.atcVoiceVolume = 0.35
 
@@ -111,42 +130,77 @@ AudioConfig.atcVoiceVolume = 0.35
 -- callouts silent until recorded clips are added.
 AudioConfig.useTextToSpeech = true
 -- Voice for text-to-speech (see the Roblox "list of artificial voices"; "1" and "2" are valid).
-AudioConfig.ttsVoiceId = "5" -- warnings and callouts: United States male #2
+AudioConfig.ttsVoiceId = "1" -- warnings and callouts: British male (the voice from the first sound build)
 
 -- Radio voices (Roblox voice IDs: 1 British male, 2 British female, 3 US male, 4 US
 -- female, 5 US male #2, 6 US female #2, 7 Australian male, 8 Australian female).
 -- Controllers and pilots use different voices; each pilot also gets a small pitch shift
 -- so two pilots on the same voice still sound like different people.
 AudioConfig.atcControllerVoices = { "4", "3" }
-AudioConfig.atcPilotVoices = { "1", "2", "6", "7", "8" }
+AudioConfig.atcPilotVoices = { "2", "5", "6", "7", "8" } -- not "1": that is the warning voice
 AudioConfig.atcPilotPitch = 2.5 -- +/- semitones
 
--- Which engine sounds each aircraft uses. Unknown aircraft use "jet".
+-- Engine sound types. Each has a main "whine" layer (pitch and level follow N1) and a
+-- "rumble" layer (follows thrust), plus optional extra layers:
+--   follow = "n1" | "thrust" | "afterburner" (lit afterburners only)
+-- pitch scales every layer; whineGain / rumbleGain scale their volume.
 AudioConfig.profiles = {
-	jet = { whine = "jetWhine", rumble = "jetRumble" },
-	prop = { whine = "propDrone", rumble = "propRumble" },
+	turbofan = { whine = "jetWhine", rumble = "jetRumble" }, -- airliners
+	heavy = { whine = "jetWhine", rumble = "jetRumble", pitch = 0.82, rumbleGain = 1.25, whineGain = 0.85 }, -- jumbos
+	bizjet = { whine = "jetWhine", rumble = "jetRumble", pitch = 1.22, rumbleGain = 0.7 }, -- small fast whine
+	fighter = { whine = "jetWhine", rumble = "jetRoar", pitch = 1.1, whineGain = 0.6, rumbleGain = 1.2 }, -- raw turbojet roar
+	supersonic = { -- Concorde-style turbojets: roar, plus afterburners at full throttle
+		whine = "jetWhine", rumble = "jetRoar", pitch = 0.95, whineGain = 0.5, rumbleGain = 1.2,
+		extra = { { slot = "afterburner", follow = "afterburner", gain = 1 } },
+	},
+	turboprop = { -- propeller drone with a turbine whine underneath
+		whine = "propDrone", rumble = "propRumble",
+		extra = { { slot = "turbineHum", follow = "n1", gain = 0.35 } },
+	},
+	piston = { whine = "pistonEngine", rumble = "propRumble", rumbleGain = 0.6 }, -- light planes
+	radial = { whine = "pistonEngine", rumble = "propRumble", pitch = 0.72, rumbleGain = 0.9 }, -- vintage biplane
+	stunt = { whine = "stuntEngine", rumble = "propRumble", pitch = 1.15, rumbleGain = 0.5 }, -- high-revving aerobatic
 }
--- (an aircraft config's own soundProfile wins; this table covers older configs)
+-- Older names some aircraft configs use (their `soundProfile`).
+AudioConfig.profileAliases = { jet = "turbofan", prop = "turboprop" }
+
+-- Which sound type each aircraft uses, and its own pitch so planes of the same type
+-- still sound different. Unknown aircraft use the config's soundProfile, else turbofan.
 AudioConfig.aircraftProfile = {
-	bumble = "prop",
-	meadowlark4 = "prop",
-	sprite = "prop",
-	ridgehopper = "prop",
-	puffin = "prop",
-	breezetwin = "prop",
-	silverline8 = "jet",
-	swiftletj3 = "jet",
-	vectorx1 = "jet",
-	nightjart2 = "jet",
-	kestrel72 = "prop",
-	rainmaker = "prop",
-	meridian200 = "jet",
-	hauler4 = "prop",
-	atlas400 = "jet",
-	arrowstar = "jet",
-	celestia800 = "jet",
+	bumble = "radial",
+	meadowlark4 = "piston",
+	sprite = "stunt",
+	ridgehopper = "piston",
+	puffin = "piston",
+	breezetwin = "turboprop",
+	silverline8 = "bizjet",
+	swiftletj3 = "fighter",
+	vectorx1 = "fighter",
+	nightjart2 = "fighter",
+	kestrel72 = "turboprop",
+	rainmaker = "turboprop",
+	meridian200 = "turbofan",
+	hauler4 = "turboprop",
+	atlas400 = "heavy",
+	arrowstar = "supersonic",
+	celestia800 = "heavy",
 }
-AudioConfig.defaultProfile = "jet"
+AudioConfig.aircraftPitch = {
+	meadowlark4 = 1.08, -- small trainer: a bit higher
+	ridgehopper = 0.92, -- bigger bush-plane engine
+	puffin = 1.0,
+	breezetwin = 1.1,
+	kestrel72 = 1.0,
+	rainmaker = 0.9,
+	hauler4 = 0.82, -- four big props
+	swiftletj3 = 1.12, -- trainer jet
+	vectorx1 = 1.05,
+	nightjart2 = 0.94, -- twin engines, deeper
+	meridian200 = 1.0,
+	atlas400 = 1.0,
+	celestia800 = 0.94,
+}
+AudioConfig.defaultProfile = "turbofan"
 
 -- Mixing ------------------------------------------------------------------------------
 AudioConfig.mix = {
@@ -184,10 +238,10 @@ AudioConfig.mix = {
 	chimeAltFt = 10000, -- cabin chime when crossing this altitude
 
 	-- Background ATC chatter: never constant. After an exchange ends, the next one waits
-	-- atcMinGap..atcMaxGap seconds (about 3 to 5 exchanges a minute). Each exchange is
+	-- a random atcMinGap..atcMaxGap seconds. Each exchange is
 	-- cut off after atcMaxSeconds.
 	atcMinGap = 5,
-	atcMaxGap = 16,
+	atcMaxGap = 35,
 	atcMaxSeconds = 15,
 	atcPoolMax = 16, -- spoken exchanges kept and reused (each new one costs 2 TTS requests)
 	atcLineGap = 0.6, -- s between a call and its reply

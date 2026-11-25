@@ -40,7 +40,9 @@ return { name = "Audio", run = function(T)
 			end
 		end
 		for name, p in AudioConfig.profiles do
-			T.check(AudioConfig.sounds[p.whine] and AudioConfig.sounds[p.rumble], name .. " profile slots exist")
+			for _, slot in AudioMix.engineSlots(p) do
+				T.check(AudioConfig.sounds[slot] and AudioConfig.sounds[slot].looped, name .. " profile slot exists: " .. slot)
+			end
 		end
 	end)
 	T.test("asset ids: empty and junk are rejected, numbers are accepted", function()
@@ -58,14 +60,35 @@ return { name = "Audio", run = function(T)
 		T.check(#list == 2 and list[1] == "rbxassetid://1" and list[2] == "rbxassetid://2", "candidate list")
 		T.check(#AudioMix.assetUrls("") == 0, "empty list")
 	end)
-	T.test("profiles: the jet uses turbine sounds, a turboprop uses prop sounds", function()
-		T.check(jet.whine == "jetWhine", "jet")
+	T.test("engine sounds: every plane has its own type and pitch", function()
+		T.check(jet.whine == "jetWhine", "airliner")
 		T.check(AudioMix.profileFor(AudioConfig, "kestrel72", nil).whine == "propDrone", "Kestrel 72 is a turboprop")
-		local Registry = require("../src/shared/AircraftRegistry")
-		for id in Registry.types do
-			T.check(AudioConfig.aircraftProfile[id] ~= nil, id .. " has a sound profile")
-		end
 		T.check(AudioMix.profileFor(AudioConfig, "unknown", nil).whine == "jetWhine", "default")
+		T.check(AudioMix.profileFor(AudioConfig, "unknown", { soundProfile = "prop" }).name == "turboprop", "old config names still work")
+		local Registry = require("../src/shared/AircraftRegistry")
+		local seen = {}
+		for id in Registry.types do
+			local name = AudioConfig.aircraftProfile[id]
+			T.check(name ~= nil and AudioConfig.profiles[name] ~= nil, id .. " has an engine sound type")
+			local p = AudioMix.profileFor(AudioConfig, id, nil)
+			local key = p.name .. string.format("@%.3f", p.pitch)
+			T.check(seen[key] == nil, id .. " sounds the same as " .. tostring(seen[key]))
+			seen[key] = id
+		end
+		T.check(AudioConfig.aircraftProfile.arrowstar == "supersonic", "Concorde-style")
+		T.check(AudioConfig.aircraftProfile.sprite == "stunt" and AudioConfig.aircraftProfile.bumble == "radial", "stunt and vintage")
+	end)
+	T.test("afterburner roar only when the afterburners are lit; per-plane pitch", function()
+		local ss = AudioMix.profileFor(AudioConfig, "arrowstar", nil)
+		local off = AudioMix.loops(snap({ n1 = 100 }), nil, 0.1, ss, mix)
+		local on = AudioMix.loops(snap({ n1 = 100, afterburner = 1 }), nil, 0.1, ss, mix)
+		T.check(off.afterburner.level == 0 and on.afterburner.level == 1, "afterburner")
+		T.check(on.jetRoar.level > 0.8, "turbojet roar")
+		local heavy = AudioMix.loops(snap({ n1 = 60 }), nil, 0.1, AudioMix.profileFor(AudioConfig, "atlas400", nil), mix)
+		local biz = AudioMix.loops(snap({ n1 = 60 }), nil, 0.1, AudioMix.profileFor(AudioConfig, "silverline8", nil), mix)
+		T.check(heavy.jetWhine.pitchMul < 1 and biz.jetWhine.pitchMul > 1, "jumbo deeper, bizjet higher")
+		local crashed = AudioMix.loops(snap({ n1 = 100, afterburner = 1, crashed = true }), nil, 0.1, ss, mix)
+		T.check(crashed.afterburner.level == 0 and crashed.jetRoar.level == 0, "silent after a crash")
 	end)
 	T.test("engine whine rises in pitch and level with N1; silent when off", function()
 		local off = AudioMix.loops(snap({ n1 = 0 }), nil, 0.1, jet, mix)
@@ -222,7 +245,7 @@ return { name = "Audio", run = function(T)
 		T.check(up.cabinChime and down.cabinChime, "both ways")
 	end)
 	T.test("ATC chatter: frequent but not constant, two-voice exchanges", function()
-		T.check(AudioMix.atcDelay(0, mix) >= 3 and AudioMix.atcDelay(1, mix) <= 30, "gap after each exchange")
+		T.check(AudioMix.atcDelay(0, mix) == 5 and AudioMix.atcDelay(1, mix) == 35, "random 5 to 35 s between exchanges")
 		T.check(mix.atcMaxSeconds <= 15, "length cap")
 		T.check(#AudioConfig.atcControllerVoices > 0 and #AudioConfig.atcPilotVoices > 1, "voice lists")
 		for _, v in AudioConfig.atcControllerVoices do
@@ -246,7 +269,7 @@ return { name = "Audio", run = function(T)
 				T.check(words >= 3 and words <= 20 and #line.text <= 300, "line length: " .. line.text)
 			end
 		end
-		T.check(pilotFirst > 20 and atcFirst > 20, "both orders happen")
+		T.check(pilotFirst > atcFirst and atcFirst > 20, "other pilots call ATC more often than not")
 		local v1 = AudioMix.voiceFor("Skyline four two", AudioConfig.atcPilotVoices)
 		local v2 = AudioMix.voiceFor("Skyline four two", AudioConfig.atcPilotVoices)
 		T.check(v1 == v2, "same callsign keeps its voice")
@@ -273,9 +296,9 @@ return { name = "Audio", run = function(T)
 		T.check(AudioMix.gpws(sn({ bank = 50 }), mix) == "calloutBankAngle", "bank angle")
 		T.check(AudioMix.gpws(sn({ bank = 20 }), mix) == nil, "normal turn")
 	end)
-	T.test("pull up: a recorded GPWS clip first, whoop siren + spoken fallback", function()
+	T.test("pull up: whoop siren sound, then a spoken pull up", function()
 		local p = AudioConfig.sounds.calloutPullUp
-		T.check(type(p.id) == "table" and #p.id > 0, "recorded clip candidates")
+		T.check(#AudioMix.assetUrls(p.id) == 0 and AudioConfig.ttsVoiceId == "1", "spoken in the original warning voice")
 		T.check(not string.find(string.lower(p.text), "whoop"), "the whoop is a sound, not words")
 		T.check(AudioConfig.sounds.gpwsWhoop and AudioConfig.sounds.gpwsWhoop.maxSeconds, "whoop siren slot")
 	end)

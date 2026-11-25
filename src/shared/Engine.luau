@@ -140,9 +140,10 @@ function Engine.update(e: EngineState, throttle: number, reverseCmd: boolean, re
 		if m > 2 then
 			ram *= math.max(0, 1 - (m - 2) * 6)
 		end
-		-- the intake schedule is built for thin cruise air: down low the gain is small,
-		-- so the jet goes truly fast only once it climbs (like the real thing)
-		ram *= math.clamp((1 - densityRatio) / 0.7, 0, 1)
+		-- cfg.ramDensitySpan: how far the air must thin (1 - rho/rho0) before the intakes
+		-- give their full gain. The default 0.7 needs cruise altitude; a small span lets
+		-- the jet go fast almost from the ground.
+		ram *= math.clamp((1 - densityRatio) / (cfg.ramDensitySpan or 0.7), 0, 1)
 		speedFactor += ram
 	end
 	local lapse = densityRatio ^ 0.75 * speedFactor

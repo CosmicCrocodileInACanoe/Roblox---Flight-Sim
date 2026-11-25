@@ -20,7 +20,7 @@ local function engine(name: string, x: number): any
 		maxThrust = 125000, idleN1 = 22, spoolUpTau = 2.2, spoolDownTau = 1.4,
 		startTime = 12, reverseFraction = 0.3, lapseSpeed = 900,
 		-- supersonic intakes: thrust grows with speed; full throttle lights the afterburners
-		ramGain = 2.0, afterburner = { above = 0.95, thrustMul = 1.35, fuelMul = 3 },
+		ramGain = 2.0, ramDensitySpan = 0.035, afterburner = { above = 0.95, thrustMul = 1.35, fuelMul = 3 },
 		fuelFlowIdle = 0.15, fuelFlowMax = 2.6,
 	}
 end
@@ -29,7 +29,7 @@ local config = {
 	id = "arrowstar",
 	displayName = "Arrowstar",
 	class = "Supersonic airliner",
-	description = "Super-fast delta-wing airliner with a needle nose. Full throttle lights the afterburners; climb above 20,000 ft and it passes Mach 2.",
+	description = "Super-fast delta-wing airliner with a needle nose. Full throttle lights the afterburners; climb above 1,200 ft and it passes Mach 2.",
 	unlocked = true,
 	seats = 100,
 	difficulty = 4,
@@ -43,7 +43,7 @@ local config = {
 	fuel = { capacity = 60000, initial = 30000 },
 
 	speeds = {
-		rotate = 170, v2 = 195, approach = 165, vref = 155, cruise = 340, vmo = 800,
+		rotate = 170, v2 = 195, approach = 165, vref = 155, cruise = 340, vmo = 1400,
 		flapLimits = { 999, 230 }, gearLimit = 270,
 	},
 
@@ -80,19 +80,20 @@ local config = {
 		waveDrag = { mcrit = 0.95, peak = 0.012 },
 	},
 
+	-- Engine pairs sit either side of the main gear, so the legs fold up between them.
 	engines = {
-		engine("LeftOuterEngine", -4.4),
-		engine("LeftInnerEngine", -2.8),
-		engine("RightInnerEngine", 2.8),
-		engine("RightOuterEngine", 4.4),
+		engine("LeftOuterEngine", -4.6),
+		engine("LeftInnerEngine", -2.6),
+		engine("RightInnerEngine", 2.6),
+		engine("RightOuterEngine", 4.6),
 	},
 
 	gear = {
 		retractTime = 8,
 		units = {
 			Kit.gear("NoseGear", "NoseGear", { 0, -1.3, -16.0 }, { nose = true, strut = 2.3, wheel = 0.42, travel = 0.5, damping = 0.9, steerDeg = 60, wheels = 2, wheelSpacing = 0.5 }),
-			Kit.gear("LeftMainGear", "LeftMainGear", { -3.6, -1.1, 2.4 }, { strut = 2.3, wheel = 0.55, travel = 0.35, wheels = 2, wheelSpacing = 0.7 }),
-			Kit.gear("RightMainGear", "RightMainGear", { 3.6, -1.1, 2.4 }, { strut = 2.3, wheel = 0.55, travel = 0.35, wheels = 2, wheelSpacing = 0.7 }),
+			Kit.gear("LeftMainGear", "LeftMainGear", { -3.6, -1.1, 2.4 }, { strut = 2.3, wheel = 0.55, travel = 0.35, wheels = 2, wheelSpacing = 0.5 }),
+			Kit.gear("RightMainGear", "RightMainGear", { 3.6, -1.1, 2.4 }, { strut = 2.3, wheel = 0.55, travel = 0.35, wheels = 2, wheelSpacing = 0.5 }),
 		},
 		friction = { rolling = 0.02, brake = 0.55, lateral = 0.75 },
 	},
@@ -103,10 +104,10 @@ local config = {
 		AftFuselage = Kit.comp("Fuselage", 6000, 6, 25, { 0, -0.3, 14 }),
 		LeftWing = Kit.comp("Fuselage", 9000, 6, 21, { -5, -0.6, 3 }),
 		RightWing = Kit.comp("Fuselage", 9000, 6, 21, { 5, -0.6, 3 }),
-		LeftOuterEngine = Kit.comp("LeftWing", 3200, 4, 15, { -4.4, -1.55, 4.0 }),
-		LeftInnerEngine = Kit.comp("LeftWing", 3200, 4, 15, { -2.8, -1.55, 4.0 }),
-		RightInnerEngine = Kit.comp("RightWing", 3200, 4, 15, { 2.8, -1.55, 4.0 }),
-		RightOuterEngine = Kit.comp("RightWing", 3200, 4, 15, { 4.4, -1.55, 4.0 }),
+		LeftOuterEngine = Kit.comp("LeftWing", 3200, 4, 15, { -4.6, -1.55, 4.0 }),
+		LeftInnerEngine = Kit.comp("LeftWing", 3200, 4, 15, { -2.6, -1.55, 4.0 }),
+		RightInnerEngine = Kit.comp("RightWing", 3200, 4, 15, { 2.6, -1.55, 4.0 }),
+		RightOuterEngine = Kit.comp("RightWing", 3200, 4, 15, { 4.6, -1.55, 4.0 }),
 		VerticalStab = Kit.comp("AftFuselage", 900, 5, 17, { 0, 4.0, 17.0 }),
 		HorizontalStab = Kit.comp("Fuselage", 600, 5, 17, { 0, -0.6, 12.5 }),
 		NoseGear = Kit.comp("ForwardFuselage", 400, 6, 17, { 0, -3.2, -16.0 }, { gear = true }),
@@ -120,8 +121,8 @@ local config = {
 		{ 0, -1.45, -24, "ForwardFuselage" }, { 0, -1.45, -12, "ForwardFuselage" }, { 0, -1.45, 0, "Fuselage" },
 		{ 0, -1.2, 10, "AftFuselage" }, { 0, -0.3, 21, "AftFuselage" },
 		{ -12.0, -0.6, 10.4, "LeftWing" }, { 12.0, -0.6, 10.4, "RightWing" },
-		{ -4.4, -2.1, 4.0, "LeftOuterEngine" }, { -2.8, -2.1, 4.0, "LeftInnerEngine" },
-		{ 2.8, -2.1, 4.0, "RightInnerEngine" }, { 4.4, -2.1, 4.0, "RightOuterEngine" },
+		{ -4.6, -2.1, 4.0, "LeftOuterEngine" }, { -2.6, -2.1, 4.0, "LeftInnerEngine" },
+		{ 2.6, -2.1, 4.0, "RightInnerEngine" }, { 4.6, -2.1, 4.0, "RightOuterEngine" },
 	},
 
 	cameras = {

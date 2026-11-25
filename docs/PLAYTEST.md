@@ -156,8 +156,8 @@ These are the most likely places for first-run bugs, so check them first.
 
 15. **Mach 2 jet.** Fly the Arrowstar from HBR. Full throttle on the runway lights the
     afterburners (orange flames behind the engines, "AB" next to each engine). Climb above
-    20,000 ft with the gear up and full throttle: the HUD shows the Mach number next to GS
-    and it passes M2.00 within a few minutes. Down low it should sit around Mach 1. With the
+    1,200 ft with the gear up and full throttle: the HUD shows the Mach number next to GS
+    and it passes M2.00 within a few minutes. Right down low it should sit around Mach 1. With the
     gear down in the air the flames go out. Note anything that shakes, jitters or tears
     apart at that speed.
 
@@ -210,7 +210,25 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     the green Fix all button): the aircraft comes back whole, upright on the ground next to
     the wreck, and the debris is gone. In flight, use the Events menu to snap a wing, then
     press Y: the wing is back, you keep your speed and height, and any mission keeps going.
-    Pressing Y again within 2 s does nothing.
+    Pressing Y again within 2 s does nothing. Ditch a Puffin or the Meridian in the sea and
+    press Y: it comes back on the surface, not on the seabed. Start Strong winds, press Y:
+    the wind keeps blowing after the fix.
+
+19. **Arrowstar at Mach 2.** Take the Arrowstar up past 20,000 ft at full throttle, gear
+    up. The HUD passes M2.00 and the aircraft is never reset for "impossible speed". After
+    take-off, raise the gear (G) and look underneath in the chase view (right-drag): the
+    main legs fold up between the engine pairs, not into them.
+
+17. **Autoland.** In a few aircraft (Meadowlark 4, Meridian 200, Celestia 800, Arrowstar),
+    fly 10 to 20 km from an airport at a few thousand feet and press 3. Check: the HUD says
+    AUTOLAND and what it is doing, it lines up with a runway, gear and flaps come out, it
+    flares, touches down gently on the centreline, brakes to a stop and says so. Try it from
+    past the runway flying away too. Moving the stick hands control back.
+
+18. **Rainmaker refills and fire distances.** Empty the tank on a fire, press 1: the WATER
+    bar fills at once. Empty it again and press 2: it flies to the sea, lands on the hull
+    (gear up), the bar fills, it takes off and climbs out and hands back. Each WILDFIRE label
+    shows a distance under it that counts down as you fly toward it.
 
 ## C. Report back
 

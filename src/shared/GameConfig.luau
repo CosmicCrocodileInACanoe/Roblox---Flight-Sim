@@ -87,7 +87,10 @@ GameConfig.rateLimits = {
 
 -- Server sanity limits on replicated aircraft motion (m/s, m/s^2).
 GameConfig.limits = {
-	maxSpeed = 360, -- well above Vmo; beyond this the server resets the aircraft
+	-- Ground speed, m/s. Beyond this the server resets the aircraft. It has to clear the
+	-- Arrowstar's Mach 2+ dash (about 600 m/s high up) plus a strong tailwind; at 360 the
+	-- server used to reset it at about 700 kt, long before Mach 2.
+	maxSpeed = 900,
 	maxTeleportStudsPerSample = 1800,
 }
 

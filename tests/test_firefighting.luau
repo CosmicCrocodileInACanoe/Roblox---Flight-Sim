@@ -10,6 +10,7 @@ local Wildfire = require("../src/shared/Wildfire")
 local WorldGen = require("../src/shared/WorldGen")
 local Airports = require("../src/shared/Airports")
 local Controls = require("../src/shared/Controls")
+local GameConfig = require("../src/shared/GameConfig")
 
 local function floatY(cfg)
 	local y = math.huge
@@ -257,12 +258,16 @@ return { name = "Firefighting and the Mach 2 jet", run = function(T)
 		T.check(mach > 1.9 and mach < 2.4, string.format("Mach %.2f at 11 km", mach))
 		T.check(s.model.engines[1].afterburner > 0.9, "afterburner lit")
 		T.check(s.model.fuel > 0, "fuel left")
+		-- the server's speed sanity check must not reset it at Mach 2 (plus a 60 kt tailwind)
+		local v = math.sqrt(s.vx * s.vx + s.vy * s.vy + s.vz * s.vz)
+		T.check(v + 31 < GameConfig.limits.maxSpeed * 0.9, string.format("%.0f m/s vs the server limit %.0f", v, GameConfig.limits.maxSpeed))
 	end)
 
-	T.test("Arrowstar: down low it is held near the sound barrier", function()
+	T.test("Arrowstar: passes Mach 2 from about 1,200 ft up", function()
 		local a = Registry.get("arrowstar")
-		local s = fullPower(a, 1500, 180)
-		T.check(s.model.result.mach < 1.3, string.format("Mach %.2f at 1.5 km", s.model.result.mach))
+		local s = fullPower(a, 1200 * 0.3048, 240)
+		local mach = s.model.result.mach
+		T.check(mach > 1.9 and mach < 2.4, string.format("Mach %.2f at 1,200 ft", mach))
 	end)
 
 	T.test("airliners hit the sound barrier: an airliner tops out below Mach 0.95", function()

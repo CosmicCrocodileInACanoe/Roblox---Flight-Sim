@@ -64,20 +64,35 @@ function AudioMix.assetUrls(id: any): { string }
 end
 
 function AudioMix.profileFor(audioCfg: any, aircraftId: string?, aircraftCfg: any?): any
-	local name = (aircraftCfg and aircraftCfg.soundProfile)
-		or (aircraftId and audioCfg.aircraftProfile[aircraftId])
-		or audioCfg.defaultProfile
-	return audioCfg.profiles[name] or audioCfg.profiles[audioCfg.defaultProfile]
+	local name = (aircraftId and audioCfg.aircraftProfile[aircraftId]) or (aircraftCfg and aircraftCfg.soundProfile)
+	name = (audioCfg.profileAliases and audioCfg.profileAliases[name]) or name
+	local base = audioCfg.profiles[name] or audioCfg.profiles[audioCfg.defaultProfile]
+	local out = table.clone(base)
+	out.name = if audioCfg.profiles[name] then name else audioCfg.defaultProfile
+	out.pitch = (base.pitch or 1) * ((aircraftId and audioCfg.aircraftPitch and audioCfg.aircraftPitch[aircraftId]) or 1)
+	return out
+end
+
+-- Every looping slot an engine profile can drive.
+function AudioMix.engineSlots(profile: any): { string }
+	local slots = { profile.whine, profile.rumble }
+	for _, l in profile.extra or {} do
+		table.insert(slots, l.slot)
+	end
+	return slots
 end
 
 function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: any): { [string]: { level: number, effect: number } }
-	local out: { [string]: { level: number, effect: number } } = {}
-	local function set(slot: string, level: number, effect: number)
-		out[slot] = { level = clamp01(level), effect = clamp01(effect) }
+	local out: { [string]: { level: number, effect: number, pitchMul: number? } } = {}
+	local function set(slot: string, level: number, effect: number, pitchMul: number?)
+		out[slot] = { level = clamp01(level), effect = clamp01(effect), pitchMul = pitchMul }
 	end
 	-- Silence every loop once the aircraft is destroyed; one-shots carry the crash.
 	if snap.crashed then
-		for _, slot in { profile.whine, profile.rumble, "wind", "runwayRoll", "gearMotor", "flapMotor", "stallWarning", "stickShaker", "gearWarning", "cockpitAmbience", "fireBell", "overspeedClacker" } do
+		for _, slot in AudioMix.engineSlots(profile) do
+			set(slot, 0, 0)
+		end
+		for _, slot in { "wind", "runwayRoll", "gearMotor", "flapMotor", "stallWarning", "stickShaker", "gearWarning", "cockpitAmbience", "fireBell", "overspeedClacker" } do
 			set(slot, 0, 0)
 		end
 		return out
@@ -87,10 +102,21 @@ function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: an
 	-- engines are quiet at idle and loud at full power.
 	local n = clamp01(snap.n1 / 100)
 	local fadeIn = clamp01(n / 0.15) -- spooling up from zero fades in
-	set(profile.whine, fadeIn * (0.15 + 0.85 * n ^ 1.3), n)
+	local pm = profile.pitch or 1
+	local whine = fadeIn * (0.15 + 0.85 * n ^ 1.3)
+	set(profile.whine, whine * (profile.whineGain or 1), n, pm)
 	local thrust = clamp01((n - 0.2) / 0.8)
 	local rumble = 0.1 * clamp01(n / 0.2) + 0.9 * thrust ^ 1.5 + 0.4 * snap.reverser * fadeIn
-	set(profile.rumble, rumble, thrust)
+	set(profile.rumble, rumble * (profile.rumbleGain or 1), thrust, pm)
+	for _, l in profile.extra or {} do
+		local level, effect = whine, n
+		if l.follow == "thrust" then
+			level, effect = rumble, thrust
+		elseif l.follow == "afterburner" then
+			level, effect = clamp01(snap.afterburner or 0), clamp01(snap.afterburner or 0)
+		end
+		set(l.slot, level * (l.gain or 1), effect, pm)
+	end
 
 	-- Wind grows with the square of airspeed; gear and speedbrake add buffet.
 	local s = math.max(0, snap.ias) / mix.windFullKts
@@ -317,6 +343,15 @@ function AudioMix.atcExchange(randInt: (number, number) -> number): any
 		{ { P, "Tower, " .. cs .. ", holding short runway " .. rwy .. ", ready." }, { A, cs .. ", runway " .. rwy .. ", cleared for takeoff." } },
 		{ { P, fac .. ", " .. cs .. ", request direct to the field." }, { A, cs .. ", proceed direct, descend at your discretion." } },
 		{ { P, fac .. ", " .. cs .. ", we're getting some light chop up here." }, { A, cs .. ", roger, smoother rides reported lower." } },
+		{ { P, fac .. ", " .. cs .. ", passing " .. alt .. " thousand for flight level " .. fl .. "." }, { A, cs .. ", " .. fac .. ", radar contact." } },
+		{ { P, "Tower, " .. cs .. ", ten miles out, inbound for landing." }, { A, cs .. ", Tower, continue, number two following traffic." } },
+		{ { P, fac .. ", " .. cs .. ", request descent." }, { A, cs .. ", descend and maintain " .. alt .. " thousand." } },
+		{ { P, fac .. ", " .. cs .. ", request heading " .. hdg .. " for weather." }, { A, cs .. ", heading " .. hdg .. " approved, advise when clear." } },
+		{ { P, "Ground, " .. cs .. ", at the gate, ready to taxi." }, { A, cs .. ", Ground, taxi to runway " .. rwy .. " via alpha." } },
+		{ { P, fac .. ", " .. cs .. ", we have the traffic in sight." }, { A, cs .. ", thanks, maintain visual separation." } },
+		{ { P, "Tower, " .. cs .. ", going around." }, { A, cs .. ", roger, fly runway heading, climb to three thousand." } },
+		{ { P, fac .. ", " .. cs .. ", say again the frequency?" }, { A, cs .. ", contact Center " .. freq .. "." } },
+		{ { P, fac .. ", " .. cs .. ", any reports of ice up here?" }, { A, cs .. ", negative, no reports." } },
 	}
 	local t = templates[randInt(1, #templates)]
 	return {

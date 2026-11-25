@@ -39,6 +39,9 @@ Controls.KEYMAP = {
 	{ action = "brake", kind = "hold", group = "Aircraft systems", label = "Wheel brakes", keys = { "B", "ButtonB" } },
 	{ action = "parkingBrake", kind = "press", group = "Aircraft systems", label = "Parking brake", keys = { "P", "DPadLeft" } },
 	{ action = "reverse", kind = "hold", group = "Aircraft systems", label = "Reverse thrust (on the ground)", keys = { "Z" } },
+	{ action = "autoland", kind = "press", group = "Aircraft systems", label = "Autoland on / off (lands at the best runway nearby)", keys = { "Three" } },
+	{ action = "refillWater", kind = "press", group = "Aircraft systems", label = "Refill the water tank (water bomber)", keys = { "One" } },
+	{ action = "autoScoop", kind = "press", group = "Aircraft systems", label = "Auto refill: fly to the sea, scoop and climb out (water bomber)", keys = { "Two" } },
 	{ action = "waterDrop", kind = "hold", group = "Aircraft systems", label = "Drop water (water bomber; skim the sea to refill)", keys = { "L" } },
 	-- Camera and game
 	{ action = "camera", kind = "press", group = "Camera and game", label = "Camera: chase / cockpit / tower", keys = { "C", "ButtonSelect" } },
@@ -48,6 +51,7 @@ Controls.KEYMAP = {
 	{ action = "minimap", kind = "press", group = "Camera and game", label = "Show / hide the map", keys = { "N" } },
 	{ action = "events", kind = "press", group = "Camera and game", label = "Failures and weather events menu", keys = { "J" } },
 	{ action = "hud", kind = "press", group = "Camera and game", label = "Hide / show HUD", keys = { "H" } },
+	{ action = "music", kind = "press", group = "Camera and game", label = "Background music on / off", keys = { "O" } },
 	{ action = "debug", kind = "press", group = "Camera and game", label = "Debug panel", keys = { "F3" } },
 	{ action = "menu", kind = "press", group = "Camera and game", label = "Menu", keys = { "M", "ButtonStart" } },
 	{ action = "reset", kind = "press", group = "Camera and game", label = "Reset / respawn", keys = { "R" } },

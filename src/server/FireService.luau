@@ -156,20 +156,32 @@ local function buildFire(site: any, index: number): Fire
 	-- a label that shows from far away, so pilots can find the fire
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "FireLabel"
-	gui.Size = UDim2.fromOffset(160, 40)
+	gui.Size = UDim2.fromOffset(170, 62)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, 260, 0)
 	gui.AlwaysOnTop = true
 	gui.MaxDistance = 60000
 	gui.LightInfluence = 0
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
-	label.Size = UDim2.fromScale(1, 1)
+	label.Size = UDim2.fromScale(1, 0.62)
 	label.Font = Enum.Font.GothamBlack
 	label.TextScaled = true
 	label.TextColor3 = Color3.fromRGB(255, 140, 50)
 	label.TextStrokeTransparency = 0.3
 	label.Text = "WILDFIRE"
 	label.Parent = gui
+	-- distance line under the title: each client fills it in for its own position
+	local dist = Instance.new("TextLabel")
+	dist.Name = "Distance"
+	dist.BackgroundTransparency = 1
+	dist.Position = UDim2.fromScale(0, 0.62)
+	dist.Size = UDim2.fromScale(1, 0.38)
+	dist.Font = Enum.Font.GothamBold
+	dist.TextScaled = true
+	dist.TextColor3 = Color3.fromRGB(255, 235, 200)
+	dist.TextStrokeTransparency = 0.3
+	dist.Text = ""
+	dist.Parent = gui
 	gui.Parent = smokeBase
 
 	model.Parent = folder
@@ -253,7 +265,8 @@ local function onDrop(p: Player, model: any, x: any, z: any, kg: any, heightM: a
 	end
 	-- no more water than the tank can pour out (with slack for network bunching)
 	local now = os.clock()
-	local b = dropBudget[p] or { kg = 0, t = now }
+	-- a new player starts with a full tank's worth, so their first drop counts in full
+	local b = dropBudget[p] or { kg = cfg.waterTank.capacity, t = now }
 	b.kg = math.min(cfg.waterTank.capacity, b.kg + (now - b.t) * cfg.waterTank.dropRate * 1.5)
 	b.t = now
 	dropBudget[p] = b

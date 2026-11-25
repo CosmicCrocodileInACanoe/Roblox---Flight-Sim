@@ -19,6 +19,7 @@ local Crash = require(Shared.Crash)
 local GameConfig = require(Shared.GameConfig)
 local Registry = require(Shared.AircraftRegistry)
 local Units = require(Shared.Units)
+local WorldGen = require(Shared.WorldGen)
 
 local S = Units.STUDS_PER_METER
 local CC = GameConfig.crash.crater
@@ -184,8 +185,10 @@ local function onReportCrash(p: Player, model: any, pos: any, dv: any)
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = hooks.ignore()
 	local hit = Workspace:Raycast(pos + Vector3.new(0, 30, 0), Vector3.new(0, -30 - 40 * S, 0), params)
-	if not hit or isWater(hit.Instance) then
-		return -- in the air, on a building far above ground, or in the sea: no crater
+	if not hit or isWater(hit.Instance) or hit.Position.Y < WorldGen.SEA_LEVEL then
+		-- in the air, on a building far above ground, or in the sea (including shallow
+		-- water, where the ground under the surface would hide the crater): no crater
+		return
 	end
 	CraterService.build(hit.Position, hit.Normal, radiusM, rimM, p.UserId + math.floor(os.clock()))
 end

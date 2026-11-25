@@ -445,7 +445,7 @@ end
 local function snapshot(fc: any, aheadSec: number): any
 	local fm = fc.fm
 	local t = fc.telemetry or {}
-	local n1, starting, rev = 0, false, 0
+	local n1, starting, rev, ab = 0, false, 0, 0
 	local count = math.max(1, #fm.engines)
 	for i, e in fm.engines do
 		local comp = fc.cfg.engines[i] and fc.cfg.engines[i].component
@@ -453,6 +453,7 @@ local function snapshot(fc: any, aheadSec: number): any
 			n1 += e.n1
 			starting = starting or e.starting
 			rev = math.max(rev, e.reverser)
+			ab = math.max(ab, e.afterburner or 0)
 		end
 	end
 	local detached, failedParts, degraded = 0, 0, 0
@@ -492,6 +493,7 @@ local function snapshot(fc: any, aheadSec: number): any
 		n1 = n1 / count,
 		anyStarting = starting,
 		reverser = rev,
+		afterburner = ab,
 		throttle = t.throttle or 0,
 		ias = t.ias or 0,
 		gs = t.gs or 0,
@@ -534,6 +536,106 @@ function SoundController:_playOneShot(slot: string, o: any, gain: number, master
 	end)
 	Debris:AddItem(s, o.cfg.maxSeconds or 30) -- also the fallback if Ended never fires
 	return s
+end
+
+-- Background music ---------------------------------------------------------------------
+-- One Sound in SoundService that walks a shuffled playlist. updateMusic runs every frame
+-- (flying or not); while anything important is talking it ducks to duckedVolume.
+local music: Sound? = nil
+local musicOn = AudioConfig.music.enabled
+local musicOrder: { string } = {}
+local musicIdx = 0
+local musicVol = 0
+local musicWait = 0
+local musicBad: { [string]: boolean } = {}
+
+local function nextTrack(): string?
+	local urls = AudioMix.assetUrls(AudioConfig.music.tracks)
+	local good = {}
+	for _, u in urls do
+		if not musicBad[u] then
+			table.insert(good, u)
+		end
+	end
+	if #good == 0 then
+		return nil
+	end
+	if musicIdx >= #musicOrder or #musicOrder ~= #good then
+		musicOrder = table.clone(good)
+		for i = #musicOrder, 2, -1 do
+			local j = math.random(1, i)
+			musicOrder[i], musicOrder[j] = musicOrder[j], musicOrder[i]
+		end
+		musicIdx = 0
+	end
+	musicIdx += 1
+	return musicOrder[musicIdx]
+end
+
+function SoundController:toggleMusic()
+	musicOn = not musicOn
+	print("[Audio] background music " .. (if musicOn then "on" else "off") .. " (press O to toggle)")
+end
+
+function SoundController:updateMusic(dt: number)
+	local ok, err = pcall(function()
+		local cfg = AudioConfig.music
+		if not music or not music.Parent then
+			local s = Instance.new("Sound")
+			s.Name = "BackgroundMusic"
+			s.Looped = false
+			s.Volume = 0
+			s.Parent = SoundService
+			s.Ended:Connect(function()
+				musicWait = cfg.gapSeconds
+			end)
+			music = s
+		end
+		local m = music :: Sound
+		local ducked = os.clock() < (self.duckUntil or 0)
+		local target = if not musicOn then 0 elseif ducked then cfg.duckedVolume else cfg.volume
+		target *= AudioConfig.masterVolume
+		local step = (cfg.volume / math.max(cfg.fade, 0.05)) * dt
+		musicVol = if musicVol < target then math.min(target, musicVol + step) else math.max(target, musicVol - step)
+		m.Volume = musicVol
+		if not musicOn then
+			if m.IsPlaying and musicVol <= 0.001 then
+				m:Pause()
+			end
+			return
+		end
+		if m.IsPlaying then
+			return
+		end
+		if m.SoundId ~= "" and m.TimePosition > 0 and m.TimePosition < m.TimeLength - 0.1 then
+			m:Resume() -- toggled back on mid-track
+			return
+		end
+		musicWait -= dt
+		if musicWait > 0 then
+			return
+		end
+		local url = nextTrack()
+		if not url then
+			return
+		end
+		m.SoundId = url
+		m.TimePosition = 0
+		m:Play()
+		-- A track that never loads is skipped from then on.
+		task.delay(8, function()
+			if m.SoundId == url and not m.IsLoaded then
+				musicBad[url] = true
+				m:Stop()
+				musicWait = 0
+			end
+		end)
+		musicWait = 1
+	end)
+	if not ok then
+		warn("[Audio] music stopped: " .. tostring(err))
+		musicOn = false
+	end
 end
 
 -- cameraMode: "chase" | "cockpit" | "tower"
@@ -594,7 +696,8 @@ function SoundController:_update(dt: number, cameraMode: string?)
 		local effect = if tgt then tgt.effect else 0
 		local wantVol = level * l.cfg.volume * master
 		l.volume += (wantVol - l.volume) * k
-		l.pitch += (AudioMix.pitch(l.cfg, effect) - l.pitch) * k
+		local pitchMul = if tgt and tgt.pitchMul then tgt.pitchMul else 1
+		l.pitch += (AudioMix.pitch(l.cfg, effect) * pitchMul - l.pitch) * k
 		local s = l.sound
 		if l.volume < SILENT and wantVol < SILENT then
 			if s.IsPlaying then
@@ -608,6 +711,18 @@ function SoundController:_update(dt: number, cameraMode: string?)
 				s:Resume()
 			end
 		end
+	end
+
+	-- Duck the music under warnings, callouts and ATC.
+	local talking = self.atcBusy or (self.lastCallout ~= nil and (self.lastCallout :: any).IsPlaying)
+	for _, slot in { "stallWarning", "stickShaker", "gearWarning", "fireBell", "overspeedClacker" } do
+		local l = self.loops[slot]
+		if l and l.volume > 0.02 then
+			talking = true
+		end
+	end
+	if talking then
+		self.duckUntil = os.clock() + 1.5
 	end
 
 	-- One-shots: play a copy so overlapping hits don't cut each other off. Copies live

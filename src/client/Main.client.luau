@@ -99,6 +99,9 @@ local input = InputController.new({
 	controls = function()
 		controlsPopup:toggle()
 	end,
+	music = function()
+		sound:toggleMusic()
+	end,
 	panel = function()
 		if flightPanel then
 			flightPanel:toggle()
@@ -112,6 +115,9 @@ local input = InputController.new({
 	end,
 	engines = command("engines"),
 	assist = command("assist"),
+	autoland = command("autoland"),
+	refillWater = command("refillWater"),
+	autoScoop = command("autoScoop"),
 })
 
 flightPanel = FlightPanel.new(input, {})
@@ -184,7 +190,7 @@ local function onAssigned(model: Model, options: any, sp: any, repaired: boolean
 		fc:destroy()
 		fc = nil
 	end
-	hazards:attach(nil)
+	hazards:attach(nil, repaired)
 	sound:detach()
 	if not model then
 		return
@@ -206,7 +212,7 @@ local function onAssigned(model: Model, options: any, sp: any, repaired: boolean
 	fc.windProvider = function(pos: Vector3, t: number): Vector3
 		return WorldFx.wind(pos, t) + hazards:windAt(pos, t)
 	end
-	hazards:attach(fc)
+	hazards:attach(fc, repaired)
 	hazardPanel:setFlying(true)
 	sound:attach(fc)
 	destination = options.destination
@@ -291,7 +297,7 @@ local function keysFor(action: string): { [Enum.KeyCode]: boolean }
 	end
 	return set
 end
-local menuKeys, controlsKeys = keysFor("menu"), keysFor("controls")
+local menuKeys, controlsKeys, musicKeys = keysFor("menu"), keysFor("controls"), keysFor("music")
 UserInputService.InputBegan:Connect(function(io, processed)
 	if processed or fc then
 		return
@@ -304,6 +310,8 @@ UserInputService.InputBegan:Connect(function(io, processed)
 		end
 	elseif controlsKeys[io.KeyCode] then
 		controlsPopup:toggle()
+	elseif musicKeys[io.KeyCode] then
+		sound:toggleMusic()
 	end
 end)
 
@@ -322,13 +330,50 @@ RunService.PreSimulation:Connect(function(dt)
 	end
 end)
 
+-- Wildfire labels: live distance from the aircraft (or the character) under "WILDFIRE"
+local fireLabelTimer = 0
+local function updateFireDistances(dt: number)
+	fireLabelTimer -= dt
+	if fireLabelTimer > 0 then
+		return
+	end
+	fireLabelTimer = 0.2
+	local folder = workspace:FindFirstChild("Wildfires")
+	if not folder then
+		return
+	end
+	local from: Vector3? = nil
+	if fc and fc.core and fc.core.Parent then
+		from = fc.core.Position
+	else
+		local cam = workspace.CurrentCamera
+		from = cam and cam.Focus.Position
+	end
+	if not from then
+		return
+	end
+	for _, m in folder:GetChildren() do
+		local gui = m:FindFirstChild("FireLabel", true)
+		local dist = gui and gui:FindFirstChild("Distance")
+		local base = gui and gui.Parent
+		if dist and base and base:IsA("BasePart") then
+			local p = base.Position
+			local d = Vector3.new(p.X - from.X, 0, p.Z - from.Z).Magnitude * 0.28 -- metres
+			local nm = d / 1852
+			;(dist :: TextLabel).Text = if nm < 0.5 then string.format("%d m away", math.floor(d / 10 + 0.5) * 10) else string.format("%.1f nm away", nm)
+		end
+	end
+end
+
 RunService.Heartbeat:Connect(function(dt)
+	updateFireDistances(dt)
 	WorldFx.update(dt, if fc then fc.model else nil)
 	hazards:update(dt)
 	hazardPanel:setStatus(hazards:status())
 	if fc then
 		sound:update(dt, camera.mode)
 	end
+	sound:updateMusic(dt)
 	if fc then
 		hud:update(fc.telemetry, destination)
 		flightPanel:update(fc.telemetry)

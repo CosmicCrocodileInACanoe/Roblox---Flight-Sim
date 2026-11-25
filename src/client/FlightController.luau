@@ -27,6 +27,8 @@ local WorldGen = require(Shared.WorldGen)
 local Stunts = require(Shared.Stunts)
 local Airports = require(Shared.Airports)
 local Wildfire = require(Shared.Wildfire)
+local Autopilot = require(Shared.Autopilot)
+local Controls = require(Shared.Controls)
 local Hazards = require(Shared.Hazards)
 local Effects = require(script.Parent.Effects)
 
@@ -246,6 +248,28 @@ function FlightController:command(name: string)
 		else
 			fm:startEngines()
 		end
+	elseif name == "autoland" then
+		if self.autopilot and self.autopilot.mode == "land" then
+			self:disengageAutopilot("Autoland off: you have control")
+		else
+			self:engageAutoland()
+		end
+	elseif name == "autoScoop" then
+		if self.autopilot and self.autopilot.mode == "scoop" then
+			self:disengageAutopilot("Auto refill off: you have control")
+		else
+			self:engageAutoScoop()
+		end
+	elseif name == "refillWater" then
+		local tank = self.cfg.waterTank
+		if not tank then
+			self:say("Only water bombers carry water")
+		elseif fm.water >= tank.capacity - 1 then
+			self:say("The water tank is already full")
+		else
+			fm.water = tank.capacity
+			self:say("Water tank refilled")
+		end
 	elseif name == "assist" then
 		local was = self.assist.mode
 		self.assist.mode = Assist.nextMode(was)
@@ -256,6 +280,139 @@ function FlightController:command(name: string)
 			self.input.raw.trim = 0
 		end
 	end
+end
+
+-- A one-line message for the HUD (shown as a toast by Hud:update).
+function FlightController:say(text: string)
+	self.noticeId = (self.noticeId or 0) + 1
+	self.notice = { id = self.noticeId, text = text }
+end
+
+-- Autopilot --------------------------------------------------------------------------
+-- The autopilot works in metres; the world is in studs.
+local function runwayStrips(): { any }
+	local out = {}
+	for _, id in Airports.order do
+		local l = Airports.layout(id)
+		for _, e in l.ends do
+			table.insert(out, { id = id .. " " .. e.ident, x = e.thx * MPS, z = e.thz * MPS, heading = e.heading, surfaceY = l.y * MPS, lengthM = l.lengthM })
+		end
+	end
+	return out
+end
+
+function FlightController:engageAutoland()
+	if self.crashed then
+		return
+	end
+	local r = self.fm.result
+	if r.onGround or r.onFloats then
+		self:say("Autoland works in the air: take off first")
+		return
+	end
+	if not self.fm:enginesRunning() then
+		self:say("Autoland needs the engines running")
+		return
+	end
+	local pos = self.core.Position
+	local look = self.core.CFrame.LookVector
+	local rw = Autopilot.pickRunway(runwayStrips(), pos.X * MPS, pos.Z * MPS, Units.headingFromXZ(look.X, look.Z))
+	if not rw then
+		return
+	end
+	self.autopilot = Autopilot.newLand(self.cfg, rw, self.ctl.trim)
+	self:say(string.format("Autoland on: runway %s. Move the stick or press %s to take over", rw.id, Controls.firstKey("autoland") or "the autoland key"))
+end
+
+function FlightController:engageAutoScoop()
+	local tank = self.cfg.waterTank
+	if not tank or self.crashed then
+		self:say("Auto refill is for water bombers")
+		return
+	end
+	if self.fm.water >= tank.capacity - 1 then
+		self:say("The water tank is already full")
+		return
+	end
+	if not self.fm:enginesRunning() then
+		self:say("Auto refill needs the engines running")
+		return
+	end
+	if self.fm.result.onGround then
+		self:say("Auto refill works in the air: take off first")
+		return
+	end
+	local pos = self.core.Position
+	local look = self.core.CFrame.LookVector
+	local function isSea(xm: number, zm: number): boolean
+		-- deep enough water, well clear of the shore
+		return WorldGen.meshHeight(xm * SPM, zm * SPM) < WorldGen.SEA_LEVEL - 25
+	end
+	local strip = Autopilot.findScoopStrip(isSea, pos.X * MPS, pos.Z * MPS, Units.headingFromXZ(look.X, look.Z))
+	if not strip then
+		self:say("No open sea close enough for a scoop run")
+		return
+	end
+	strip.surfaceY = WorldGen.SEA_LEVEL * MPS
+	self.autopilot = Autopilot.newScoop(self.cfg, strip, self.ctl.trim)
+	if self.fm.result.onFloats then
+		self.autopilot.phase = "skim"
+	end
+	local d = math.sqrt((strip.x - pos.X * MPS) ^ 2 + (strip.z - pos.Z * MPS) ^ 2)
+	self:say(string.format("Auto refill on: scooping %.1f km away. Move the stick to take over", d / 1000))
+end
+
+function FlightController:disengageAutopilot(text: string?)
+	local ap = self.autopilot
+	if not ap then
+		return
+	end
+	self.autopilot = nil
+	-- hand the controls back where the autopilot left them
+	local raw, ctl = self.input.raw, self.ctl
+	raw.throttle = ctl.throttle
+	raw.flaps = ctl.flaps
+	raw.gearDown = ctl.gearDown
+	raw.parkingBrake = ctl.parkingBrake
+	raw.speedbrake = 0
+	if self.assist.mode == "simulation" then
+		raw.trim = ap.trim
+	else
+		self.assist.autoTrim = ap.trim
+	end
+	if text then
+		self:say(text)
+	end
+end
+
+-- One autopilot frame: fly, and hand back on stick input, a crash or the end of the job.
+function FlightController:stepAutopilot(cf: CFrame, vWorld: Vector3, raw: any, dt: number)
+	local ap = self.autopilot
+	if math.abs(raw.pitch) > 0.4 or math.abs(raw.roll) > 0.4 then
+		self:disengageAutopilot(if ap.mode == "land" then "Autoland off: you have control" else "Auto refill off: you have control")
+		return false
+	end
+	if self.crashed then
+		self:disengageAutopilot()
+		return false
+	end
+	local look = cf.LookVector
+	local p = cf.Position * MPS
+	local st = { x = p.X, y = p.Y, z = p.Z, vx = vWorld.X, vy = vWorld.Y, vz = vWorld.Z, heading = Units.headingFromXZ(look.X, look.Z) }
+	Autopilot.step(ap, self.ctl, st, self.env, self.fm, dt)
+	-- keep the pilot's levers in step so nothing jumps when the autopilot lets go
+	raw.throttle = self.ctl.throttle
+	raw.flaps = self.ctl.flaps
+	raw.gearDown = self.ctl.gearDown
+	raw.parkingBrake = self.ctl.parkingBrake
+	if ap.done then
+		if ap.mode == "land" then
+			self:disengageAutopilot("Autoland: landed and stopped. Parking brake on")
+		else
+			self:disengageAutopilot("Auto refill: tank full, level and climbing. You have control")
+		end
+	end
+	return true
 end
 
 function FlightController:setFailure(kind: string, on: boolean)
@@ -395,7 +552,10 @@ function FlightController:step(dt: number)
 		end
 	end
 
-	Assist.apply(self.assist, raw, self.ctl, env, fm, dt)
+	local flown = self.autopilot ~= nil and self:stepAutopilot(cf, vWorld, raw, dt)
+	if not flown then
+		Assist.apply(self.assist, raw, self.ctl, env, fm, dt)
+	end
 	local r = fm:step(env, self.ctl, dt)
 	if cfg.waterTank then
 		self:waterBomber(dt, cf, r)
@@ -722,6 +882,8 @@ function FlightController:updateTelemetry(cf: CFrame, v: Vector3, r: any, raw: a
 	t.fuel = fm.fuel
 	t.fuelFlow = r.fuelFlow
 	t.waterTank = self.cfg.waterTank
+	t.autopilot = if self.autopilot then { mode = self.autopilot.mode, message = self.autopilot.message } else nil
+	t.notice = self.notice
 	t.water = fm.water
 	t.scooping, t.dropping, t.refilling = r.scooping, r.dropping, r.refilling
 	t.crashed = self.crashed

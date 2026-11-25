@@ -146,13 +146,13 @@ local config = {
 		fuselage = {
 			radius = 1.3, deck = 0.65,
 			noseZ = -9.4, cabinStartZ = -6.6, forwardSplitZ = -3.8, aftSplitZ = 3.6,
-			cabinEndZ = 5.0, tailEndZ = 11.0, tailUpsweep = 1.25, noseDrop = 0.3, tailTipFraction = 0.24,
+			cabinEndZ = 5.0, tailEndZ = 11.0, tailUpsweep = 1.9, noseDrop = 0.3, tailTipFraction = 0.2,
 			windowRows = {}, doors = { -5.2, 3.8 }, apu = false, bellyFairing = false, stripe = false,
 			windscreen = { yLow = 0.55, yHigh = 1.25 },
 			pitot = 0.6,
 			-- the boat hull under the barrel: a V keel, chines and spray rails, the step
 			-- behind the tank, and the tank doors and scoop probes
-			boatHull = { bowZ = -8.6, stepZ = 2.2, keelY = KEEL, chineY = KEEL + 0.32, chineX = 1.12, tailZ = 8.5, doors = { -2.6, 1.4 }, probesZ = 2.5 },
+			boatHull = { bowZ = -8.6, stepZ = 2.2, keelY = KEEL, chineY = KEEL + 0.75, chineX = 1.0, tailZ = 6.8, doors = { -2.6, 1.4 }, probesZ = 2.5 },
 		},
 		wing = {
 			mount = "high",

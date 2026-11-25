@@ -15,6 +15,7 @@ export type EngineState = {
 	thrust: number, -- N, last computed (negative when reversing)
 	fuelFlow: number, -- kg/s, last computed
 	fire: boolean,
+	afterburner: number, -- 0..1 reheat glow (cfg.afterburner only)
 }
 
 function Engine.new(cfg: any, running: boolean): EngineState
@@ -29,6 +30,7 @@ function Engine.new(cfg: any, running: boolean): EngineState
 		thrust = 0,
 		fuelFlow = 0,
 		fire = false,
+		afterburner = 0,
 	}
 end
 
@@ -70,7 +72,9 @@ end
 -- Advance one engine.
 --   throttle: 0..1 lever, reverseCmd: reverser requested (only honoured when allowed)
 --   densityRatio: rho/rho0, airspeed: true airspeed m/s, hasFuel: fuel available
-function Engine.update(e: EngineState, throttle: number, reverseCmd: boolean, reverseAllowed: boolean, densityRatio: number, airspeed: number, hasFuel: boolean, dt: number): number
+--   mach: flight Mach number (for cfg.ramGain; defaults to airspeed / 340)
+--   reheatAllowed: false keeps an afterburner unlit (FlightModel: airborne with the gear down)
+function Engine.update(e: EngineState, throttle: number, reverseCmd: boolean, reverseAllowed: boolean, densityRatio: number, airspeed: number, hasFuel: boolean, dt: number, reheatAllowed: boolean?, mach: number?): number
 	local cfg = e.cfg
 	local idle = cfg.idleN1
 
@@ -126,8 +130,34 @@ function Engine.update(e: EngineState, throttle: number, reverseCmd: boolean, re
 	end
 	-- Thrust lapse with density and speed (high-bypass turbofan approximation).
 	-- (propellers lose thrust with speed faster: cfg.lapseSpeed ~300 m/s instead of 600)
-	local lapse = densityRatio ^ 0.75 * math.max(0.45, 1 - airspeed / (cfg.lapseSpeed or 600))
+	-- cfg.ramGain: a supersonic intake adds ram pressure that builds from about Mach 0.6,
+	-- so a Mach 2 jet gets stronger as it speeds up (changes nothing at low speed).
+	-- Past about Mach 2 the intakes run out of margin and the gain falls away fast.
+	local speedFactor = math.max(0.45, 1 - airspeed / (cfg.lapseSpeed or 600))
+	if cfg.ramGain then
+		local m = mach or airspeed / 340
+		local ram = cfg.ramGain * math.max(0, math.min(m, 2) - 0.6) ^ 2
+		if m > 2 then
+			ram *= math.max(0, 1 - (m - 2) * 6)
+		end
+		-- the intake schedule is built for thin cruise air: down low the gain is small,
+		-- so the jet goes truly fast only once it climbs (like the real thing)
+		ram *= math.clamp((1 - densityRatio) / 0.7, 0, 1)
+		speedFactor += ram
+	end
+	local lapse = densityRatio ^ 0.75 * speedFactor
 	local thrust = cfg.maxThrust * frac * lapse
+	-- Afterburner (reheat): lights with the throttle past `above`, multiplies thrust and
+	-- burns fuel several times faster. Takes about half a second to light and go out.
+	local ab = cfg.afterburner
+	local abTarget = 0
+	if ab and reheatAllowed ~= false and e.running and e.reverser == 0 and throttle >= ab.above and e.n1 > 90 then
+		abTarget = 1
+	end
+	e.afterburner += math.clamp(abTarget - e.afterburner, -dt * 2, dt * 2)
+	if ab then
+		thrust *= 1 + (ab.thrustMul - 1) * e.afterburner
+	end
 	if e.reverser > 0 then
 		thrust = thrust * (1 - e.reverser) - thrust * e.reverser * cfg.reverseFraction
 	end
@@ -135,6 +165,9 @@ function Engine.update(e: EngineState, throttle: number, reverseCmd: boolean, re
 
 	if e.running then
 		e.fuelFlow = cfg.fuelFlowIdle + (cfg.fuelFlowMax - cfg.fuelFlowIdle) * math.max(0, frac - 0.06) / 0.94
+		if ab then
+			e.fuelFlow *= 1 + ((ab.fuelMul or 3) - 1) * e.afterburner
+		end
 	elseif e.starting then
 		e.fuelFlow = cfg.fuelFlowIdle * 0.5
 	else

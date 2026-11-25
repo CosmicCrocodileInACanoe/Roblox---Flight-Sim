@@ -1227,6 +1227,20 @@ local function buildEngines(ctx: Ctx)
 		else
 			buildTurbofan(ctx, comp, i, p, eg, nac)
 		end
+		-- afterburner flame behind the nozzle (hidden; the client fades it in with reheat)
+		if e.afterburner and kind == "turbofan" then
+			local L, R = eg.length, eg.radius
+			local flameLen = L * 0.9
+			local z = p.Z + L * 0.42 + flameLen / 2
+			local outer = ellipsoid(ctx, comp, "AfterburnerFlame", CFrame.new(p.X, p.Y, z), Vector3.new(R * 0.5, R * 0.5, flameLen / 2), Color3.fromRGB(255, 140, 50), { material = Enum.Material.Neon, transparency = 1, noShadow = true, attrs = { AfterburnerIndex = i } })
+			ellipsoid(ctx, comp, "AfterburnerCore", CFrame.new(p.X, p.Y, z - flameLen * 0.2), Vector3.new(R * 0.3, R * 0.3, flameLen * 0.3), Color3.fromRGB(255, 230, 170), { material = Enum.Material.Neon, transparency = 1, noShadow = true, attrs = { AfterburnerIndex = i } })
+			local light = Instance.new("PointLight")
+			light.Name = "AfterburnerLight"
+			light.Color = Color3.fromRGB(255, 150, 70)
+			light.Range = 30
+			light.Brightness = 0
+			light.Parent = outer
+		end
 		-- smoke emitter (enabled by the client when the engine is failed/on fire)
 		failureSmoke(ctx, comp)
 	end

@@ -299,6 +299,8 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 
 	-- Engines ---------------------------------------------------------------
 	local totalThrust, fuelFlow = 0, 0
+	-- afterburners light for the take-off run and with the gear up, never on an approach
+	local reheatAllowed = anyGround or not ctl.gearDown
 	local hasFuel = self.fuel > 0
 	for i, e in self.engines do
 		local ecfg = cfg.engines[i]
@@ -308,7 +310,7 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 		end
 		local thrust = 0
 		if compState ~= "detached" then
-			thrust = Engine.update(e, ctl.throttle, ctl.reverse, anyGround, sigmaRho, tas, hasFuel, dt)
+			thrust = Engine.update(e, ctl.throttle, ctl.reverse, anyGround, sigmaRho, tas, hasFuel, dt, reheatAllowed, tas / Units.speedOfSound(altitude))
 			if compState == "degraded" then
 				thrust *= 0.7
 			end
@@ -420,6 +422,30 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 	my += bpz * dfx - bpx * dfz
 	mz += bpx * dfy - bpy * dfx
 	totalDrag += sqrt(dfx * dfx + dfy * dfy + dfz * dfz)
+
+	-- Compressibility (wave) drag: past the critical Mach number drag climbs steeply up
+	-- to the sound barrier, then eases off a little once supersonic. Only aircraft built
+	-- for it (a low aero.waveDrag.peak) get through; everything else hits a wall.
+	local mach = tas / Units.speedOfSound(altitude)
+	r.mach = mach
+	local wd = aero.waveDrag
+	local mcrit = (wd and wd.mcrit) or 0.8
+	if mach > mcrit and tas > 0.1 then
+		local peak = (wd and wd.peak) or 0.06
+		local cdw
+		if mach < 1.05 then
+			local t = (mach - mcrit) / (1.05 - mcrit)
+			cdw = peak * t * t
+		else
+			cdw = peak * math.max(0.55, 1.05 / mach)
+		end
+		local dq = 0.5 * rho * tas * aero.wingArea * cdw
+		local wfx, wfy, wfz = -dq * vax, -dq * vay, -dq * vaz
+		fx += wfx
+		fy += wfy
+		fz += wfz
+		totalDrag += dq * tas
+	end
 
 	-- Small extra aerodynamic rotational damping
 	local ed = aero.extraDamping

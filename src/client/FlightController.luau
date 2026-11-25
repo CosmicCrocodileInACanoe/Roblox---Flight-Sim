@@ -104,6 +104,7 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 	self.fans = {}
 	self.smoke = {}
 	self.hullParts = {}
+	self.afterburners = {}
 	self.landingLight = nil :: SpotLight?
 	for _, d in model:GetDescendants() do
 		if d:IsA("Motor6D") then
@@ -117,6 +118,8 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 		elseif d:IsA("ParticleEmitter") and d.Name == "FailureSmoke" then
 			local comp = (d:FindFirstAncestorWhichIsA("Model") :: Model).Name
 			self.smoke[comp] = d
+		elseif d:IsA("BasePart") and d:GetAttribute("AfterburnerIndex") then
+			table.insert(self.afterburners, { part = d, index = d:GetAttribute("AfterburnerIndex") :: number, light = d:FindFirstChild("AfterburnerLight") :: PointLight? })
 		elseif d:IsA("SpotLight") and d.Name == "LandingLight" then
 			self.landingLight = d
 		elseif d:IsA("BasePart") and d.CanTouch and d:GetAttribute("Component") then
@@ -582,6 +585,7 @@ function FlightController:updateTelemetry(cf: CFrame, v: Vector3, r: any, raw: a
 	local look = cf.LookVector
 	local pitch, bank = Assist.attitude(self.env.ux, self.env.uy, self.env.uz)
 	t.ias = r.ias * Units.KTS_PER_MPS
+	t.mach = r.mach or 0
 	t.tas = r.tas * Units.KTS_PER_MPS
 	t.gs = Vector3.new(v.X, 0, v.Z).Magnitude * Units.KTS_PER_MPS
 	t.altFt = cf.Position.Y * MPS * Units.FT_PER_M
@@ -603,7 +607,7 @@ function FlightController:updateTelemetry(cf: CFrame, v: Vector3, r: any, raw: a
 	t.throttle = raw.throttle
 	t.n1 = {}
 	for i, e in fm.engines do
-		t.n1[i] = { n1 = e.n1, running = e.running, starting = e.starting, failed = e.failed, reverser = e.reverser }
+		t.n1[i] = { n1 = e.n1, running = e.running, starting = e.starting, failed = e.failed, reverser = e.reverser, afterburner = e.afterburner }
 	end
 	t.flapLabel = self.cfg.aero.flaps.labels[math.clamp(math.floor(fm.flapPos + 0.5), 1, #self.cfg.aero.flaps.labels)]
 	t.flapCmd = self.cfg.aero.flaps.labels[self.ctl.flaps]
@@ -691,6 +695,17 @@ function FlightController:updateVisuals(dt: number)
 	end
 	if self.landingLight then
 		self.landingLight.Enabled = fm.gearExtension > 0.9
+	end
+	-- Afterburner flames: fade in with reheat, with a little flicker
+	for _, ab in self.afterburners do
+		local e = fm.engines[ab.index]
+		if ab.part.Parent and ab.part:IsDescendantOf(self.model) then
+			local k = if e then e.afterburner else 0
+			ab.part.Transparency = if k < 0.02 then 1 else 1 - k * (0.55 + 0.15 * math.random())
+			if ab.light then
+				ab.light.Brightness = k * 4
+			end
+		end
 	end
 end
 

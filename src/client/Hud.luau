@@ -21,6 +21,7 @@ local MONO = Enum.Font.RobotoMono
 local GREEN = Color3.fromRGB(90, 235, 140)
 local AMBER = Color3.fromRGB(255, 190, 60)
 local RED = Color3.fromRGB(255, 70, 70)
+local ORANGE = Color3.fromRGB(255, 130, 40)
 local WHITE = Color3.fromRGB(240, 244, 248)
 local DIM = Color3.fromRGB(160, 170, 180)
 local PANEL = Color3.fromRGB(12, 16, 22)
@@ -342,7 +343,8 @@ function Hud:update(t: any, destId: string?)
 
 	-- speed
 	self.ias.Text = string.format("%d", math.floor(t.ias + 0.5))
-	self.gs.Text = string.format("GS %d", math.floor(t.gs + 0.5))
+	-- Mach number once it matters (fast jets; the Arrowstar goes past Mach 2)
+	self.gs.Text = if (t.mach or 0) >= 0.6 then string.format("GS %d  M%.2f", math.floor(t.gs + 0.5), t.mach) else string.format("GS %d", math.floor(t.gs + 0.5))
 	local sp = t.speeds
 	local flapIdx = math.clamp(math.floor(t.flapPos + 0.5), 1, #sp.flapLimits)
 	local hint = ""
@@ -421,8 +423,12 @@ function Hud:update(t: any, destId: string?)
 			if e.reverser > 0.1 then
 				status ..= " REV"
 			end
+			local reheat = (e.afterburner or 0) > 0.5
+			if reheat then
+				status ..= " AB"
+			end
 			b.text.Text = status
-			b.fill.BackgroundColor3 = if e.failed then RED elseif e.starting then AMBER else GREEN
+			b.fill.BackgroundColor3 = if e.failed then RED elseif e.starting then AMBER elseif reheat then ORANGE else GREEN
 			b.text.TextColor3 = if e.failed then RED else WHITE
 		end
 	end

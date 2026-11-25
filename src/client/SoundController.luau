@@ -48,6 +48,9 @@ function SoundController.new()
 	self.lastCallout = nil :: Instance?
 	self.aheadSec = math.huge
 	self.aheadTimer = 0
+	self.atcVoice = nil :: Instance?
+	self.atcClips = {} :: { any }
+	self.atcTimer = 0
 	return self
 end
 
@@ -55,7 +58,7 @@ end
 -- audio API (AudioTextToSpeech -> Wire -> AudioDeviceOutput). Returns nil when that API
 -- isn't available, so the callout just stays silent.
 local ttsBroken = false
-local function makeVoice(parent: Instance, name: string, text: string): Instance?
+local function makeVoice(parent: Instance, name: string, text: string, radio: boolean?): Instance?
 	if ttsBroken then
 		return nil
 	end
@@ -65,8 +68,24 @@ local function makeVoice(parent: Instance, name: string, text: string): Instance
 		tts.Text = text
 		local out = Instance.new("AudioDeviceOutput" :: any) :: any
 		out.Parent = tts
+		local source: any = tts
+		if radio then
+			-- Thin "radio" tone: cut lows and highs. Optional; skipped if unavailable.
+			pcall(function()
+				local eq = Instance.new("AudioEqualizer" :: any) :: any
+				eq.LowGain = -30
+				eq.MidGain = 4
+				eq.HighGain = -18
+				eq.Parent = tts
+				local w = Instance.new("Wire" :: any) :: any
+				w.SourceInstance = tts
+				w.TargetInstance = eq
+				w.Parent = tts
+				source = eq
+			end)
+		end
 		local wire = Instance.new("Wire" :: any) :: any
-		wire.SourceInstance = tts
+		wire.SourceInstance = source
 		wire.TargetInstance = out
 		wire.Parent = tts
 		tts.Parent = parent
@@ -149,6 +168,15 @@ function SoundController:attach(fc: any)
 				self.oneShots[slot] = { sound = s, cfg = sc }
 			end
 		end
+		for slot, o in self.oneShots do
+			if string.sub(slot, 1, 10) == "atcChatter" then
+				table.insert(self.atcClips, o)
+			end
+		end
+		if #self.atcClips == 0 and AudioConfig.useTextToSpeech then
+			self.atcVoice = makeVoice(folder, "AtcVoice", "", true)
+		end
+		self.atcTimer = AudioMix.atcDelay(math.random(), AudioConfig.mix)
 		folder.Parent = SoundService
 		self.folder = folder
 	end)
@@ -168,6 +196,9 @@ function SoundController:detach()
 	self.oneShots = {}
 	self.voices = {}
 	self.lastCallout = nil
+	self.atcVoice = nil
+	self.atcClips = {}
+	self.atcTimer = 0
 	self.aheadSec = math.huge
 	self.aheadTimer = 0
 	self.prev = nil
@@ -227,6 +258,8 @@ local function snapshot(fc: any, aheadSec: number): any
 		stallWarning = t.stallWarning == true,
 		stall = t.stall == true,
 		terrainAheadSec = aheadSec,
+		altFt = t.altFt,
+		rotateKts = fc.cfg.speeds and fc.cfg.speeds.rotate,
 		raFt = t.raFt or 1e4,
 		vsFpm = t.vsFpm or 0,
 		crashed = fc.crashed == true,
@@ -344,7 +377,48 @@ function SoundController:_update(dt: number, cameraMode: string?)
 		end
 	end
 
+	self:_atc(dt, snap, cockpitVol)
 	self.prev = snap
+end
+
+-- Background ATC: one transmission every atcMinGap..atcMaxGap seconds, cut at atcMaxSeconds.
+function SoundController:_atc(dt: number, snap: any, cockpitVol: number)
+	local mix = AudioConfig.mix
+	if snap.crashed or (#self.atcClips == 0 and not self.atcVoice) then
+		return
+	end
+	self.atcTimer -= dt
+	if self.atcTimer > 0 then
+		return
+	end
+	-- Hold off while a warning is talking; try again shortly.
+	if snap.time - (self.memo.lastCalloutTime or -math.huge) < mix.atcQuietAfterWarning then
+		self.atcTimer = 2
+		return
+	end
+	self.atcTimer = AudioMix.atcDelay(math.random(), mix)
+	local maxSec = mix.atcMaxSeconds
+	if #self.atcClips > 0 then
+		local o = self.atcClips[math.random(1, #self.atcClips)]
+		local s = o.sound:Clone()
+		s.Volume = o.cfg.volume * AudioConfig.masterVolume
+		s.Parent = oneShotFolder()
+		s:Play()
+		task.delay(maxSec, function()
+			s:Destroy()
+		end)
+	elseif self.atcVoice then
+		local v: any = self.atcVoice
+		local ok = pcall(function()
+			v.Text = AudioMix.atcPhrase(math.random)
+		end)
+		if ok then
+			playVoice(v, AudioConfig.atcVoiceVolume * AudioConfig.masterVolume * cockpitVol)
+			task.delay(maxSec, function()
+				stopAny(v)
+			end)
+		end
+	end
 end
 
 return SoundController

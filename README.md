@@ -133,6 +133,13 @@ error. What each slot does:
   sink rate is checked against height. A normal approach with the gear and landing flaps down
   stays quiet. A callout slot without an id is spoken with Roblox text-to-speech
   (`AudioConfig.useTextToSpeech`). If that isn't available, it stays silent.
+- Pilot callouts: "eighty knots" and "rotate" on the takeoff roll, and radio-altitude callouts
+  on approach (1000, 500, 100, 50, 40, 30, 20, 10).
+- `cabinChime` through 10,000 ft, `cockpitAmbience` (avionics hum loop).
+- Background ATC chatter, never constant: one transmission every 20 to 55 s (at most 3 a
+  minute), each cut off at 15 s, held back while a warning is talking. Fill `atcChatter1..5`
+  with radio clips. With none filled, made-up exchanges are spoken with text-to-speech in a
+  thin radio tone.
 
 In the cockpit view, outside sounds are muffled by an equaliser and warnings are at full
 volume. In the tower view, outside sounds fade with distance.

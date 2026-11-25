@@ -61,7 +61,35 @@ AudioConfig.sounds = {
 	calloutSinkRate = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Sink rate!", repeatEvery = 2.5 },
 	calloutTooLowGear = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Too low. Gear!", repeatEvery = 3 },
 	calloutStall = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Stall! Stall!", repeatEvery = 2 },
+
+	-- Pilot and automatic callouts (one each time the moment happens) ------------------
+	calloutEightyKnots = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Eighty knots." },
+	calloutRotate = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Rotate." },
+	calloutAlt1000 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "One thousand." },
+	calloutAlt500 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Five hundred." },
+	calloutAlt100 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "One hundred." },
+	calloutAlt50 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Fifty." },
+	calloutAlt40 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Forty." },
+	calloutAlt30 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Thirty." },
+	calloutAlt20 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Twenty." },
+	calloutAlt10 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Ten." },
+
+	-- Cabin and cockpit ambience ---------------------------------------------------------
+	cabinChime = { id = "", volume = 0.6, looped = false, group = "cockpit" }, -- climbing/descending through 10,000 ft
+	cockpitAmbience = { id = "", volume = 0.25, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" }, -- avionics fans and hum
+
+	-- Background ATC radio chatter. Fill any of these with radio-chatter clips; they're
+	-- picked at random. With none filled, made-up exchanges are spoken with text-to-speech.
+	-- Clips longer than mix.atcMaxSeconds are cut off.
+	atcChatter1 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
+	atcChatter2 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
+	atcChatter3 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
+	atcChatter4 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
+	atcChatter5 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
 }
+
+-- Volume of spoken ATC chatter when no clips are filled in.
+AudioConfig.atcVoiceVolume = 0.35
 
 -- Speak callouts with Roblox text-to-speech when their slot has no id. Turn off to keep
 -- callouts silent until recorded clips are added.
@@ -120,6 +148,19 @@ AudioConfig.mix = {
 	pullUpAheadSec = 12, -- "pull up" when it's this close
 	lookAheadMaxStuds = 6000, -- how far ahead the terrain check looks
 	tooLowGearFt = 500, -- "too low, gear" below this height with the gear up
+
+	-- Pilot callouts and ambience --------------------------------------------------------
+	altitudeCallouts = { 1000, 500, 100, 50, 40, 30, 20, 10 }, -- feet, on approach with gear down
+	takeoffMinThrottle = 0.5, -- "eighty knots" and "rotate" only on a takeoff roll
+	chimeAltFt = 10000, -- cabin chime when crossing this altitude
+
+	-- Background ATC chatter: never constant. Each transmission starts at least
+	-- atcMinGap seconds after the last one started (so at most 60 / atcMinGap a minute),
+	-- and is cut off after atcMaxSeconds.
+	atcMinGap = 20,
+	atcMaxGap = 55,
+	atcMaxSeconds = 15,
+	atcQuietAfterWarning = 4, -- no chatter for this long after a warning callout
 }
 
 -- Cockpit muffle: an equaliser on the exterior group while in the cockpit view (dB).

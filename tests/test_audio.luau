@@ -184,6 +184,49 @@ return { name = "Audio", run = function(T)
 			end
 		end
 	end)
+	T.test("takeoff callouts: eighty knots, then rotate", function()
+		local function ev(prevIas, ias)
+			return slots(AudioMix.events(
+				snap({ onGround = true, throttle = 0.9, ias = ias, rotateKts = 140 }),
+				snap({ onGround = true, throttle = 0.9, ias = prevIas, rotateKts = 140 }), mix, {}, AudioConfig.sounds))
+		end
+		T.check(ev(79, 81).calloutEightyKnots ~= nil, "eighty")
+		T.check(ev(139, 141).calloutRotate ~= nil, "rotate")
+		T.check(next(ev(100, 102)) == nil, "nothing in between")
+		local landing = slots(AudioMix.events(snap({ onGround = true, throttle = 0, ias = 79 }), snap({ onGround = true, throttle = 0, ias = 81 }), mix, {}))
+		T.check(landing.calloutEightyKnots == nil, "not when slowing after landing")
+	end)
+	T.test("altitude callouts on approach, lowest height crossed only", function()
+		local function ev(prevRa, ra, gear)
+			return slots(AudioMix.events(
+				snap({ onGround = false, raFt = ra, vsFpm = -700, gearExt = gear or 1, flapPos = 5 }),
+				snap({ onGround = false, raFt = prevRa, vsFpm = -700, gearExt = gear or 1, flapPos = 5 }), mix, {}, AudioConfig.sounds))
+		end
+		T.check(ev(1010, 990).calloutAlt1000 ~= nil, "1000")
+		T.check(ev(52, 38).calloutAlt40 ~= nil and ev(52, 38).calloutAlt50 == nil, "lowest only")
+		T.check(next(ev(800, 780)) == nil, "between callouts")
+		for _, h in mix.altitudeCallouts do
+			T.check(AudioConfig.sounds["calloutAlt" .. h] ~= nil, "slot for " .. h)
+		end
+	end)
+	T.test("cabin chime through 10,000 ft", function()
+		local up = slots(AudioMix.events(snap({ onGround = false, raFt = 9000, altFt = 10010 }), snap({ onGround = false, raFt = 9000, altFt = 9990 }), mix, {}))
+		local down = slots(AudioMix.events(snap({ onGround = false, raFt = 9000, altFt = 9990 }), snap({ onGround = false, raFt = 9000, altFt = 10010 }), mix, {}))
+		T.check(up.cabinChime and down.cabinChime, "both ways")
+	end)
+	T.test("ATC chatter: at most 3 a minute, short exchanges", function()
+		T.check(AudioMix.atcDelay(0, mix) >= 20 and AudioMix.atcDelay(1, mix) <= 60, "gap")
+		T.check(60 / AudioMix.atcDelay(0, mix) <= 3, "rate")
+		T.check(mix.atcMaxSeconds <= 15, "length cap")
+		for _ = 1, 200 do
+			local p = AudioMix.atcPhrase(math.random)
+			local words = 0
+			for _ in string.gmatch(p, "%S+") do
+				words += 1
+			end
+			T.check(words >= 6 and words <= 32, "phrase length " .. words .. ": " .. p)
+		end
+	end)
 	T.test("pitch mapping stays within the slot's range", function()
 		local sc = AudioConfig.sounds.jetWhine
 		T.near(AudioMix.pitch(sc, 0), sc.pitchMin, 1e-9, "min")

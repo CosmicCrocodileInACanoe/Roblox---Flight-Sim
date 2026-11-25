@@ -11,7 +11,15 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
+local Controls = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Controls"))
+
 local FlightPanel = {}
+
+-- Button caption with the action's keyboard key, read from the controls list.
+local function withKey(text: string, action: string): string
+	local key = Controls.firstKey(action)
+	return if key then string.format("%s (%s)", text, key) else text
+end
 FlightPanel.__index = FlightPanel
 
 local PANEL = Color3.fromRGB(14, 18, 26)
@@ -302,9 +310,9 @@ function FlightPanel.new(input: any, callbacks: { [string]: () -> () })
 		self.buttons[name] = b
 		return b
 	end
-	tapButton("Autoland", "AUTOLAND (3)", "autoland", -248)
-	tapButton("RefillWater", "REFILL WATER (1)", "refillWater", -300).Visible = false
-	tapButton("AutoScoop", "AUTO REFILL AT SEA (2)", "autoScoop", -352).Visible = false
+	tapButton("Autoland", withKey("AUTOLAND", "autoland"), "autoland", -248)
+	tapButton("RefillWater", withKey("REFILL WATER", "refillWater"), "refillWater", -300).Visible = false
+	tapButton("AutoScoop", withKey("AUTO REFILL AT SEA", "autoScoop"), "autoScoop", -352).Visible = false
 	return self
 end
 
@@ -360,11 +368,11 @@ function FlightPanel:update(t: any)
 	paint(b.Speedbrake, if sb > 0.75 then "AIR BRAKE\nFULL" elseif sb > 0.2 then "AIR BRAKE\nHALF" else "AIR BRAKE\nOFF", if sb > 0.2 then WARN else OFF)
 	paint(b.Parking, "PARK\nBRAKE", if t.parkingBrake then RED else OFF)
 	local ap = t.autopilot
-	paint(b.Autoland, if ap and ap.mode == "land" then "AUTOLAND ON\n(tap to stop)" else "AUTOLAND (3)", if ap and ap.mode == "land" then ON else OFF)
+	paint(b.Autoland, if ap and ap.mode == "land" then "AUTOLAND ON\n(tap to stop)" else withKey("AUTOLAND", "autoland"), if ap and ap.mode == "land" then ON else OFF)
 	if b.RefillWater then
 		b.RefillWater.Visible = t.waterTank ~= nil
 		b.AutoScoop.Visible = t.waterTank ~= nil
-		paint(b.AutoScoop, if ap and ap.mode == "scoop" then "AUTO REFILL ON\n(tap to stop)" else "AUTO REFILL AT SEA (2)", if ap and ap.mode == "scoop" then ON else OFF)
+		paint(b.AutoScoop, if ap and ap.mode == "scoop" then "AUTO REFILL ON\n(tap to stop)" else withKey("AUTO REFILL AT SEA", "autoScoop"), if ap and ap.mode == "scoop" then ON else OFF)
 	end
 	if b.WaterDrop then
 		b.WaterDrop.Visible = t.waterTank ~= nil

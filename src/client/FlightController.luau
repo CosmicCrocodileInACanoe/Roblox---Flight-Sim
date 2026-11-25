@@ -28,6 +28,7 @@ local Stunts = require(Shared.Stunts)
 local Airports = require(Shared.Airports)
 local Wildfire = require(Shared.Wildfire)
 local Autopilot = require(Shared.Autopilot)
+local Controls = require(Shared.Controls)
 local Hazards = require(Shared.Hazards)
 local Effects = require(script.Parent.Effects)
 
@@ -320,7 +321,7 @@ function FlightController:engageAutoland()
 		return
 	end
 	self.autopilot = Autopilot.newLand(self.cfg, rw, self.ctl.trim)
-	self:say(string.format("Autoland on: runway %s. Move the stick or press %s to take over", rw.id, "3"))
+	self:say(string.format("Autoland on: runway %s. Move the stick or press %s to take over", rw.id, Controls.firstKey("autoland") or "the autoland key"))
 end
 
 function FlightController:engageAutoScoop()

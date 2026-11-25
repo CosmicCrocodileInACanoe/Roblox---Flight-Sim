@@ -190,6 +190,16 @@ Bird strike: a flock flies into the nose a second or two later. Strong winds: yo
 sideways and sink in the downburst halfway through. Clear weather removes them; R resets.
 Note any Output errors from HazardController, HazardPanel or FlightController.
 
+17. **Rudder and Free mode.** In the Meridian 200 at cruise in Easy mode, hold Q for 4 s:
+    the nose swings left and keeps going left (a slight bank into it is fine), with no
+    back-and-forth wobble. Let go: the nose eases back in about a second and the wings
+    level. Press T until the HUD says FREE. Roll hard right and let go: the aircraft
+    rolls faster than in Easy and stays at the bank you left it (up to about 75 deg),
+    turning without you having to pull. Pull up and let go: the nose stays where you left
+    it. Flaps, gear, throttle and brakes behave exactly as in Easy. Then right-drag the
+    camera to look sideways, let go and wait: after 10 s it drifts back behind the aircraft
+    (also in the cockpit view).
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

@@ -83,4 +83,19 @@ function MathUtil.wrap180(a: number): number
 	return a
 end
 
+-- Camera auto re-centre: after `delay` seconds without the pilot looking around, ease
+-- the look angle (radians) back toward `target` with a ~1.2 s time constant, taking the
+-- short way round. Returns the new angle.
+function MathUtil.recenter(angle: number, target: number, idle: number, delay: number, dt: number): number
+	if idle < delay then
+		return angle
+	end
+	local d = MathUtil.wrapPi(angle - target)
+	d *= math.exp(-dt / 1.2)
+	if math.abs(d) < 1e-3 then
+		d = 0
+	end
+	return target + d
+end
+
 return MathUtil

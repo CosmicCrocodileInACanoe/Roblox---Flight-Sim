@@ -6,7 +6,9 @@
 --   n1 (average engine N1, percent), anyStarting, reverser (0..1), throttle (0..1),
 --   ias, gs (knots), onGround, gearExt (0..1), flapPos (notch, 1 = up), speedbrake (0..1),
 --   stallWarning, raFt, vsFpm, crashed, touchdownCount, touchdownVsFpm,
---   impactCount, impactDv (m/s), detachedCount, time (s)
+--   impactCount, impactDv (m/s), detachedCount, time (s),
+--   stall (wing actually stalled), terrainAheadSec (seconds until the flight path meets
+--   the ground, math.huge when clear)
 --
 -- loops() returns, per looping slot, { level = 0..1, effect = 0..1 }: level scales the
 -- slot's volume and effect picks the pitch between pitchMin and pitchMax.
@@ -52,18 +54,19 @@ function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: an
 	end
 	-- Silence every loop once the aircraft is destroyed; one-shots carry the crash.
 	if snap.crashed then
-		for _, slot in { profile.whine, profile.rumble, "wind", "runwayRoll", "gearMotor", "flapMotor", "stallWarning", "gearWarning" } do
+		for _, slot in { profile.whine, profile.rumble, "wind", "runwayRoll", "gearMotor", "flapMotor", "stallWarning", "stickShaker", "gearWarning" } do
 			set(slot, 0, 0)
 		end
 		return out
 	end
 
-	-- Engines: the whine follows N1 (pitch and level), the rumble follows thrust.
+	-- Engines: the whine follows N1 (pitch and level), the rumble follows thrust, so the
+	-- engines are quiet at idle and loud at full power.
 	local n = clamp01(snap.n1 / 100)
 	local fadeIn = clamp01(n / 0.15) -- spooling up from zero fades in
-	set(profile.whine, fadeIn * (0.2 + 0.8 * n), n)
+	set(profile.whine, fadeIn * (0.15 + 0.85 * n ^ 1.3), n)
 	local thrust = clamp01((n - 0.2) / 0.8)
-	local rumble = 0.15 * clamp01(n / 0.2) + 0.85 * thrust ^ 1.5 + 0.4 * snap.reverser * fadeIn
+	local rumble = 0.1 * clamp01(n / 0.2) + 0.9 * thrust ^ 1.5 + 0.4 * snap.reverser * fadeIn
 	set(profile.rumble, rumble, thrust)
 
 	-- Wind grows with the square of airspeed; gear and speedbrake add buffet.
@@ -83,7 +86,8 @@ function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: an
 
 	-- Warnings
 	local airborne = not snap.onGround
-	set("stallWarning", if airborne and snap.stallWarning then 1 else 0, 0.5)
+	set("stallWarning", if airborne and (snap.stallWarning or snap.stall) then 1 else 0, 0.5)
+	set("stickShaker", if airborne and snap.stall then 1 else 0, 0.5)
 	local lowAndSlow = airborne
 		and snap.raFt < mix.gearWarningFt
 		and snap.gearExt < 0.99
@@ -92,8 +96,48 @@ function AudioMix.loops(snap: any, prev: any?, dt: number, profile: any, mix: an
 	return out
 end
 
+-- Ground proximity warning: the most urgent callout for this moment, or nil.
+-- Order of priority: pull up, terrain, stall, sink rate, too low gear.
+function AudioMix.gpws(snap: any, mix: any): string?
+	if snap.crashed or snap.onGround then
+		return nil
+	end
+	local ra = snap.raFt
+	local sink = math.max(0, -snap.vsFpm)
+	local landingConfig = snap.gearExt >= 0.99 and snap.flapPos >= mix.gearWarningFlap - 0.05
+	local ahead = snap.terrainAheadSec or math.huge
+	local inBand = ra >= mix.gpwsMinFt
+	-- Time until the ground below at the current sink rate.
+	local belowSec = if sink > 1 then ra / sink * 60 else math.huge
+	local limit = mix.sinkRateBaseFpm + mix.sinkRatePerFt * ra
+	local excessiveSink = inBand and ra <= mix.gpwsMaxFt and sink > limit
+	-- A normal approach in landing configuration flies at the runway on purpose, so the
+	-- look-ahead check only counts when the aircraft is not set up to land.
+	local aheadCounts = inBand and not landingConfig
+
+	if (excessiveSink and (sink > limit * mix.pullUpSinkFactor or belowSec < mix.pullUpBelowSec))
+		or (aheadCounts and ahead < mix.pullUpAheadSec)
+	then
+		return "calloutPullUp"
+	end
+	if aheadCounts and ahead < mix.terrainAheadSec then
+		return "calloutTerrain"
+	end
+	if snap.stall then
+		return "calloutStall"
+	end
+	if excessiveSink then
+		return "calloutSinkRate"
+	end
+	if inBand and ra < mix.tooLowGearFt and snap.gearExt < 0.99 and snap.vsFpm < 0 then
+		return "calloutTooLowGear"
+	end
+	return nil
+end
+
 -- `memo` keeps cooldowns between frames; pass the same table every call.
-function AudioMix.events(snap: any, prev: any?, mix: any, memo: any): { { slot: string, gain: number } }
+-- `sounds` (AudioConfig.sounds) supplies each callout's repeatEvery; optional.
+function AudioMix.events(snap: any, prev: any?, mix: any, memo: any, sounds: any?): { { slot: string, gain: number } }
 	local out = {}
 	if not prev then
 		return out
@@ -136,6 +180,21 @@ function AudioMix.events(snap: any, prev: any?, mix: any, memo: any): { { slot: 
 	end
 	if snap.crashed and not prev.crashed then
 		play("crash", 1)
+	end
+
+	-- Voice callouts repeat while their condition lasts; a change of callout plays at once.
+	local callout = AudioMix.gpws(snap, mix)
+	if callout then
+		local every = (sounds and sounds[callout] and sounds[callout].repeatEvery) or 2.5
+		local since = snap.time - (memo.lastCalloutTime or -math.huge)
+		-- A new callout waits at least 1 s so flickering conditions don't stutter.
+		if (callout ~= memo.lastCallout and since >= 1) or since >= every then
+			memo.lastCallout = callout
+			memo.lastCalloutTime = snap.time
+			play(callout, 1)
+		end
+	else
+		memo.lastCallout = nil
 	end
 	return out
 end

@@ -47,9 +47,25 @@ AudioConfig.sounds = {
 	crash = { id = "", volume = 1.5, looped = false, group = "exterior" }, -- aircraft destroyed
 
 	-- Cockpit warnings (not muffled) ----------------------------------------------------
+	-- stallWarning: about to stall (within a couple of degrees of the stall angle) and while stalled
 	stallWarning = { id = "", volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	-- stickShaker: rattle while the wing is actually stalled
+	stickShaker = { id = "", volume = 0.7, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 	gearWarning = { id = "", volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+
+	-- Voice callouts (one-shots, repeated while the danger lasts) -----------------------
+	-- `text` is spoken with Roblox text-to-speech when the slot has no id (see
+	-- useTextToSpeech below). A recorded clip in `id` always wins.
+	calloutPullUp = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Whoop whoop. Pull up!", repeatEvery = 2.2 },
+	calloutTerrain = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Terrain, terrain!", repeatEvery = 2.5 },
+	calloutSinkRate = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Sink rate!", repeatEvery = 2.5 },
+	calloutTooLowGear = { id = "", volume = 0.9, looped = false, group = "cockpit", text = "Too low. Gear!", repeatEvery = 3 },
+	calloutStall = { id = "", volume = 1.0, looped = false, group = "cockpit", text = "Stall! Stall!", repeatEvery = 2 },
 }
+
+-- Speak callouts with Roblox text-to-speech when their slot has no id. Turn off to keep
+-- callouts silent until recorded clips are added.
+AudioConfig.useTextToSpeech = true
 
 -- Which engine sounds each aircraft uses. Unknown aircraft use "jet".
 AudioConfig.profiles = {
@@ -92,6 +108,18 @@ AudioConfig.mix = {
 	warningsOutside = 0.6, -- warning volume in the chase/tower views
 	towerFalloffStuds = 300, -- tower view: exterior sounds fade beyond this distance
 	smoothing = 8, -- loop volume/pitch follow rate (1/s); higher is snappier
+
+	-- Ground proximity warnings (GPWS) --------------------------------------------------
+	gpwsMinFt = 50, -- no terrain callouts below this height (flare and touchdown)
+	gpwsMaxFt = 2500, -- sink rate checks only below this height
+	sinkRateBaseFpm = 1000, -- "sink rate" when descending faster than base + perFt * height
+	sinkRatePerFt = 0.6,
+	pullUpSinkFactor = 1.4, -- "pull up" at this multiple of the sink rate limit
+	pullUpBelowSec = 8, -- "pull up" when the ground below is this many seconds away
+	terrainAheadSec = 25, -- "terrain" when the flight path meets ground within this time
+	pullUpAheadSec = 12, -- "pull up" when it's this close
+	lookAheadMaxStuds = 6000, -- how far ahead the terrain check looks
+	tooLowGearFt = 500, -- "too low, gear" below this height with the gear up
 }
 
 -- Cockpit muffle: an equaliser on the exterior group while in the cockpit view (dB).

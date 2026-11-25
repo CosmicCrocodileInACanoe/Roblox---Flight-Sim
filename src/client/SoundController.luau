@@ -44,7 +44,58 @@ function SoundController.new()
 	self.prev = nil
 	self.memo = {}
 	self.profile = nil
+	self.voices = {} :: { [string]: { tts: Instance, cfg: any } }
+	self.lastCallout = nil :: Instance?
+	self.aheadSec = math.huge
+	self.aheadTimer = 0
 	return self
+end
+
+-- Text-to-speech voice for a callout slot without a recorded clip. Uses the Roblox
+-- audio API (AudioTextToSpeech -> Wire -> AudioDeviceOutput). Returns nil when that API
+-- isn't available, so the callout just stays silent.
+local ttsBroken = false
+local function makeVoice(parent: Instance, name: string, text: string): Instance?
+	if ttsBroken then
+		return nil
+	end
+	local ok, res = pcall(function()
+		local tts = Instance.new("AudioTextToSpeech" :: any) :: any
+		tts.Name = name
+		tts.Text = text
+		local out = Instance.new("AudioDeviceOutput" :: any) :: any
+		out.Parent = tts
+		local wire = Instance.new("Wire" :: any) :: any
+		wire.SourceInstance = tts
+		wire.TargetInstance = out
+		wire.Parent = tts
+		tts.Parent = parent
+		return tts
+	end)
+	if ok then
+		return res
+	end
+	ttsBroken = true
+	warn("[Audio] text-to-speech isn't available, voice callouts without an id stay silent: " .. tostring(res))
+	return nil
+end
+
+local function playVoice(v: any, volume: number)
+	local ok, err = pcall(function()
+		v.Volume = volume
+		v:Stop()
+		v.TimePosition = 0
+		v:Play()
+	end)
+	if not ok then
+		warn("[Audio] voice callout failed: " .. tostring(err))
+	end
+end
+
+local function stopAny(inst: any)
+	pcall(function()
+		inst:Stop()
+	end)
 end
 
 local function makeGroup(parent: Instance, name: string): SoundGroup
@@ -77,6 +128,12 @@ function SoundController:attach(fc: any)
 		for slot, sc in AudioConfig.sounds do
 			local url = AudioMix.assetUrl(sc.id)
 			if not url then
+				if sc.text and AudioConfig.useTextToSpeech then
+					local v = makeVoice(folder, slot, sc.text)
+					if v then
+						self.voices[slot] = { tts = v, cfg = sc }
+					end
+				end
 				continue
 			end
 			local s = Instance.new("Sound")
@@ -109,12 +166,35 @@ function SoundController:detach()
 	self.eq = nil
 	self.loops = {}
 	self.oneShots = {}
+	self.voices = {}
+	self.lastCallout = nil
+	self.aheadSec = math.huge
+	self.aheadTimer = 0
 	self.prev = nil
 	self.memo = {}
 	self.fc = nil
 end
 
-local function snapshot(fc: any): any
+-- Seconds until the flight path meets the ground (math.huge when clear).
+local function terrainAhead(fc: any, maxStuds: number): number
+	local core = fc.model.PrimaryPart
+	if not core then
+		return math.huge
+	end
+	local v = core.AssemblyLinearVelocity
+	local speed = v.Magnitude
+	if speed < 20 then
+		return math.huge
+	end
+	local dist = math.min(maxStuds, speed * 40)
+	local hit = Workspace:Raycast(core.Position, v.Unit * dist, fc.rayParams)
+	if hit then
+		return (hit.Position - core.Position).Magnitude / speed
+	end
+	return math.huge
+end
+
+local function snapshot(fc: any, aheadSec: number): any
 	local fm = fc.fm
 	local t = fc.telemetry or {}
 	local n1, starting, rev = 0, false, 0
@@ -145,6 +225,8 @@ local function snapshot(fc: any): any
 		flapPos = fm.flapPos,
 		speedbrake = fm.speedbrakePos or 0,
 		stallWarning = t.stallWarning == true,
+		stall = t.stall == true,
+		terrainAheadSec = aheadSec,
 		raFt = t.raFt or 1e4,
 		vsFpm = t.vsFpm or 0,
 		crashed = fc.crashed == true,
@@ -176,7 +258,12 @@ function SoundController:_update(dt: number, cameraMode: string?)
 	local fc = self.fc
 	local mix = AudioConfig.mix
 	local master = AudioConfig.masterVolume
-	local snap = snapshot(fc)
+	self.aheadTimer -= dt
+	if self.aheadTimer <= 0 then
+		self.aheadTimer = 0.2
+		self.aheadSec = terrainAhead(fc, mix.lookAheadMaxStuds)
+	end
+	local snap = snapshot(fc, self.aheadSec)
 
 	-- View-dependent mix: cockpit muffles the outside, tower fades with distance.
 	local inCockpit = cameraMode == "cockpit"
@@ -228,12 +315,27 @@ function SoundController:_update(dt: number, cameraMode: string?)
 
 	-- One-shots: play a copy so overlapping hits don't cut each other off. Copies live
 	-- outside the aircraft's folder so a crash keeps sounding after the aircraft is gone.
-	for _, ev in AudioMix.events(snap, self.prev, mix, self.memo) do
+	local cockpitVol = if inCockpit then 1 else mix.warningsOutside
+	for _, ev in AudioMix.events(snap, self.prev, mix, self.memo, AudioConfig.sounds) do
+		local isCallout = string.sub(ev.slot, 1, 7) == "callout"
+		if isCallout and self.lastCallout then
+			stopAny(self.lastCallout) -- one voice at a time
+			self.lastCallout = nil
+		end
+		local voice = self.voices[ev.slot]
+		if voice then
+			playVoice(voice.tts, ev.gain * voice.cfg.volume * master * cockpitVol)
+			self.lastCallout = voice.tts
+			continue
+		end
 		local o = self.oneShots[ev.slot]
 		if o then
 			local s = o.sound:Clone()
 			s.Volume = ev.gain * o.cfg.volume * master
 			s.Parent = oneShotFolder()
+			if isCallout then
+				self.lastCallout = s
+			end
 			s:Play()
 			s.Ended:Once(function()
 				s:Destroy()

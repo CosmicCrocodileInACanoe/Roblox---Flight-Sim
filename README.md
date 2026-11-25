@@ -126,7 +126,13 @@ error. What each slot does:
 - `gearMotor`, `flapMotor` loop while they move; `gearLock` clunks when the gear locks.
 - `touchdown` thump (louder on hard landings), `tyreSqueal` above 40 kt.
 - `impactLight`, `impactHeavy` for hits and parts breaking off, `crash` when the aircraft is destroyed.
-- `stallWarning`, `gearWarning` (gear not down below 1,000 ft with low throttle or landing flaps).
+- `stallWarning` (about to stall, and while stalled), `stickShaker` (while stalled), `gearWarning` (gear not down below 1,000 ft with low throttle or landing flaps).
+- Voice callouts, like a real ground proximity warning system: `calloutPullUp` ("whoop whoop,
+  pull up"), `calloutTerrain`, `calloutSinkRate`, `calloutTooLowGear` and `calloutStall`. They
+  repeat while the danger lasts. Terrain ahead is found by a ray along the flight path, and
+  sink rate is checked against height. A normal approach with the gear and landing flaps down
+  stays quiet. A callout slot without an id is spoken with Roblox text-to-speech
+  (`AudioConfig.useTextToSpeech`). If that isn't available, it stays silent.
 
 In the cockpit view, outside sounds are muffled by an equaliser and warnings are at full
 volume. In the tower view, outside sounds fade with distance.

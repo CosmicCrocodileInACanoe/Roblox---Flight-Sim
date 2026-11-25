@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 589 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 595 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `589 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `595 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -85,7 +85,6 @@ Expected: `589 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | F3 | Debug panel |
 | M | Menu (aircraft, airport, mode, route, start point, weather, time, failures) |
 | R | Reset / respawn |
-| Y | Fix all damage (puts broken-off parts back) |
 
 A typical first flight: spawn at an HBR runway threshold, press I and wait for the engines,
 set flaps 2 (press F twice), hold Shift for full throttle, pull back gently at about 145 kt,
@@ -120,12 +119,9 @@ Weather and hazards:
 | Lightning | A bolt and a flash, a strike on a wing or the tail, and often an engine flameout (press **I** to relight) |
 | Bird strike | A flock appears ahead and hits the nose; an engine swallows birds and loses power or fails |
 | Strong winds | 45 s of 40-55 kt crosswind with gusts and turbulence, and a downburst halfway through |
-| Clear weather | Ends the tornado, winds and birds. Damage stays until you fix it (**Y**) or reset (**R**) |
+| Clear weather | Ends the tornado, winds and birds. Damage stays until you reset with **R** |
 
-Resetting (R) gives you a fresh aircraft and clears every event. **Fix all** (Y, or the green
-button top right) repairs every dent, bend and failure and puts torn-off parts back, right
-where you are: in the air you keep flying at the same speed, and a wreck is set upright on
-the ground. Missions and races keep going.
+Resetting (R) gives you a fresh aircraft and clears every event.
 
 ## Firefighting
 
@@ -216,7 +212,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   FlightModel             6-DOF forces and torques for one aircraft (the core of the game)
   Assist                  Easy mode (self-levelling, pitch/bank limits, no stalls, speed floor, flare help,
                           tougher airframe), Free mode (roll/pitch rate commands, holds bank and pitch,
-                          75 deg bank, extra authority) and Assisted mode (auto-trim, turn coordination,
+                          no bank or pitch limits, extra authority) and Assisted mode (auto-trim, turn coordination,
                           protections); Q/E yaw-rate control with a yaw damper in all three
   Damage                  component health, states, propagation, detachment, lost sections
   Crash                   crash feel: per-component profiles, dents, break points, debris breakup
@@ -271,17 +267,6 @@ wing goes, and debris splits again on hard secondary hits.
 Set `breakApart = false` to keep planes in one piece. A wrecked component then stays
 attached and collapses instead: wings droop, gear folds and the fuselage sags. Parts come
 off only in truly extreme hits, at `Damage.EXTREME_FACTOR` (2.2) times their destroy speed.
-
-### Explosions and craters
-
-When the aircraft is destroyed, the owning client reports the crash and the server
-(`src/server/CraterService.luau`) checks it against the speed it has seen. It sets off a
-cartoon explosion (flash and fireball, it pushes and breaks nothing). On land it leaves a
-crater everyone sees: a scorched patch, a dark pit, a rim of thrown-up earth and some smoke,
-sized by the impact energy (`Crash.craterSize`, 3 to 30 m across the radius). The ground is
-made of anchored parts that can't be dug into, so the crater is built on top and is visual
-only (no collisions). No crater in the sea. Settings are in `GameConfig.crash.crater`: at most
-12 craters, each gone after 15 minutes.
 
 ### Bending metal (soft-body look)
 

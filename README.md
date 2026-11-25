@@ -194,10 +194,19 @@ stays silent and never errors.
 - Pilot callouts: "eighty knots" and "rotate" on the takeoff roll, and radio-altitude callouts
   on approach (1000, 500, 100, 50, 40, 30, 20, 10).
 - `cabinChime` through 10,000 ft, `cockpitAmbience` (avionics hum loop).
-- Background ATC chatter, never constant: one transmission every 20 to 55 s (at most 3 a
-  minute), each cut off at 15 s, held back while a warning is talking. Fill `atcChatter1..5`
-  with radio clips. With none filled, made-up exchanges are spoken with text-to-speech in a
-  thin radio tone.
+- Background ATC chatter, never constant. Exchanges are a call and a reply: some start
+  with the controller, some with a pilot. Controllers and pilots use different
+  text-to-speech voices, and each callsign keeps its own voice and pitch. After each
+  exchange there are 5 to 16 s of quiet, so about 3 to 5 exchanges a minute, each cut off
+  at 15 s. Roblox limits text-to-speech to about 7 requests a minute, so new exchanges are
+  generated slowly (warnings first) and reused. Recorded chatter clips in `atcChatter1..5`
+  are mixed in.
+- Cockpit alarms: GPWS "whoop whoop, pull up" (a recorded clip, or the whoop siren then a
+  spoken "pull up"), "bank angle", the stall alarm and stick shaker, a fire bell while an
+  engine burns, an overspeed clacker above Vmo, and master warning and caution chimes.
+  The warning chime sounds for fire, a part failing or breaking off, and overspeed. The
+  caution chime sounds for an engine out, jammed controls, hydraulics, a fuel leak, low
+  fuel and damage. The Events menu failures and weather set these off.
 
 In the cockpit view, outside sounds are muffled by an equaliser and warnings are at full
 volume. In the tower view, outside sounds fade with distance.

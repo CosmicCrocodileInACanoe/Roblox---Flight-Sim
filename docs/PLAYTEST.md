@@ -40,6 +40,10 @@ These are the most likely places for first-run bugs, so check them first.
 - [ ] Sound check: after spawning, Output shows `[Audio] N sounds loaded` (write down N and
       any slot it lists with no working ID). The engines get louder with throttle, and wind
       grows with speed.
+- [ ] Alarms: Events menu (J) -> Engine fire gives the fire bell and master warning; Bird
+      strike or Lightning gives the caution chime; diving past Vmo starts the clacker; a
+      50 degree bank says "bank angle". Radio chatter has a controller and pilots in
+      different voices.
 - [ ] Sound with every ID empty: no errors or `[Audio]` warnings in Output. With IDs filled
       in: the engine whine rises and falls with throttle, wind grows with speed, the gear horn
       sounds low with the gear up, touchdown thumps, cockpit view sounds muffled, and nothing

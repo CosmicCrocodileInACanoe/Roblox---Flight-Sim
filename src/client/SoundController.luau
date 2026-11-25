@@ -162,32 +162,102 @@ local function getVoice(slot: string, text: string, radio: boolean?): Instance?
 	return nv
 end
 
--- Generate the most important voices ahead of time, one every few seconds, so a
--- "pull up" never waits on (or is refused by) the text-to-speech service.
+-- Text-to-speech budget. Roblox allows about 1 + 6 x players generation requests a
+-- minute, so one scheduler makes one request every ttsWarmInterval seconds: warning
+-- voices first (so a "pull up" never waits), then new ATC exchanges for the chatter
+-- pool. Everything generated is kept and replayed, which costs nothing.
 local WARM_ORDER = {
 	"calloutPullUp", "calloutTerrain", "calloutStall", "calloutSinkRate", "calloutTooLowGear",
-	"calloutEightyKnots", "calloutRotate", "calloutAlt1000", "calloutAlt500", "calloutAlt100",
-	"calloutAlt50", "calloutAlt40", "calloutAlt30", "calloutAlt20", "calloutAlt10",
+	"calloutBankAngle", "calloutEightyKnots", "calloutRotate", "calloutAlt1000", "calloutAlt500",
+	"calloutAlt100", "calloutAlt50", "calloutAlt40", "calloutAlt30", "calloutAlt20", "calloutAlt10",
 }
-local warming = false
-local function warmVoices()
-	if warming or ttsBroken then
+local atcPool: { any } = {} -- ready exchanges: { lines = { { tts, who } } }
+local schedulerStarted = false
+
+local function loadVoice(v: any): boolean
+	local ok, st = pcall(function()
+		return v:LoadAsync()
+	end)
+	return ok and st == Enum.AssetFetchStatus.Success
+end
+
+-- Two voices for one made-up exchange: the controller in a controller voice, the pilot
+-- in a pilot voice picked from the callsign (with a small pitch shift).
+local function makeExchange(): any?
+	local ex = AudioMix.atcExchange(math.random)
+	local pilotVoice, p = AudioMix.voiceFor(ex.callsign, AudioConfig.atcPilotVoices)
+	local ctrl = AudioConfig.atcControllerVoices
+	local ctrlVoice = ctrl[math.random(1, #ctrl)]
+	local lines = {}
+	for _, line in ex.lines do
+		local v: any = makeVoice(voiceFolder(), "AtcLine", line.text, true)
+		if not v then
+			return nil
+		end
+		pcall(function()
+			if line.who == "pilot" then
+				v.VoiceId = pilotVoice
+				v.Pitch = (p * 2 - 1) * AudioConfig.atcPilotPitch
+			else
+				v.VoiceId = ctrlVoice
+			end
+		end)
+		table.insert(lines, { tts = v, who = line.who })
+	end
+	return { lines = lines }
+end
+
+local function startTtsScheduler()
+	if schedulerStarted or ttsBroken or not AudioConfig.useTextToSpeech then
 		return
 	end
-	warming = true
+	schedulerStarted = true
 	task.spawn(function()
-		for _, slot in WARM_ORDER do
-			local v: any = voiceCache[slot]
-			if v and v.Parent then
-				pcall(function()
-					if not v.IsLoaded then
-						v:LoadAsync()
-					end
-				end)
-				task.wait(AudioConfig.mix.ttsWarmInterval)
+		local i = 1
+		local pending: any = nil
+		local turn = false -- after the six warnings, alternate callouts and ATC lines
+		while not ttsBroken do
+			local didRequest = false
+			turn = not turn
+			local warmFirst = i <= 6 or turn
+			while warmFirst and i <= #WARM_ORDER and not didRequest do
+				local v: any = voiceCache[WARM_ORDER[i]]
+				i += 1
+				if v and v.Parent and not v.IsLoaded then
+					loadVoice(v)
+					didRequest = true
+				end
 			end
+			if not didRequest then
+				if i > #WARM_ORDER then
+					ttsWarmDone = true
+				end
+				if not pending and #atcPool < AudioConfig.mix.atcPoolMax then
+					pending = makeExchange()
+					if pending then
+						pending.next = 1
+						pending.ok = true
+					end
+				end
+				if pending then
+					local line = pending.lines[pending.next]
+					pending.ok = loadVoice(line.tts) and pending.ok
+					didRequest = true
+					pending.next += 1
+					if pending.next > #pending.lines then
+						if pending.ok then
+							table.insert(atcPool, pending)
+						else
+							for _, l in pending.lines do
+								l.tts:Destroy()
+							end
+						end
+						pending = nil
+					end
+				end
+			end
+			task.wait(if didRequest then AudioConfig.mix.ttsWarmInterval else 2)
 		end
-		ttsWarmDone = true
 	end)
 end
 
@@ -331,7 +401,7 @@ function SoundController:attach(fc: any)
 		return
 	end
 	self:_resolveAssets()
-	warmVoices()
+	startTtsScheduler()
 end
 
 function SoundController:detach()
@@ -385,12 +455,39 @@ local function snapshot(fc: any, aheadSec: number): any
 			rev = math.max(rev, e.reverser)
 		end
 	end
-	local detached = 0
+	local detached, failedParts, degraded = 0, 0, 0
 	for _, c in fm.damage.components do
 		if c.state == "detached" then
 			detached += 1
+			failedParts += 1
+		elseif c.state == "failed" then
+			failedParts += 1
+		elseif c.state == "degraded" then
+			degraded += 1
 		end
 	end
+	-- Master warning / caution items (counts only go up as things break).
+	local airborne = t.onGround ~= true
+	local fire, engineOut = false, 0
+	for i, e in fm.engines do
+		local comp = fc.cfg.engines[i] and fc.cfg.engines[i].component
+		local attached = comp == nil or Damage.isAttached(fm.damage, comp)
+		if attached and e.fire then
+			fire = true
+		elseif attached and airborne and not e.running and not e.starting then
+			engineOut += 1
+		end
+	end
+	local failureCount = 0
+	for _, v in fm.failures or {} do
+		if v then
+			failureCount += 1
+		end
+	end
+	local speeds = fc.cfg.speeds or {}
+	local overspeed = speeds.vmo ~= nil and (t.ias or 0) > speeds.vmo
+	local cap = fc.cfg.fuel and fc.cfg.fuel.capacity
+	local lowFuel = cap ~= nil and fm.fuel ~= nil and fm.fuel < cap * AudioConfig.mix.lowFuelFraction
 	return {
 		n1 = n1 / count,
 		anyStarting = starting,
@@ -406,6 +503,11 @@ local function snapshot(fc: any, aheadSec: number): any
 		stall = t.stall == true,
 		terrainAheadSec = aheadSec,
 		altFt = t.altFt,
+		bank = t.bank or 0,
+		fire = fire,
+		overspeed = overspeed,
+		warnCount = (if fire then 1 else 0) + failedParts + (if overspeed then 1 else 0),
+		cautionCount = engineOut + failureCount + degraded + (if lowFuel then 1 else 0),
 		rotateKts = fc.cfg.speeds and fc.cfg.speeds.rotate,
 		raFt = t.raFt or 1e4,
 		vsFpm = t.vsFpm or 0,
@@ -417,6 +519,21 @@ local function snapshot(fc: any, aheadSec: number): any
 		detachedCount = detached,
 		time = fc.time or 0,
 	}
+end
+
+-- Play a copy of a one-shot so overlapping hits don't cut each other off. Copies live
+-- outside the aircraft's folder so a crash keeps sounding after the aircraft is gone.
+-- A slot's maxSeconds cuts long clips short.
+function SoundController:_playOneShot(slot: string, o: any, gain: number, master: number): Sound
+	local s = o.sound:Clone()
+	s.Volume = gain * o.cfg.volume * master
+	s.Parent = oneShotFolder()
+	s:Play()
+	s.Ended:Once(function()
+		s:Destroy()
+	end)
+	Debris:AddItem(s, o.cfg.maxSeconds or 30) -- also the fallback if Ended never fires
+	return s
 end
 
 -- cameraMode: "chase" | "cockpit" | "tower"
@@ -504,23 +621,29 @@ function SoundController:_update(dt: number, cameraMode: string?)
 		end
 		local voice = self.voices[ev.slot]
 		if voice then
-			playVoice(voice.tts, ev.gain * voice.cfg.volume * master * cockpitVol)
+			local vol = ev.gain * voice.cfg.volume * master * cockpitVol
+			local whoop = ev.slot == "calloutPullUp" and self.oneShots.gpwsWhoop
+			if whoop then
+				-- Spoken "pull up" comes after the whoop siren, like the real GPWS.
+				self:_playOneShot("gpwsWhoop", whoop, 1, master)
+				local v = voice.tts
+				task.delay(whoop.cfg.maxSeconds or 1.2, function()
+					if self.fc then
+						playVoice(v, vol)
+					end
+				end)
+			else
+				playVoice(voice.tts, vol)
+			end
 			self.lastCallout = voice.tts
 			continue
 		end
 		local o = self.oneShots[ev.slot]
 		if o then
-			local s = o.sound:Clone()
-			s.Volume = ev.gain * o.cfg.volume * master
-			s.Parent = oneShotFolder()
+			local s = self:_playOneShot(ev.slot, o, ev.gain, master)
 			if isCallout then
 				self.lastCallout = s
 			end
-			s:Play()
-			s.Ended:Once(function()
-				s:Destroy()
-			end)
-			Debris:AddItem(s, 30) -- fallback if Ended never fires (asset failed to load)
 		end
 	end
 
@@ -528,10 +651,11 @@ function SoundController:_update(dt: number, cameraMode: string?)
 	self.prev = snap
 end
 
--- Background ATC: one transmission every atcMinGap..atcMaxGap seconds, cut at atcMaxSeconds.
+-- Background ATC: an exchange (call + reply, different voices) or a recorded chatter
+-- clip, then atcMinGap..atcMaxGap seconds of quiet. Each is cut at atcMaxSeconds.
 function SoundController:_atc(dt: number, snap: any, cockpitVol: number)
 	local mix = AudioConfig.mix
-	if snap.crashed then
+	if snap.crashed or self.atcBusy then
 		return
 	end
 	self.atcTimer -= dt
@@ -543,39 +667,62 @@ function SoundController:_atc(dt: number, snap: any, cockpitVol: number)
 		self.atcTimer = 2
 		return
 	end
-	self.atcTimer = AudioMix.atcDelay(math.random(), mix)
-	local maxSec = mix.atcMaxSeconds
 	local clips = {}
 	for slot, o in self.oneShots do
 		if string.sub(slot, 1, 10) == "atcChatter" then
 			table.insert(clips, o)
 		end
 	end
-	if #clips > 0 then
-		local o = clips[math.random(1, #clips)]
-		local s = o.sound:Clone()
-		s.Volume = o.cfg.volume * AudioConfig.masterVolume
-		s.Parent = oneShotFolder()
-		s:Play()
-		task.delay(maxSec, function()
-			s:Destroy()
-		end)
-	elseif AudioConfig.useTextToSpeech and ttsWarmDone then
-		-- Spoken chatter waits until the warning voices are ready (TTS is rate-limited).
-		local v: any = getVoice("AtcVoice", "", true)
-		if not v then
-			return
-		end
-		local ok = pcall(function()
-			v.Text = AudioMix.atcPhrase(math.random)
-		end)
-		if ok then
-			playVoice(v, AudioConfig.atcVoiceVolume * AudioConfig.masterVolume * cockpitVol)
-			task.delay(maxSec, function()
-				stopAny(v)
-			end)
-		end
+	local useClip = #clips > 0 and (#atcPool == 0 or math.random() < 0.2)
+	if not useClip and #atcPool == 0 then
+		self.atcTimer = 3 -- nothing ready yet
+		return
 	end
+	self.atcBusy = true
+	local fcAtStart = self.fc
+	local maxSec = mix.atcMaxSeconds
+	local vol = AudioConfig.atcVoiceVolume * AudioConfig.masterVolume * cockpitVol
+	task.spawn(function()
+		local start = os.clock()
+		local function live(): boolean
+			return self.fc == fcAtStart and os.clock() - start < maxSec
+		end
+		if useClip then
+			local o = clips[math.random(1, #clips)]
+			local s = self:_playOneShot("atcChatter", o, 1, AudioConfig.masterVolume)
+			task.wait(0.2)
+			while live() and s.Parent and s.IsPlaying do
+				task.wait(0.1)
+			end
+			s:Destroy()
+		else
+			-- Don't repeat the last exchange.
+			local idx = math.random(1, #atcPool)
+			if #atcPool > 1 and idx == self.lastExchange then
+				idx = idx % #atcPool + 1
+			end
+			self.lastExchange = idx
+			local ex = atcPool[idx]
+			for k, line in ex.lines do
+				if not live() then
+					break
+				end
+				local v: any = line.tts
+				playVoice(v, vol)
+				task.wait(0.2)
+				while live() and v.IsPlaying do
+					task.wait(0.1)
+				end
+				stopAny(v)
+				if k < #ex.lines then
+					task.wait(mix.atcLineGap)
+				end
+			end
+		end
+		self.atcBusy = false
+		-- Only a couple of recorded clips to choose from: leave longer gaps between them.
+		self.atcTimer = AudioMix.atcDelay(math.random(), mix) * (if useClip and #atcPool == 0 then 2.5 else 1)
+	end)
 end
 
 return SoundController

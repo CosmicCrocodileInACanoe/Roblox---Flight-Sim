@@ -458,6 +458,9 @@ function FlightController:step(dt: number)
 	if fm.damage.destroyed and not self.crashed then
 		self.crashed = true
 		Effects.shake(2)
+		-- Boom: the server sets off the explosion and digs a crater if we're on land.
+		local dv = if self.time - (self.peakDvTime or -math.huge) < 1.5 then self.peakDv or 0 else vWorld.Magnitude
+		self.remotes.ReportCrash:FireServer(self.model, cf.Position, math.max(dv, 0))
 	end
 
 	-- Touchdown report
@@ -563,6 +566,10 @@ function FlightController:detectImpacts(dt: number, cf: CFrame, v: Vector3, w: V
 	if maxDv > 0 then
 		self.impactCount += 1
 		self.impactDv = maxDv
+		-- hardest hit in the last moment, for the crash explosion/crater size
+		if maxDv >= (self.peakDv or 0) or self.time - (self.peakDvTime or -math.huge) > 1.5 then
+			self.peakDv, self.peakDvTime = maxDv, self.time
+		end
 	end
 	if maxDv > 5 then
 		Effects.shake(math.clamp(maxDv / 25, 0.1, 1.5))

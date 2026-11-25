@@ -523,7 +523,7 @@ function Hud:update(t: any, destId: string?)
 	local warn = ""
 	local caution = ""
 	if t.crashed then
-		warn = "AIRCRAFT DESTROYED  ·  R TO RESET"
+		warn = "AIRCRAFT DESTROYED  ·  Y TO FIX ALL  ·  R TO RESET"
 	elseif t.stall then
 		warn = "STALL  ·  NOSE DOWN, ADD POWER"
 	elseif t.stallWarning and math.floor(now * 4) % 2 == 0 then

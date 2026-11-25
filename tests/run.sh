@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")/.."
 mkdir -p tests/generated
-for f in src/server/AircraftBuilder.luau src/server/World/StuntCourseBuilder.luau; do
+for f in src/server/AircraftBuilder.luau src/server/World/StuntCourseBuilder.luau src/server/CraterService.luau; do
 	name=$(basename "$f" .luau)
 	{ printf 'return [=====['; cat "$f"; printf ']=====]\n'; } > "tests/generated/${name}_src.luau"
 done

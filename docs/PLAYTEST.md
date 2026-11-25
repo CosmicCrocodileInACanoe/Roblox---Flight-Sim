@@ -200,6 +200,14 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     camera to look sideways, let go and wait: after 10 s it drifts back behind the aircraft
     (also in the cockpit view).
 
+18. **Craters and Fix all.** Fly the Meridian 200 into open ground at speed. There is a
+    fireball (nothing is thrown about by it) and a crater: dark pit, earth rim, smoke. A
+    second player sees the same crater. Crash into the sea: splash, no crater. Press Y (or
+    the green Fix all button): the aircraft comes back whole, upright on the ground next to
+    the wreck, and the debris is gone. In flight, use the Events menu to snap a wing, then
+    press Y: the wing is back, you keep your speed and height, and any mission keeps going.
+    Pressing Y again within 2 s does nothing.
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

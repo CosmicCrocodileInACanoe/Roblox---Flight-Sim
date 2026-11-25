@@ -47,6 +47,10 @@ local hazards = HazardController.new({
 	end,
 })
 local hazardPanel = HazardPanel.new(function(id: string)
+	if id == "fixall" then
+		(remotes:WaitForChild("RequestRepair") :: RemoteEvent):FireServer()
+		return
+	end
 	hud:notify(hazards:trigger(id), 5)
 end)
 local stunts = StuntsHud.new({
@@ -86,6 +90,11 @@ local input = InputController.new({
 	end,
 	reset = function()
 		(remotes:WaitForChild("RequestReset") :: RemoteEvent):FireServer()
+	end,
+	fixAll = function()
+		if fc then
+			(remotes:WaitForChild("RequestRepair") :: RemoteEvent):FireServer()
+		end
 	end,
 	controls = function()
 		controlsPopup:toggle()
@@ -170,7 +179,7 @@ menu = Menu.new({
 WorldFx.setWeather(GameConfig.weather[1])
 WorldFx.setTime(GameConfig.timeOfDay[2])
 
-local function onAssigned(model: Model, options: any, sp: any)
+local function onAssigned(model: Model, options: any, sp: any, repaired: boolean?)
 	if fc then
 		fc:destroy()
 		fc = nil
@@ -183,7 +192,9 @@ local function onAssigned(model: Model, options: any, sp: any)
 	-- Start the race HUD before anything yields, so the server's first race update
 	-- (sent right after this event) is never missed.
 	local racing = type(options) == "table" and options.mode == Stunts.MODE
-	if racing then
+	if repaired then
+		-- Fix all: same flight, keep the race and mission going.
+	elseif racing then
 		stunts:start()
 	else
 		stunts:stop()
@@ -207,9 +218,9 @@ local function onAssigned(model: Model, options: any, sp: any)
 	menu.flying = true
 	menu:hide()
 end
-;(remotes:WaitForChild("AircraftAssigned") :: RemoteEvent).OnClientEvent:Connect(function(model: Model, options: any, sp: any)
+;(remotes:WaitForChild("AircraftAssigned") :: RemoteEvent).OnClientEvent:Connect(function(model: Model, options: any, sp: any, repaired: any)
 	requestId += 1 -- answered
-	local ok, err = xpcall(onAssigned, debug.traceback, model, options, sp)
+	local ok, err = xpcall(onAssigned, debug.traceback, model, options, sp, repaired == true)
 	if not ok then
 		warn("[Flight] could not start the flight: " .. tostring(err))
 		menu:setStatus("Could not start the flight (see Output, F9): " .. tostring(err):split("\n")[1])

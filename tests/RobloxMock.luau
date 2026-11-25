@@ -300,6 +300,17 @@ M.Instance = {
 	end,
 }
 
+-- Deterministic stand-ins for Roblox's Random and task libraries.
+M.Random = { new = function(seed: number?)
+	local x = math.floor((seed or 1) * 7919) % 2147483646 + 1
+	return { NextNumber = function(_, a: number?, b: number?)
+		x = (x * 16807) % 2147483647
+		local u = x / 2147483647
+		return (a or 0) + ((b or 1) - (a or 0)) * u
+	end }
+end }
+M.task = { delay = function(_t, _f) end, spawn = function(f, ...) f(...) end, wait = function() return 0 end }
+
 -- Loads a Roblox ModuleScript source file with these globals and a `require` that maps
 -- Instance-style module references (`Shared.Units`) to real files.
 -- `src` is the module's source text (see tests/run.sh, which embeds it).
@@ -325,7 +336,7 @@ function M.loadModule(src: string, chunkName: string, sharedDir: string, realReq
 		Vector3 = M.Vector3, CFrame = M.CFrame, Color3 = M.Color3, Instance = M.Instance, Enum = M.Enum,
 		PhysicalProperties = M.PhysicalProperties, NumberRange = M.NumberRange, NumberSequence = M.NumberSequence,
 		NumberSequenceKeypoint = M.NumberSequenceKeypoint, ColorSequence = M.ColorSequence,
-		UDim = M.UDim, UDim2 = M.UDim2, Vector2 = M.Vector2,
+		UDim = M.UDim, UDim2 = M.UDim2, Vector2 = M.Vector2, Random = M.Random, task = M.task,
 	}, { __index = _G })
 	setfenv(chunk, env)
 	return chunk()

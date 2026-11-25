@@ -17,6 +17,7 @@ local PANEL = Color3.fromRGB(14, 18, 26)
 local FAIL = Color3.fromRGB(150, 52, 46)
 local WEATHER = Color3.fromRGB(44, 92, 150)
 local NEUTRAL = Color3.fromRGB(52, 58, 72)
+local FIX = Color3.fromRGB(46, 130, 70)
 local WHITE = Color3.fromRGB(240, 244, 248)
 local DIM = Color3.fromRGB(160, 170, 182)
 
@@ -62,6 +63,20 @@ function HazardPanel.new(onTrigger: (string) -> ())
 		self:toggle()
 	end)
 	self.button = button
+
+	-- "Fix all" sits left of the Events button: repairs everything, puts broken parts back.
+	local fixKey = Controls.firstKey("fixAll")
+	local fixButton = make("TextButton", {
+		Parent = gui, Name = "FixAllButton", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -396, 0, 8),
+		Size = UDim2.fromOffset(130, 32), BackgroundColor3 = FIX, BackgroundTransparency = 0.1,
+		Text = if fixKey then `Fix all ({fixKey})` else "Fix all", Font = Enum.Font.GothamBold, TextColor3 = WHITE,
+		TextSize = 14, Visible = false, AutoButtonColor = true,
+	})
+	round(fixButton, 8)
+	fixButton.Activated:Connect(function()
+		onTrigger("fixall")
+	end)
+	self.fixButton = fixButton
 
 	-- Menu: drops down on the right, left of the minimap.
 	local panel = make("Frame", {
@@ -129,6 +144,8 @@ function HazardPanel.new(onTrigger: (string) -> ())
 		self:setOpen(false)
 	end)
 
+	local fixg = grid()
+	eventButton(fixg, "fixall", "Fix all damage", FIX, "Repairs everything: dents, bends, failures and parts that broke off")
 	heading("FAILURES (break parts, change how it flies)")
 	local fg = grid()
 	for _, f in Hazards.FAILURES do
@@ -141,7 +158,7 @@ function HazardPanel.new(onTrigger: (string) -> ())
 	end
 	local mg = grid()
 	eventButton(mg, "random", "Random failure", FAIL, "Something random breaks")
-	eventButton(mg, "clear", "Clear weather", NEUTRAL, "Ends the tornado, winds and birds. Damage stays until you reset (R)")
+	eventButton(mg, "clear", "Clear weather", NEUTRAL, "Ends the tornado, winds and birds. Damage stays until you fix it (Y) or reset (R)")
 
 	self.hint = make("TextLabel", {
 		Parent = panel, LayoutOrder = nextOrder(), Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1,
@@ -169,6 +186,7 @@ end
 function HazardPanel:setFlying(on: boolean)
 	self.flying = on
 	self.button.Visible = on
+	self.fixButton.Visible = on
 	if not on then
 		self:setOpen(false)
 	end

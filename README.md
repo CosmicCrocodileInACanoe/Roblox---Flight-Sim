@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 587 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 595 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `587 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `595 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -212,7 +212,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   FlightModel             6-DOF forces and torques for one aircraft (the core of the game)
   Assist                  Easy mode (self-levelling, pitch/bank limits, no stalls, speed floor, flare help,
                           tougher airframe), Free mode (roll/pitch rate commands, holds bank and pitch,
-                          75 deg bank, extra authority) and Assisted mode (auto-trim, turn coordination,
+                          no bank or pitch limits, extra authority) and Assisted mode (auto-trim, turn coordination,
                           protections); Q/E yaw-rate control with a yaw damper in all three
   Damage                  component health, states, propagation, detachment, lost sections
   Crash                   crash feel: per-component profiles, dents, break points, debris breakup

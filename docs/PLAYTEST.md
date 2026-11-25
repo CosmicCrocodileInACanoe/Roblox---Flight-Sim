@@ -30,6 +30,13 @@ These are the most likely places for first-run bugs, so check them first.
       clipping), and speed, altitude, heading and vertical speed tapes all update.
 - [ ] Menu: every dropdown works; the Fly button spawns an aircraft; M toggles the menu
       while parked and while flying.
+- [ ] Voice callouts (text-to-speech, no IDs needed): dive at the ground with the gear up and
+      hear "terrain" then "whoop whoop, pull up"; slow down until the stall and hear "stall";
+      fly a normal approach with gear and landing flaps down and hear nothing. If Output shows
+      `[Audio] text-to-speech isn't available`, note it: callouts then need recorded clip IDs.
+- [ ] ATC chatter: in 3 minutes of flight you hear no more than 9 short transmissions, none
+      longer than 15 s. Takeoff gives "eighty knots" and "rotate"; an approach counts down
+      "one thousand" to "ten".
 - [ ] Sound with every ID empty: no errors or `[Audio]` warnings in Output. With IDs filled
       in: the engine whine rises and falls with throttle, wind grows with speed, the gear horn
       sounds low with the gear up, touchdown thumps, cockpit view sounds muffled, and nothing

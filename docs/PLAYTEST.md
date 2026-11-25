@@ -70,11 +70,13 @@ These are the most likely places for first-run bugs, so check them first.
      the aircraft breaks up.
    - With a damaged wing (sandbox failure "Left wing damaged"): the aircraft still flies but
      needs right aileron.
-   - **No breaking apart (default).** Fly nose-first into a building at speed: the plane
-     crumples, bends and comes to rest in one piece. The nose is shortened and the fuselage
-     sags. Nothing should fall off unless you hit something very hard (100 kt or more).
-   - Land at over 1,400 fpm: the gear folds up under the plane, and it slides on its belly.
-   - Drag a wing along the ground until it's wrecked: it droops from the root and stays on.
+   - **Breaking apart (default).** Fly nose-first into a building at speed: the nose crumples
+     and bends, then the plane breaks up. Wings, engines and tail come off as debris that
+     keeps moving and breaks again when it hits the ground.
+   - Land at over 1,400 fpm: the gear tears off and the plane slides on its belly.
+   - Clip a wingtip hard: the outer wing tears off and the rest of the wing stays on.
+   - Set `GameConfig.crash.breakApart = false` and repeat: the plane should crumple,
+     droop and stay in one piece.
    - **Bending.** Hit a wingtip hard on a hangar or the ground: the outer wing visibly bends up
      or down and stays bent. A second hit on the same wing bends it further, up to about 28°.
      A nose-first hit into a building shortens the nose (crush) rather than bending it.

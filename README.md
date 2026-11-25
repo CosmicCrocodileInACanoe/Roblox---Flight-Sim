@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 430 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 431 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy mode) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `199 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -182,16 +182,17 @@ LeftWing = { ..., crash = { sections = false } }, -- no break point
 
 Tunables shared by all aircraft are in `GameConfig.crash`.
 
-### Planes stay in one piece by default
+### Breaking apart
 
-`GameConfig.crash.breakApart = false` (the default). A wrecked component stays attached
-and collapses instead of falling off: wings and tailplanes droop from the root, the fin
-leans over, gear folds up under the plane, and a wrecked centre fuselage breaks its back,
-so the nose and tail sag. Outer wing sections and stabiliser tips tear off only on hits
-twice as hard as normal (`extremeSectionFactor`). A whole component comes off only in a
-truly extreme hit: `Damage.EXTREME_FACTOR` (2.2) times its destroy speed, which is a
-50 m/s (about 100 kt) smash into something solid for a wing. Set `breakApart = true` to
-get the old behaviour back, where parts detach as soon as their health runs out.
+`GameConfig.crash.breakApart = true` (the default). Parts dent and bend first. When a
+component's health runs out it tears off as debris that keeps its momentum, taking its
+children with it: a wing takes its engines and gear. A wrecked centre fuselage breaks the
+plane into pieces. Outer wing sections and stabiliser tips can tear off before the whole
+wing goes, and debris splits again on hard secondary hits.
+
+Set `breakApart = false` to keep planes in one piece. A wrecked component then stays
+attached and collapses instead: wings droop, gear folds and the fuselage sags. Parts come
+off only in truly extreme hits, at `Damage.EXTREME_FACTOR` (2.2) times their destroy speed.
 
 ### Bending metal (soft-body look)
 

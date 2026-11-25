@@ -221,18 +221,63 @@ return { name = "Audio", run = function(T)
 		local down = slots(AudioMix.events(snap({ onGround = false, raFt = 9000, altFt = 9990 }), snap({ onGround = false, raFt = 9000, altFt = 10010 }), mix, {}))
 		T.check(up.cabinChime and down.cabinChime, "both ways")
 	end)
-	T.test("ATC chatter: at most 3 a minute, short exchanges", function()
-		T.check(AudioMix.atcDelay(0, mix) >= 20 and AudioMix.atcDelay(1, mix) <= 60, "gap")
-		T.check(60 / AudioMix.atcDelay(0, mix) <= 3, "rate")
+	T.test("ATC chatter: frequent but not constant, two-voice exchanges", function()
+		T.check(AudioMix.atcDelay(0, mix) >= 3 and AudioMix.atcDelay(1, mix) <= 30, "gap after each exchange")
 		T.check(mix.atcMaxSeconds <= 15, "length cap")
-		for _ = 1, 200 do
-			local p = AudioMix.atcPhrase(math.random)
-			local words = 0
-			for _ in string.gmatch(p, "%S+") do
-				words += 1
-			end
-			T.check(words >= 6 and words <= 32, "phrase length " .. words .. ": " .. p)
+		T.check(#AudioConfig.atcControllerVoices > 0 and #AudioConfig.atcPilotVoices > 1, "voice lists")
+		for _, v in AudioConfig.atcControllerVoices do
+			T.check(table.find(AudioConfig.atcPilotVoices, v) == nil, "controllers and pilots use different voices: " .. v)
 		end
+		local pilotFirst, atcFirst = 0, 0
+		for _ = 1, 300 do
+			local ex = AudioMix.atcExchange(math.random)
+			T.check(#ex.lines == 2, "call and reply")
+			T.check(ex.lines[1].who ~= ex.lines[2].who, "two different speakers")
+			if ex.lines[1].who == "pilot" then
+				pilotFirst += 1
+			else
+				atcFirst += 1
+			end
+			for _, line in ex.lines do
+				local words = 0
+				for _ in string.gmatch(line.text, "%S+") do
+					words += 1
+				end
+				T.check(words >= 3 and words <= 20 and #line.text <= 300, "line length: " .. line.text)
+			end
+		end
+		T.check(pilotFirst > 20 and atcFirst > 20, "both orders happen")
+		local v1 = AudioMix.voiceFor("Skyline four two", AudioConfig.atcPilotVoices)
+		local v2 = AudioMix.voiceFor("Skyline four two", AudioConfig.atcPilotVoices)
+		T.check(v1 == v2, "same callsign keeps its voice")
+	end)
+	T.test("real alarms: fire bell, overspeed clacker, master warning and caution", function()
+		local air = { onGround = false, raFt = 5000 }
+		local function sn(o)
+			local t = table.clone(air)
+			for k, v in o do
+				t[k] = v
+			end
+			return snap(t)
+		end
+		local l = AudioMix.loops(sn({ fire = true, overspeed = true }), nil, 0.1, jet, mix)
+		T.check(l.fireBell.level == 1 and l.overspeedClacker.level == 1, "bell and clacker")
+		local quiet = AudioMix.loops(sn({}), nil, 0.1, jet, mix)
+		T.check(quiet.fireBell.level == 0 and quiet.overspeedClacker.level == 0, "quiet")
+		local warn = slots(AudioMix.events(sn({ warnCount = 1 }), sn({ warnCount = 0 }), mix, {}))
+		T.check(warn.masterWarning ~= nil and warn.masterCaution == nil, "master warning")
+		local caution = slots(AudioMix.events(sn({ cautionCount = 2 }), sn({ cautionCount = 1 }), mix, {}))
+		T.check(caution.masterCaution ~= nil, "master caution")
+		local same = slots(AudioMix.events(sn({ cautionCount = 2 }), sn({ cautionCount = 2 }), mix, {}))
+		T.check(same.masterCaution == nil, "only when something new goes wrong")
+		T.check(AudioMix.gpws(sn({ bank = 50 }), mix) == "calloutBankAngle", "bank angle")
+		T.check(AudioMix.gpws(sn({ bank = 20 }), mix) == nil, "normal turn")
+	end)
+	T.test("pull up: a recorded GPWS clip first, whoop siren + spoken fallback", function()
+		local p = AudioConfig.sounds.calloutPullUp
+		T.check(type(p.id) == "table" and #p.id > 0, "recorded clip candidates")
+		T.check(not string.find(string.lower(p.text), "whoop"), "the whoop is a sound, not words")
+		T.check(AudioConfig.sounds.gpwsWhoop and AudioConfig.sounds.gpwsWhoop.maxSeconds, "whoop siren slot")
 	end)
 	T.test("pitch mapping stays within the slot's range", function()
 		local sc = AudioConfig.sounds.jetWhine

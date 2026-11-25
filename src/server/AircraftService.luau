@@ -20,6 +20,7 @@ local Selection = require(Shared.Selection)
 local Stunts = require(Shared.Stunts)
 local AircraftBuilder = require(script.Parent.AircraftBuilder)
 local CrashService = require(script.Parent.CrashService)
+local CraterService = require(script.Parent.CraterService)
 local Crash = require(Shared.Crash)
 
 local AircraftService = {}
@@ -35,6 +36,7 @@ type PlayerState = {
 	aircraft: Model?,
 	options: any?,
 	lastSpawn: number,
+	lastRepair: number?,
 	debris: { { model: Model, t: number } },
 	samples: { { t: number, pos: Vector3, vel: Vector3 } },
 	damageBudget: number,
@@ -254,6 +256,8 @@ local function resolveSpawn(p: Player, options: any, cfg: any): any
 	return sp
 end
 
+local placeAircraft: (Player, PlayerState, any, any, any, CFrame, boolean) -> ()
+
 function AircraftService.spawn(p: Player, rawOptions: any)
 	local s = getState(p)
 	local now = os.clock()
@@ -306,6 +310,17 @@ function AircraftService.spawn(p: Player, rawOptions: any)
 		y = (gy or sp.y) + restHeight(cfg) * Units.STUDS_PER_METER + 0.3
 	end
 	local cf = CFrame.new(sp.x, y, sp.z) * CFrame.Angles(0, -math.rad(sp.heading), 0) * CFrame.Angles(math.rad(sp.pitchDeg or 0), 0, 0)
+	placeAircraft(p, s, options, cfg, sp, cf, false)
+end
+
+-- Build the aircraft at `cf`, seat the pilot and hand it to the client. `repaired`
+-- (Fix all) keeps the current mission/race going instead of starting a new one.
+placeAircraft = function(p: Player, s: PlayerState, options: any, cfg: any, sp: any, cf: CFrame, repaired: boolean)
+	local character = p.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
+	end
 	local model = AircraftBuilder.build(cfg, cf)
 	model.Name = `{cfg.displayName} ({p.Name})`
 	model:SetAttribute("OwnerUserId", p.UserId)
@@ -336,10 +351,71 @@ function AircraftService.spawn(p: Player, rawOptions: any)
 	-- stream the world around the aircraft, not wherever the character started
 	p.ReplicationFocus = model.PrimaryPart
 
-	;(remotes:FindFirstChild("AircraftAssigned") :: RemoteEvent):FireClient(p, model, options, sp)
-	if onSpawned then
+	;(remotes:FindFirstChild("AircraftAssigned") :: RemoteEvent):FireClient(p, model, options, sp, repaired)
+	if onSpawned and not repaired then
 		onSpawned(p, options, sp)
 	end
+end
+
+-- Fix all: rebuild the aircraft where it is with every part back on, all damage,
+-- dents, bends and failures gone. Flying: same position, heading and speed. Wrecked or
+-- slow: upright on the ground below, engines kept running, ready to go again.
+function AircraftService.repair(p: Player)
+	local s = getState(p)
+	local old = s.aircraft
+	local options = s.options
+	local core = old and old.PrimaryPart
+	if not old or not options or not core then
+		return
+	end
+	local now = os.clock()
+	if now - (s.lastRepair or -math.huge) < GameConfig.crash.repairCooldown then
+		return
+	end
+	s.lastRepair = now
+	local cfg = Registry.get(old:GetAttribute("AircraftId") :: string)
+	if not cfg then
+		return
+	end
+	local cf = core.CFrame
+	local v = core.AssemblyLinearVelocity * Units.METERS_PER_STUD
+	local sys = s.systems or {}
+	local look = cf.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 1e-3 then
+		flat = Vector3.new(0, 0, -1)
+	end
+	local heading = -math.deg(math.atan2(-flat.Unit.X, -flat.Unit.Z))
+	local crashed = sys.Crashed == true or old:GetAttribute("Exploded") == true
+	local forward = v:Dot(look)
+	local gy = groundBelow(cf.Position.X, cf.Position.Z, cf.Position.Y)
+	local agl = if gy then (cf.Position.Y - gy) * Units.METERS_PER_STUD else math.huge
+	local sp: any
+	if crashed or forward < 25 or agl < 8 then
+		local y = (gy or cf.Position.Y) + restHeight(cfg) * Units.STUDS_PER_METER + 0.3
+		sp = {
+			id = "repair", kind = "runway", x = cf.Position.X, y = y, z = cf.Position.Z, heading = heading,
+			pitchDeg = 0, speed = 0, enginesRunning = sys.EnginesRunning ~= false, gearDown = true, flaps = 1, throttle = 0,
+		}
+		cf = CFrame.new(sp.x, y, sp.z) * CFrame.Angles(0, -math.rad(heading), 0)
+	else
+		local n1 = ((sys.N1_1 or 0) + (sys.N1_2 or sys.N1_1 or 0)) / 2
+		sp = {
+			id = "repair", kind = "air", x = cf.Position.X, y = cf.Position.Y, z = cf.Position.Z, heading = heading,
+			pitchDeg = 0, speed = forward, enginesRunning = sys.EnginesRunning ~= false,
+			gearDown = sys.GearDown == true, flaps = if type(sys.Flaps) == "number" then sys.Flaps else 1,
+			throttle = math.clamp(n1 / 100, 0.3, 1),
+		}
+	end
+	-- Menu failures are fixed too, for this flight and for R resets after it.
+	options = table.clone(options)
+	options.failures = {}
+	s.options = options
+	s.exited = false
+	destroyAircraft(p)
+	destroyDebrisOf(p)
+	placeAircraft(p, s, options, cfg, sp, cf, true)
+	notify(p, "Fixed! Every part is back on.")
 end
 
 function AircraftService.reset(p: Player)
@@ -664,6 +740,7 @@ function AircraftService.init(remoteFolder: Folder)
 		end
 	end)
 	;(remotes:FindFirstChild("RequestReset") :: RemoteEvent).OnServerEvent:Connect(AircraftService.reset)
+	;(remotes:FindFirstChild("RequestRepair") :: RemoteEvent).OnServerEvent:Connect(AircraftService.repair)
 	;(remotes:FindFirstChild("ControllerReady") :: RemoteEvent).OnServerEvent:Connect(onControllerReady)
 	;(remotes:FindFirstChild("ReportDamage") :: RemoteEvent).OnServerEvent:Connect(onReportDamage)
 	;(remotes:FindFirstChild("ReportSystems") :: RemoteEvent).OnServerEvent:Connect(onReportSystems)
@@ -683,6 +760,28 @@ function AircraftService.init(remoteFolder: Folder)
 			destroyAircraft(p)
 		end)
 	end
+	CraterService.init({
+		remotes = remotes,
+		getAircraft = function(p: Player): Model?
+			return getState(p).aircraft
+		end,
+		maxRecentSpeed = function(p: Player, window: number): number
+			return maxRecentSpeed(getState(p), window)
+		end,
+		ignore = function(): { Instance }
+			local list: { Instance } = { aircraftFolder, debrisFolder }
+			for _, pl in Players:GetPlayers() do
+				if pl.Character then
+					table.insert(list, pl.Character)
+				end
+			end
+			local fires = Workspace:FindFirstChild("Wildfires")
+			if fires then
+				table.insert(list, fires)
+			end
+			return list
+		end,
+	})
 	CrashService.init({
 		remotes = remotes,
 		debrisFolder = debrisFolder,

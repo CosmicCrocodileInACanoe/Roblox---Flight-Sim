@@ -16,6 +16,8 @@ GameConfig.Remotes = {
 	"ReportImpact", -- (model, component, pointBodyM: Vector3, dirBody: Vector3, dv)
 	"ReportSection", -- (model, component, sectionId, dv, cause: "event"?)
 	"WaterDrop", -- (model, impactX, impactZ (studs), kg, dropHeightM) water bomber drops
+	"RequestRepair", -- () Fix all: rebuild the aircraft where it is, every part back on
+	"ReportCrash", -- (model, worldPos: Vector3, dv) the airframe was destroyed: explode + crater
 	-- server -> client
 	"AircraftAssigned",
 	"MissionUpdate",
@@ -50,6 +52,13 @@ GameConfig.crash = {
 	-- Off: planes bend, crumple and collapse but stay in one piece; parts tear off only in
 	-- truly extreme hits (Damage.EXTREME_FACTOR x their destroy speed).
 	breakApart = true,
+	-- Craters where a destroyed aircraft hits the ground (server, shared by everyone).
+	crater = {
+		minDv = 10, -- m/s; softer wrecks just explode
+		maxCraters = 12, -- oldest goes first
+		lifetime = 900, -- s
+	},
+	repairCooldown = 2, -- s between Fix all presses
 	extremeSectionFactor = 2.0, -- break-apart off: tearing a section needs this x the dv
 	impactReportMinInterval = 0.12, -- s between dent reports for one component
 	maxCrumplesPerSecond = 12, -- server, per player

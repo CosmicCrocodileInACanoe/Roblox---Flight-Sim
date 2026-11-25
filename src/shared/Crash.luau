@@ -414,6 +414,18 @@ function Crash.inheritVelocity(v: Vec, w: Vec, r: Vec, away: Vec, push: number):
 	return { v[1] + cx + a[1] * push, v[2] + cy + a[2] * push, v[3] + cz + a[3] * push }
 end
 
+-- Crater for a destroyed aircraft hitting the ground at `dv` (m/s): radius and rim
+-- height in metres, scaled by the cube root of the impact energy so a small plane
+-- leaves a small crater and a jumbo a big one. Returns nil for gentle wrecks.
+function Crash.craterSize(massKg: number, dv: number, minDv: number?): (number?, number?)
+	if dv ~= dv or massKg ~= massKg or dv < (minDv or 10) or massKg <= 0 then
+		return nil, nil
+	end
+	local e = Crash.impactEnergy(massKg, dv)
+	local radius = math.clamp(2.5 + e ^ (1 / 3) * 0.025, 3, 30)
+	return radius, radius * 0.18
+end
+
 -- Shards to spawn on the client for a hit (kept small; Effects also caps the total).
 function Crash.shardCount(profile: Profile, dv: number): number
 	if dv <= profile.dentThreshold * 1.5 then

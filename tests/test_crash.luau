@@ -1,5 +1,6 @@
 --!nonstrict
 local Crash = require("../src/shared/Crash")
+local Mock = require("./RobloxMock")
 local Damage = require("../src/shared/Damage")
 local FlightModel = require("../src/shared/FlightModel")
 local cfg = require("../src/shared/Aircraft/Meridian200")
@@ -287,5 +288,35 @@ return { name = "Crash physics (dents, break points, breakup)", run = function(T
 		local tip = { -15, 0, 8 }
 		local dv = base.sectionBreakDv + 2
 		T.check(Crash.sectionToBreak(base, tip, dv) ~= nil and Crash.sectionToBreak(easy, tip, dv) == nil)
+	end)
+	T.test("craters: none for gentle wrecks, bigger for heavier and faster crashes, capped", function()
+		T.check(Crash.craterSize(20000, 5) == nil, "slow: no crater")
+		T.check(Crash.craterSize(20000, 0 / 0) == nil, "NaN safe")
+		local small = Crash.craterSize(2000, 40)
+		local mid = Crash.craterSize(20000, 40)
+		local fast = Crash.craterSize(20000, 80)
+		local jumbo, rim = Crash.craterSize(300000, 80)
+		T.check(small < mid and mid < fast and fast < jumbo, "scales with energy")
+		T.between(mid, 4, 14, "small airliner crater radius (m)")
+		T.check(jumbo <= 30 and rim > 0 and rim < jumbo, "capped, rim lower than radius")
+	end)
+	T.test("crater model builds (mock Roblox): pit, rim and clods, all visual-only", function()
+		local hasSrc, src = pcall(require, "./generated/CraterService_src")
+		T.check(hasSrc, "run tests/run.sh")
+		local ok, Craters = pcall(Mock.loadModule, src, "CraterService", "../src/shared/", function(path)
+			return require(path)
+		end)
+		T.check(ok, tostring(Craters))
+		local radius, rim = Crash.craterSize(20000, 50)
+		local built, m = pcall(Craters.build, Mock.Vector3.new(0, 10, 0), Mock.Vector3.new(0, 1, 0), radius, rim, 7)
+		T.check(built, tostring(m))
+		local parts = 0
+		for _, d in m:GetDescendants() do
+			if d:IsA("BasePart") then
+				parts += 1
+				T.check(d.Anchored and not d.CanCollide and not d.CanQuery and not d.CanTouch, d.Name .. " is visual only")
+			end
+		end
+		T.check(parts >= 20 and parts <= 50, "a few dozen parts, not hundreds: " .. parts)
 	end)
 end }

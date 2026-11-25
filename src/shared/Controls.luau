@@ -51,6 +51,7 @@ Controls.KEYMAP = {
 	{ action = "debug", kind = "press", group = "Camera and game", label = "Debug panel", keys = { "F3" } },
 	{ action = "menu", kind = "press", group = "Camera and game", label = "Menu", keys = { "M", "ButtonStart" } },
 	{ action = "reset", kind = "press", group = "Camera and game", label = "Reset / respawn", keys = { "R" } },
+	{ action = "fixAll", kind = "press", group = "Camera and game", label = "Fix all damage (puts broken parts back)", keys = { "Y" } },
 } :: { Binding }
 
 -- Mouse and analogue inputs that are not key bindings, shown in the popup only.

@@ -12,8 +12,8 @@
 --   the runway. Still only moves the pilot's own controls (surfaces and throttle).
 -- Free: relaxed handling for pilots who want to bank and turn without fighting the
 --   aircraft. The stick asks for a roll rate and a pitch rate (with extra control
---   authority), and the aircraft holds whatever bank and pitch you leave it in, up to
---   75 deg of bank and 50 deg of pitch (no limits for aerobatic types). Turns are
+--   authority), and the aircraft holds whatever bank and pitch you leave it in. There
+--   are no bank or pitch limits for any type: roll right round, fly inverted, loop. Turns are
 --   coordinated and the nose is held up in the turn. Stall protection stays on.
 --   Flaps, gear, throttle, brakes and the other systems work exactly as in the other
 --   modes; there is no speed floor or overspeed governor.
@@ -42,7 +42,7 @@ end
 Assist.MODES = { "easy", "free", "assisted", "simulation" }
 Assist.LABELS = {
 	easy = "Easy (self-levelling, stall and speed protection)",
-	free = "Free (easy banking and pitch, holds attitude, few limits)",
+	free = "Free (no bank or pitch limits, holds attitude)",
 	assisted = "Assisted (auto-trim, protections)",
 	simulation = "Simulation (direct, manual trim)",
 }
@@ -90,11 +90,12 @@ function Assist.limits(cfg: any?): any
 		maxBeta = rad(a.maxBetaDeg or 5),
 		-- Free mode: roll and pitch rates at full stick, attitude limits, and how much
 		-- extra elevator and aileron authority the mode lends the pilot
-		freeRollRate = rad(a.freeRollRateDeg or (if a.aerobatic then 90 else 60)),
-		freePitchRate = rad(a.freePitchRateDeg or (if a.aerobatic then 25 else 10)),
-		freeBank = if a.aerobatic then math.huge else rad(a.freeBankDeg or 75),
-		freePitchUp = if a.aerobatic then math.huge else rad(a.freePitchUpDeg or 50),
-		freePitchDown = if a.aerobatic then -math.huge else rad(a.freePitchDownDeg or -50),
+		-- (no attitude limits by default: every type can roll, fly inverted and loop)
+		freeRollRate = rad(a.freeRollRateDeg or (if a.aerobatic then 180 else 120)),
+		freePitchRate = rad(a.freePitchRateDeg or (if a.aerobatic then 25 else 15)),
+		freeBank = if a.freeBankDeg then rad(a.freeBankDeg) else math.huge,
+		freePitchUp = if a.freePitchUpDeg then rad(a.freePitchUpDeg) else math.huge,
+		freePitchDown = if a.freePitchDownDeg then rad(a.freePitchDownDeg) else -math.huge,
 		freeAuthority = a.freeAuthority or 1.6,
 	}
 end
@@ -163,8 +164,9 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 		end
 		-- in steep banks only pull for up to a 60 deg turn (about 2 g); past that the nose
 		-- is allowed to drop instead of pulling the wing into a stall
+		-- (upside down or near vertical there is no turn to feed in: just hold the attitude)
 		local cb = math.min(abs(bank), rad(60))
-		local freeTurnRate = if abs(cosB) > 0.05 then (9.81 / tas) * math.sin(cb) * math.tan(cb) else 0
+		local freeTurnRate = if cosB > 0.05 and abs(pitch) < rad(70) then (9.81 / tas) * math.sin(cb) * math.tan(cb) else 0
 		local err = env.wx - freeTurnRate - qd
 		st.autoTrim = clamp(st.autoTrim - clamp(err * 2.5, -0.35, 0.35) * dt, -1, 1)
 		out.pitch = clamp(raw.pitch * 0.3 - err * 3.0, -1, 1)
@@ -230,7 +232,15 @@ function Assist.apply(st: AssistState, raw: any, out: any, env: any, model: any,
 			elseif free then
 				local hold = if abs(st.bankHold) < rad(4) and not st.rollSettling then 0 else st.bankHold
 				hold = clamp(hold, -bankLimit, bankLimit)
-				out.roll = clamp((hold + pedalBank - bank) * 2.0 - bankRate * 1.5, -0.8, 0.8)
+				if abs(pitch) > rad(70) then
+					-- going straight up or down (a loop): bank means little here, so just stop
+					-- any roll and pick the bank up again on the way out
+					st.bankHold = bank
+					out.roll = clamp(-bankRate * 1.5, -0.8, 0.8)
+				else
+					local e = (hold + pedalBank - bank + math.pi) % (2 * math.pi) - math.pi -- short way round
+					out.roll = clamp(e * 2.0 - bankRate * 1.5, -0.8, 0.8)
+				end
 			elseif lim.aerobatic then
 				-- aerobatic types hold whatever attitude the pilot leaves them in
 				out.roll = if abs(pedal) > 0.05 then clamp((st.bankHold + pedalBank - bank) * 1.5 + env.wz * 0.8, -0.5, 0.5) else 0

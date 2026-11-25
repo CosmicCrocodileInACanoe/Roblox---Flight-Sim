@@ -126,15 +126,17 @@ return { name = "Handling", run = function(T)
 			local function rollFor(mode, seconds)
 				local s, a, raw = cruiseSim(cfg, mode)
 				raw.roll = 1
+				local total, last = 0, 0
 				for _ = 1, math.floor(60 * seconds) do
 					step(s, a, raw)
+					local _, b = s:attitude()
+					total += hdiff(last, b)
+					last = b
 				end
-				return s, a, raw
+				return s, a, raw, total
 			end
-			local se = rollFor("easy", 1.5)
-			local s, a, raw = rollFor("free", 1.5)
-			local _, be = se:attitude()
-			local _, bf = s:attitude()
+			local _, _, _, be = rollFor("easy", 1.5)
+			local s, a, raw, bf = rollFor("free", 1.5)
 			T.check(bf > be + 1, string.format("free %.1f vs easy %.1f deg after 1.5 s", bf, be))
 			raw.roll = 0
 			for _ = 1, 60 * 2 do
@@ -152,18 +154,57 @@ return { name = "Handling", run = function(T)
 			T.check(s:isFinite())
 		end)
 
-		if not lim.aerobatic then
-			T.test(`{name}: free mode banks past the easy limit but stops short of 85 deg`, function()
-				local s, a, raw = cruiseSim(cfg, "free")
-				raw.roll = 1
-				local maxB = 0
-				for _ = 1, 60 * 14 do
-					step(s, a, raw)
-					local _, b = s:attitude()
-					maxB = math.max(maxB, b)
+		T.test(`{name}: free mode has no bank limit: it rolls all the way round and holds inverted`, function()
+			local s, a, raw = cruiseSim(cfg, "free")
+			raw.throttle = 1
+			raw.roll = 1
+			local total, last = 0, 0
+			for _ = 1, 60 * 25 do
+				step(s, a, raw)
+				local _, b = s:attitude()
+				total += hdiff(last, b)
+				last = b
+				if total >= 360 then
+					break
 				end
-				T.check(maxB > math.deg(lim.bank) + 5 or maxB > 70, string.format("only reached %.1f deg", maxB))
-				T.check(maxB < 85, string.format("reached %.1f deg", maxB))
+			end
+			T.check(total >= 360, string.format("only rolled %.0f deg in 25 s", total))
+			-- roll to inverted, let go, and it stays upside down
+			local s2, a2, raw2 = cruiseSim(cfg, "free")
+			raw2.throttle, raw2.roll = 1, 1
+			local tot2, l2 = 0, 0
+			for _ = 1, 60 * 25 do
+				step(s2, a2, raw2)
+				local _, b = s2:attitude()
+				tot2 += hdiff(l2, b)
+				l2 = b
+				if tot2 > 175 then
+					break
+				end
+			end
+			raw2.roll = 0
+			for _ = 1, 60 * 4 do
+				step(s2, a2, raw2)
+			end
+			local _, binv = s2:attitude()
+			T.check(math.abs(binv) > 120, string.format("rolled back to %.0f deg after letting go inverted", binv))
+			T.check(s2:isFinite())
+		end)
+
+		if lim.aerobatic then
+			T.test(`{name}: free mode has no pitch limit: full back stick loops`, function()
+				local s, a, raw = cruiseSim(cfg, "free")
+				raw.throttle, raw.pitch = 1, 1
+				local maxP, over = -90, false
+				for _ = 1, 60 * 30 do
+					step(s, a, raw)
+					local p, b = s:attitude()
+					maxP = math.max(maxP, p)
+					if maxP > 80 and math.abs(b) > 120 then
+						over = true
+					end
+				end
+				T.check(maxP > 80 and over, string.format("pitch only reached %.0f", maxP))
 			end)
 		end
 
@@ -172,7 +213,7 @@ return { name = "Handling", run = function(T)
 			raw.throttle = 0.9
 			raw.pitch = 1
 			local stalled = false
-			for _ = 1, 60 * 1.5 do
+			for _ = 1, 60 * 1 do
 				step(s, a, raw)
 			end
 			raw.pitch = 0

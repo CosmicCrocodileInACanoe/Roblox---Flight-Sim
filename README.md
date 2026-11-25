@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 587 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 599 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `587 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `599 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -194,10 +194,19 @@ stays silent and never errors.
 - Pilot callouts: "eighty knots" and "rotate" on the takeoff roll, and radio-altitude callouts
   on approach (1000, 500, 100, 50, 40, 30, 20, 10).
 - `cabinChime` through 10,000 ft, `cockpitAmbience` (avionics hum loop).
-- Background ATC chatter, never constant: one transmission every 20 to 55 s (at most 3 a
-  minute), each cut off at 15 s, held back while a warning is talking. Fill `atcChatter1..5`
-  with radio clips. With none filled, made-up exchanges are spoken with text-to-speech in a
-  thin radio tone.
+- Background ATC chatter, never constant. Exchanges are a call and a reply: some start
+  with the controller, some with a pilot. Controllers and pilots use different
+  text-to-speech voices, and each callsign keeps its own voice and pitch. After each
+  exchange there are 5 to 16 s of quiet, so about 3 to 5 exchanges a minute, each cut off
+  at 15 s. Roblox limits text-to-speech to about 7 requests a minute, so new exchanges are
+  generated slowly (warnings first) and reused. Recorded chatter clips in `atcChatter1..5`
+  are mixed in.
+- Cockpit alarms: GPWS "whoop whoop, pull up" (a recorded clip, or the whoop siren then a
+  spoken "pull up"), "bank angle", the stall alarm and stick shaker, a fire bell while an
+  engine burns, an overspeed clacker above Vmo, and master warning and caution chimes.
+  The warning chime sounds for fire, a part failing or breaking off, and overspeed. The
+  caution chime sounds for an engine out, jammed controls, hydraulics, a fuel leak, low
+  fuel and damage. The Events menu failures and weather set these off.
 
 In the cockpit view, outside sounds are muffled by an equaliser and warnings are at full
 volume. In the tower view, outside sounds fade with distance.
@@ -212,7 +221,7 @@ src/shared/               Pure Luau, used by the server, the client and the test
   FlightModel             6-DOF forces and torques for one aircraft (the core of the game)
   Assist                  Easy mode (self-levelling, pitch/bank limits, no stalls, speed floor, flare help,
                           tougher airframe), Free mode (roll/pitch rate commands, holds bank and pitch,
-                          75 deg bank, extra authority) and Assisted mode (auto-trim, turn coordination,
+                          no bank or pitch limits, extra authority) and Assisted mode (auto-trim, turn coordination,
                           protections); Q/E yaw-rate control with a yaw damper in all three
   Damage                  component health, states, propagation, detachment, lost sections
   Crash                   crash feel: per-component profiles, dents, break points, debris breakup

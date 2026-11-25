@@ -40,6 +40,10 @@ These are the most likely places for first-run bugs, so check them first.
 - [ ] Sound check: after spawning, Output shows `[Audio] N sounds loaded` (write down N and
       any slot it lists with no working ID). The engines get louder with throttle, and wind
       grows with speed.
+- [ ] Alarms: Events menu (J) -> Engine fire gives the fire bell and master warning; Bird
+      strike or Lightning gives the caution chime; diving past Vmo starts the clacker; a
+      50 degree bank says "bank angle". Radio chatter has a controller and pilots in
+      different voices.
 - [ ] Sound with every ID empty: no errors or `[Audio]` warnings in Output. With IDs filled
       in: the engine whine rises and falls with throttle, wind grows with speed, the gear horn
       sounds low with the gear up, touchdown thumps, cockpit view sounds muffled, and nothing
@@ -194,11 +198,19 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     the nose swings left and keeps going left (a slight bank into it is fine), with no
     back-and-forth wobble. Let go: the nose eases back in about a second and the wings
     level. Press T until the HUD says FREE. Roll hard right and let go: the aircraft
-    rolls faster than in Easy and stays at the bank you left it (up to about 75 deg),
+    rolls faster than in Easy and stays at the bank you left it; keep rolling and it goes all the way round, and it holds inverted,
     turning without you having to pull. Pull up and let go: the nose stays where you left
     it. Flaps, gear, throttle and brakes behave exactly as in Easy. Then right-drag the
     camera to look sideways, let go and wait: after 10 s it drifts back behind the aircraft
     (also in the cockpit view).
+
+18. **Craters and Fix all.** Fly the Meridian 200 into open ground at speed. There is a
+    fireball (nothing is thrown about by it) and a crater: dark pit, earth rim, smoke. A
+    second player sees the same crater. Crash into the sea: splash, no crater. Press Y (or
+    the green Fix all button): the aircraft comes back whole, upright on the ground next to
+    the wreck, and the debris is gone. In flight, use the Events menu to snap a wing, then
+    press Y: the wing is back, you keep your speed and height, and any mission keeps going.
+    Pressing Y again within 2 s does nothing.
 
 ## C. Report back
 

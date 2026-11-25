@@ -210,7 +210,14 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     the green Fix all button): the aircraft comes back whole, upright on the ground next to
     the wreck, and the debris is gone. In flight, use the Events menu to snap a wing, then
     press Y: the wing is back, you keep your speed and height, and any mission keeps going.
-    Pressing Y again within 2 s does nothing.
+    Pressing Y again within 2 s does nothing. Ditch a Puffin or the Meridian in the sea and
+    press Y: it comes back on the surface, not on the seabed. Start Strong winds, press Y:
+    the wind keeps blowing after the fix.
+
+19. **Arrowstar at Mach 2.** Take the Arrowstar up past 20,000 ft at full throttle, gear
+    up. The HUD passes M2.00 and the aircraft is never reset for "impossible speed". After
+    take-off, raise the gear (G) and look underneath in the chase view (right-drag): the
+    main legs fold up between the engine pairs, not into them.
 
 ## C. Report back
 

@@ -320,9 +320,9 @@ All of them pass the same offline flight tests.
 | Rainmaker | Firefighting flying boat (amphibian) | boat hull, wingtip floats, wheels for runways; scoops 6 t of water from the sea and drops it on wildfires |
 | Meridian 200 | Narrow-body twin jet | |
 | Hauler 4 | Cargo freighter | four turboprops, T-tail, upswept tail with a ramp |
-| Atlas 400 | Wide-body twin jet | |
+| Atlas 400 | Four-engine jumbo | upper-deck hump |
 | Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines with afterburners (full throttle, gear up); passes Mach 2 above about 20,000 ft, held near Mach 1 down low. The HUD shows the Mach number |
-| Celestia 800 | Four-engine jumbo | |
+| Celestia 800 | Double-deck superjumbo | four engines, the biggest wing in the game |
 
 Adding one is a data file in `src/shared/Aircraft/` plus a line in `AircraftRegistry`. The
 builder reads everything from the config's `geometry` block (see the header of
@@ -330,7 +330,7 @@ builder reads everything from the config's `geometry` block (see the header of
 
 ## Known limits of this milestone
 
-- Sound ships with empty asset IDs, so the game is silent until they're filled in (see Sound).
+- Sound uses starter Creator Store IDs; any that fail to load stay silent and are named in Output (see Sound).
 - Weather and time of day are chosen per player, so two players can see different wind.
 - StreamingEnabled is off so terrain can't vanish under a fast aircraft. The server logs the
   world part count at start (`[World] built N parts`); terrain alone is up to about 15,000

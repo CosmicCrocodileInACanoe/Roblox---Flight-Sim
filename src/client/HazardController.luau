@@ -84,8 +84,16 @@ function HazardController.new(callbacks: { notify: (string) -> () })
 	return self
 end
 
-function HazardController:attach(fc: any)
-	self:clear()
+-- keepWeather (Fix all): the aircraft is rebuilt but a tornado, wind or birds carry on.
+function HazardController:attach(fc: any, keepWeather: boolean?)
+	if keepWeather then
+		for _, fire in self.fires do
+			fire:Destroy()
+		end
+		self.fires = {}
+	else
+		self:clear()
+	end
 	self.fc = fc
 	if fc then
 		fc.spinProvider = function(cf: CFrame, t: number): Vector3?

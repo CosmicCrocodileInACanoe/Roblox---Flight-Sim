@@ -65,9 +65,21 @@ spawn.Parent = Workspace
 -- Lighting ----------------------------------------------------------------------------
 Lighting.ClockTime = 13.5
 Lighting.Brightness = 2.6
-Lighting.EnvironmentDiffuseScale = 0.6
-Lighting.EnvironmentSpecularScale = 0.6
-Lighting.OutdoorAmbient = Color3.fromRGB(128, 132, 140)
+-- Realistic surfaces: Future lighting (per-pixel sun and specular), full sky-lit
+-- ambient and reflections so metal, glass, paint and water respond to the sky, the
+-- detailed 2022+ material textures, and soft sun shadows. The project file sets the
+-- same values; setting them here as well covers places that skip it (live sync).
+pcall(function()
+	(Lighting :: any).Technology = Enum.Technology.Future
+end)
+pcall(function()
+	(game:GetService("MaterialService") :: any).Use2022Materials = true
+end)
+Lighting.GlobalShadows = true
+Lighting.ShadowSoftness = 0.12
+Lighting.EnvironmentDiffuseScale = 1
+Lighting.EnvironmentSpecularScale = 1
+Lighting.OutdoorAmbient = Color3.fromRGB(118, 122, 132)
 local WorldGen = require(Shared.WorldGen)
 local atmosphere = Instance.new("Atmosphere")
 atmosphere.Density = WorldGen.atmosphere.density
@@ -82,6 +94,18 @@ bloom.Intensity = 0.35
 bloom.Size = 30
 bloom.Threshold = 1.6
 bloom.Parent = Lighting
+-- Mild camera-like grading: a touch more contrast, slightly warm daylight.
+local grade = Instance.new("ColorCorrectionEffect")
+grade.Name = "Grade"
+grade.Contrast = 0.08
+grade.Saturation = 0.04
+grade.TintColor = Color3.fromRGB(255, 251, 244)
+grade.Parent = Lighting
+local sky = Instance.new("Sky")
+sky.SunAngularSize = 11
+sky.MoonAngularSize = 9
+sky.StarCount = 3000
+sky.Parent = Lighting
 local rays = Instance.new("SunRaysEffect")
 rays.Intensity = 0.04
 rays.Parent = Lighting

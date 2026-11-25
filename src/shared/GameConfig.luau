@@ -14,7 +14,7 @@ GameConfig.Remotes = {
 	"ReportSystems",
 	"ReportTouchdown",
 	"ReportImpact", -- (model, component, pointBodyM: Vector3, dirBody: Vector3, dv)
-	"ReportSection", -- (model, component, sectionId, dv)
+	"ReportSection", -- (model, component, sectionId, dv, cause: "event"?)
 	"WaterDrop", -- (model, impactX, impactZ (studs), kg, dropHeightM) water bomber drops
 	-- server -> client
 	"AircraftAssigned",

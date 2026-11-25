@@ -10,8 +10,8 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 431 automated tests, all passing: aero, engines, gear, damage,
-grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy mode) through the same
+engine-independent logic has 587 automated tests, all passing: aero, engines, gear, damage,
+grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
 collisions) is unverified until someone works through `docs/PLAYTEST.md` in Studio.
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `587 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -64,7 +64,7 @@ Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | --- | --- |
 | W / S | Pitch down / up |
 | A / D | Roll left / right |
-| Q / E | Rudder and nose-wheel steering |
+| Q / E | Rudder and nose-wheel steering (in the air: a steady yaw that eases back when released) |
 | Shift / Ctrl | Throttle up / down |
 | I | Start / stop engines |
 | G | Landing gear |
@@ -75,12 +75,13 @@ Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 | L | Drop water (hold; Rainmaker water bomber only) |
 | X | Speedbrake |
 | [ / ] | Pitch trim (Simulation mode) |
-| T | Cycle Easy (default) / Assisted / Simulation |
+| T | Cycle Easy (default) / Free / Assisted / Simulation |
 | U | Show / hide the on-screen buttons (throttle lever, stick, gear, flaps, brakes...) |
 | C | Camera: chase / cockpit / tower |
-| Right mouse drag, wheel | Look around, camera distance |
+| Right mouse drag, wheel | Look around (re-centres after 10 s), camera distance |
 | H | Hide HUD |
 | N | Show / hide the minimap |
+| J | Failures and weather events menu (also the red **Events** button, top right) |
 | F3 | Debug panel |
 | M | Menu (aircraft, airport, mode, route, start point, weather, time, failures) |
 | R | Reset / respawn |
@@ -88,6 +89,39 @@ Expected: `431 passed, 0 failed`. These tests do not start Roblox. (`run.sh` emb
 A typical first flight: spawn at an HBR runway threshold, press I and wait for the engines,
 set flaps 2 (press F twice), hold Shift for full throttle, pull back gently at about 145 kt,
 press G after a positive climb, then press V to bring the flaps up above 180 kt.
+
+## Failures and weather events
+
+Press **J**, or click the red **! Events** button in the top-right row, to open the
+FAILURES & WEATHER menu. It works in every mode, at any time in flight. Hover a button to
+see what it does.
+
+Failures break things right now, through the same damage model as a crash, so torn-off
+parts fall away as real debris and the aircraft flies differently:
+
+| Button | What happens |
+| --- | --- |
+| Engine fire | One engine catches fire (flames and smoke), shuts down and can't be restarted |
+| Engine falls off | One engine tears off its pylon: no thrust on that side, and lighter |
+| Wing snaps | The outer part of one wing breaks away: a strong roll toward that side |
+| Tail damage | Part of the fin or tailplane breaks off: weaker pitch and yaw |
+| Controls jam | Ailerons, elevator or rudder stick where they are |
+| Hydraulics | Gear and flaps stop moving |
+| Fuel leak | Fuel drains fast |
+| Gear collapse | One landing-gear leg folds |
+| Random failure | Any of the above that can still happen |
+
+Weather and hazards:
+
+| Button | What happens |
+| --- | --- |
+| Tornado | A funnel touches down about 1.3 km ahead and drifts across your path for 75 s. Its swirl (up to ~145 kt), inflow and updraft act on the flight model's wind; close to the core it spins the airframe and flying debris dents and breaks parts. Fly around it |
+| Lightning | A bolt and a flash, a strike on a wing or the tail, and often an engine flameout (press **I** to relight) |
+| Bird strike | A flock appears ahead and hits the nose; an engine swallows birds and loses power or fails |
+| Strong winds | 45 s of 40-55 kt crosswind with gusts and turbulence, and a downburst halfway through |
+| Clear weather | Ends the tornado, winds and birds. Damage stays until you reset with **R** |
+
+Resetting (R) gives you a fresh aircraft and clears every event.
 
 ## Firefighting
 
@@ -134,9 +168,12 @@ whole course with the Easy assist and check every ring clears the ground.
 
 ## Sound
 
-All audio is set up in `src/shared/AudioConfig.luau`. Each slot has an `id`; paste a Creator
-Store audio asset ID there (just the number) and it plays. Empty slots stay silent and never
-error. What each slot does:
+All audio is set up in `src/shared/AudioConfig.luau`. Every slot ships with starter IDs from
+the Creator Store, and a slot can list several candidates. When you start flying, the game
+checks them and uses the first one that loads. Output then prints
+`[Audio] N sounds loaded`, plus the name of any slot with no working ID. To change a sound,
+paste another Creator Store audio ID (just the number) into that slot's `id`. An empty slot
+stays silent and never errors.
 
 - Engines: `jetWhine` (pitch and volume follow N1) and `jetRumble` (follows thrust and
   reverse). Propeller aircraft use `propDrone` and `propRumble` instead (each config's `soundProfile`,
@@ -174,7 +211,9 @@ src/shared/               Pure Luau, used by the server, the client and the test
   Aero, Engine, Gear      lift/drag per panel, spool and lapse, raycast spring-dampers
   FlightModel             6-DOF forces and torques for one aircraft (the core of the game)
   Assist                  Easy mode (self-levelling, pitch/bank limits, no stalls, speed floor, flare help,
-                          tougher airframe) and Assisted mode (auto-trim, turn coordination, protections)
+                          tougher airframe), Free mode (roll/pitch rate commands, holds bank and pitch,
+                          75 deg bank, extra authority) and Assisted mode (auto-trim, turn coordination,
+                          protections); Q/E yaw-rate control with a yaw damper in all three
   Damage                  component health, states, propagation, detachment, lost sections
   Crash                   crash feel: per-component profiles, dents, break points, debris breakup
   Grading, Mission        landing score, gate-to-gate mission state machine

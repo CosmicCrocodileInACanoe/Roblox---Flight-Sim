@@ -60,6 +60,7 @@ export type Controls = {
 	reverse: boolean,
 	trim: number, -- -1..1
 	waterDrop: boolean, -- water bomber: tank doors open
+	authority: number?, -- Free assist mode: multiplies elevator and aileron travel (default 1)
 }
 
 function FlightModel.newControls(): Controls
@@ -281,9 +282,10 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 	-- Speedbrake
 	self.speedbrakePos += clamp(ctl.speedbrake - self.speedbrakePos, -dt, dt)
 	-- Control surfaces (rate limited; jammed surfaces stay put)
-	local surfRate = math.rad(70) * dt
-	local elevTarget = clamp(ctl.pitch, -1, 1) * aero.elevator.maxDeflection
-	local ailTarget = clamp(ctl.roll, -1, 1) * aero.aileron.maxDeflection
+	local surfRate = math.rad(70) * dt * math.max(1, ctl.authority or 1)
+	local authority = clamp(ctl.authority or 1, 0.5, 2.5)
+	local elevTarget = clamp(ctl.pitch, -1, 1) * aero.elevator.maxDeflection * authority
+	local ailTarget = clamp(ctl.roll, -1, 1) * aero.aileron.maxDeflection * authority
 	local rudTarget = clamp(ctl.yaw, -1, 1) * aero.rudder.maxDeflection
 	if fails.elevatorJam then
 		elevTarget = fails.elevatorJam

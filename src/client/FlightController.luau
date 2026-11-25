@@ -27,6 +27,7 @@ local WorldGen = require(Shared.WorldGen)
 local Stunts = require(Shared.Stunts)
 local Airports = require(Shared.Airports)
 local Wildfire = require(Shared.Wildfire)
+local Hazards = require(Shared.Hazards)
 local Effects = require(script.Parent.Effects)
 
 local MPS = Units.METERS_PER_STUD
@@ -261,6 +262,33 @@ function FlightController:setFailure(kind: string, on: boolean)
 	self.fm:setFailure(kind, on)
 end
 
+-- Failures and weather hazards (HUD Events button): break things through the normal
+-- damage model, so the server tears the real parts off as in a crash. Returns the plan's
+-- message (or why nothing happened).
+function FlightController:applyHazard(plan: any): string
+	if self.crashed then
+		return "The aircraft has already crashed. Press R to reset"
+	end
+	self.eventUntil = self.time + 1.5
+	local dents = Hazards.apply(self.fm, plan)
+	local cf = self.core.CFrame
+	for _, d in dents do
+		local ref = self.compRefs[d.component]
+		if ref then
+			local dir = Vector3.new(math.random() - 0.5, -0.6, math.random() - 0.5).Unit
+			self.lastImpact[d.component] = d.dv
+			self.remotes.ReportImpact:FireServer(self.model, d.component, ref, dir, d.dv)
+			local pos = cf:PointToWorldSpace(ref * SPM)
+			Effects.debrisPuff(pos, 1.5)
+			Effects.sparks(pos, 2)
+		end
+	end
+	self.impactCount += 1 -- impact sound
+	self.impactDv = 16
+	Effects.shake(0.9)
+	return plan.message
+end
+
 local function reportDamage(self: any, ev: any)
 	local remotes = self.remotes
 	local comp = ev.component
@@ -391,13 +419,22 @@ function FlightController:step(dt: number)
 		self.force.Force = Vector3.zero
 		self.torque.Torque = Vector3.zero
 	end
+	-- Hazards (tornado swirl) spin the airframe directly: the wind field is sampled at
+	-- the centre of mass only, so a vortex's roll across the wings is added here.
+	if self.spinProvider and not self.crashed then
+		local spin = self.spinProvider(cf, self.time)
+		if spin and finite(spin) and spin.Magnitude > 0 then
+			core.AssemblyAngularVelocity += spin * dt
+		end
+	end
 
 	self:detectImpacts(dt, cf, vWorld, wWorld, fWorld, mass)
 
 	-- Damage events -> server
 	for _, ev in Damage.drainEvents(fm.damage) do
 		if ev.state == "section" then
-			self.remotes.ReportSection:FireServer(self.model, ev.component, ev.section, self.lastImpact[ev.component] or 0)
+			local cause = if self.time < (self.eventUntil or 0) then "event" else nil
+			self.remotes.ReportSection:FireServer(self.model, ev.component, ev.section, self.lastImpact[ev.component] or 0, cause)
 			local lp = self.lastContactPoint[ev.component] or self.compRefs[ev.component]
 			if lp then
 				local pos = cf:PointToWorldSpace(lp * SPM)

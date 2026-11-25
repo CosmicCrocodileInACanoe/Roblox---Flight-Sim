@@ -635,7 +635,11 @@ local function onReportImpact(p: Player, model: any, compName: any, point: any, 
 	end
 end
 
-local function onReportSection(p: Player, model: any, compName: any, sectionId: any, dv: any)
+-- Sections torn by the HUD's Events button (failures, tornado debris) need no impact;
+-- they're rate limited instead. It only ever affects the reporting player's own aircraft.
+local lastEventSection: { [Player]: { tokens: number, t: number } } = {}
+
+local function onReportSection(p: Player, model: any, compName: any, sectionId: any, dv: any, cause: any)
 	local m, cfg = validAircraft(p, model, compName)
 	if not m or type(sectionId) ~= "string" then
 		return
@@ -646,10 +650,23 @@ local function onReportSection(p: Player, model: any, compName: any, sectionId: 
 	if not section or m:GetAttribute(key) then
 		return
 	end
-	local d = plausibleDv(p, dv)
-	-- A tear needs a real impact the server could have seen.
-	if not d or d < profile.sectionBreakDv * 0.6 then
-		return
+	if cause == "event" then
+		-- token bucket: up to 4 at once, refilling one every half second
+		local now = os.clock()
+		local b = lastEventSection[p] or { tokens = 4, t = now }
+		b.tokens = math.min(4, b.tokens + (now - b.t) * 2)
+		b.t = now
+		lastEventSection[p] = b
+		if b.tokens < 1 then
+			return
+		end
+		b.tokens -= 1
+	else
+		local d = plausibleDv(p, dv)
+		-- A tear needs a real impact the server could have seen.
+		if not d or d < profile.sectionBreakDv * 0.6 then
+			return
+		end
 	end
 	m:SetAttribute(key, true)
 	CrashService.breakSection(p, m, cfg, compName, section)
@@ -662,6 +679,7 @@ function CrashService.init(h: Hooks)
 	RunService.Heartbeat:Connect(stepPieces)
 	Players.PlayerRemoving:Connect(function(p)
 		crumpleBudget[p] = nil
+		lastEventSection[p] = nil
 		for model, piece in pieces do
 			if piece.owner == p then
 				pieces[model] = nil

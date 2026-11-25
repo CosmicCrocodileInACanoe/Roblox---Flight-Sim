@@ -37,6 +37,9 @@ These are the most likely places for first-run bugs, so check them first.
 - [ ] ATC chatter: in 3 minutes of flight you hear no more than 9 short transmissions, none
       longer than 15 s. Takeoff gives "eighty knots" and "rotate"; an approach counts down
       "one thousand" to "ten".
+- [ ] Sound check: after spawning, Output shows `[Audio] N sounds loaded` (write down N and
+      any slot it lists with no working ID). The engines get louder with throttle, and wind
+      grows with speed.
 - [ ] Sound with every ID empty: no errors or `[Audio]` warnings in Output. With IDs filled
       in: the engine whine rises and falls with throttle, wind grows with speed, the gear horn
       sounds low with the gear up, touchdown thumps, cockpit view sounds muffled, and nothing
@@ -163,6 +166,39 @@ These are the most likely places for first-run bugs, so check them first.
     nn%"; about one more load puts it out (steam, "FIRE OUT", a message to everyone), and a
     new fire appears elsewhere about a minute later. Also land it on a runway on its wheels.
     Note any Output errors from FireService or FlightController.
+17. **Realistic surfaces.** In Studio, check Lighting.Technology shows Future and
+    MaterialService.Use2022Materials is ticked. Fly low over the map. Check: grass, fields,
+    forest and rock show texture and patchy colour (no flat single-colour areas); steep
+    faces read as rock; beaches have darker wet sand at the water. On each runway, dark tyre
+    smears near both touchdown zones sit under the white markings with no flicker. Houses
+    show plaster walls with tile or shingle roofs; some city blocks are brick. On an
+    aircraft, tyres look like rubber, grey wing leading edges look like bare metal, and the
+    paint has a soft sheen that catches the sun. Note the frame rate before and after if a
+    low-end device struggles (Future lighting costs a little more).
+
+## Failures and weather events (J, or the red Events button top right)
+
+In free flight at a few thousand feet in the Meridian 200, open the menu and try each
+button. Watch for: Engine fire shows flames on that engine and its N1 drops; Engine
+falls off drops the engine away as debris (other players see it too); Wing snaps tears
+the outer wing off and rolls you toward it; Tail damage breaks part of the fin or
+tailplane; Gear collapse folds one leg (land on it). Tornado: a grey funnel appears ahead
+and drifts across your path; fly near it and the aircraft gets pushed, lifted and spun,
+and "You're in the tornado's winds!" shows; inside the core parts get dented and torn
+off. Lightning: a bolt and a white flash; often an engine flames out, and I relights it.
+Bird strike: a flock flies into the nose a second or two later. Strong winds: you drift
+sideways and sink in the downburst halfway through. Clear weather removes them; R resets.
+Note any Output errors from HazardController, HazardPanel or FlightController.
+
+17. **Rudder and Free mode.** In the Meridian 200 at cruise in Easy mode, hold Q for 4 s:
+    the nose swings left and keeps going left (a slight bank into it is fine), with no
+    back-and-forth wobble. Let go: the nose eases back in about a second and the wings
+    level. Press T until the HUD says FREE. Roll hard right and let go: the aircraft
+    rolls faster than in Easy and stays at the bank you left it (up to about 75 deg),
+    turning without you having to pull. Pull up and let go: the nose stays where you left
+    it. Flaps, gear, throttle and brakes behave exactly as in Easy. Then right-drag the
+    camera to look sideways, let go and wait: after 10 s it drifts back behind the aircraft
+    (also in the cockpit view).
 
 ## C. Report back
 

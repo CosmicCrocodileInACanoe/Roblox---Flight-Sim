@@ -112,6 +112,31 @@ local function getComponent(ctx: Ctx, name: string): Model
 	return m
 end
 
+-- Surface finish, applied by part name so every aircraft gets it without per-config
+-- data: tyres are rubber, unpainted grey leading edges are bare polished aluminium, and
+-- opaque painted panels get a faint clear-coat sheen (with Future lighting this picks up
+-- the sky and sun like real aircraft paint instead of looking like flat plastic).
+local function lowSaturation(c: Color3): boolean
+	local hi, lo = math.max(c.R, c.G, c.B), math.min(c.R, c.G, c.B)
+	return hi - lo < 0.08 and hi > 0.55
+end
+local BARE_METAL = Color3.fromRGB(196, 200, 206)
+local function finish(p: BasePart, name: string, o: any)
+	if name == "Wheel" then
+		p.Material = Enum.Material.Rubber
+		return
+	end
+	if (name == "LeadingEdge" or name == "FinLeadingEdge" or name == "PylonEdge") and not o.material and lowSaturation(p.Color) then
+		p.Material = Enum.Material.Metal
+		p.Color = p.Color:Lerp(BARE_METAL, 0.6)
+		p.Reflectance = 0.12
+		return
+	end
+	if not o.material and not o.transparency and not o.reflectance and p.Material == Enum.Material.SmoothPlastic then
+		p.Reflectance = 0.04
+	end
+end
+
 -- Add a part to a component. size in metres, localCF in body metres.
 local function add(ctx: Ctx, comp: string, name: string, shape: string, sizeM: Vector3, localCF: CFrame, color: Color3, opts: any?): BasePart
 	local o = opts or {}
@@ -139,6 +164,7 @@ local function add(ctx: Ctx, comp: string, name: string, shape: string, sizeM: V
 	if o.reflectance then
 		p.Reflectance = o.reflectance
 	end
+	finish(p, name, o)
 	if o.hull then
 		p.CanCollide = true
 		p.CanTouch = true

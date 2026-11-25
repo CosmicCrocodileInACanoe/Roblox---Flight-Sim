@@ -7,6 +7,11 @@
 --   2. Paste the number into `id` below, e.g.  id = "1234567890",
 --   3. Play. Nothing else needs to change.
 --
+-- An id can also be a list of candidates: the game checks them when you start flying and
+-- uses the first one that loads (Output prints "[Audio] N sounds loaded" and names any
+-- slot with no working ID). The IDs below are starter picks from the Creator Store; swap
+-- in ones you like better.
+--
 -- An empty id ("") means "no sound for this slot": the game stays silent there and never
 -- errors. You can fill the slots in any order. Looping slots should be seamless loops;
 -- one-shot slots should start immediately (no leading silence).
@@ -22,36 +27,36 @@ AudioConfig.masterVolume = 1.0
 
 AudioConfig.sounds = {
 	-- Engines: jets (turbofan) -------------------------------------------------------
-	jetWhine = { id = "", volume = 0.7, pitchMin = 0.55, pitchMax = 1.35, looped = true, group = "exterior" },
-	jetRumble = { id = "", volume = 0.9, pitchMin = 0.8, pitchMax = 1.1, looped = true, group = "exterior" },
+	jetWhine = { id = { "183339994", "123172515633498", "9116932100" }, volume = 0.7, pitchMin = 0.55, pitchMax = 1.35, looped = true, group = "exterior" },
+	jetRumble = { id = { "169572883", "9113060656" }, volume = 0.9, pitchMin = 0.8, pitchMax = 1.1, looped = true, group = "exterior" },
 	-- Engines: propellers (turboprop) --------------------------------------------------
-	propDrone = { id = "", volume = 0.8, pitchMin = 0.6, pitchMax = 1.25, looped = true, group = "exterior" },
-	propRumble = { id = "", volume = 0.6, pitchMin = 0.85, pitchMax = 1.1, looped = true, group = "exterior" },
+	propDrone = { id = { "8907185231", "142317661", "117380424798601" }, volume = 0.8, pitchMin = 0.6, pitchMax = 1.25, looped = true, group = "exterior" },
+	propRumble = { id = { "117380424798601", "142317661" }, volume = 0.6, pitchMin = 0.85, pitchMax = 1.1, looped = true, group = "exterior" },
 	-- Engine start (one-shot, plays once when you press the start key)
-	engineStart = { id = "", volume = 0.7, looped = false, group = "exterior" },
+	engineStart = { id = { "4686865643" }, volume = 0.7, looped = false, group = "exterior" },
 
 	-- Airflow and rolling --------------------------------------------------------------
-	wind = { id = "", volume = 0.8, pitchMin = 0.7, pitchMax = 1.3, looped = true, group = "exterior" },
-	runwayRoll = { id = "", volume = 0.6, pitchMin = 0.8, pitchMax = 1.25, looped = true, group = "exterior" },
+	wind = { id = { "9125742111", "147722270", "9125515917" }, volume = 0.8, pitchMin = 0.7, pitchMax = 1.3, looped = true, group = "exterior" },
+	runwayRoll = { id = { "9125351349" }, volume = 0.6, pitchMin = 0.8, pitchMax = 1.25, looped = true, group = "exterior" },
 
 	-- Mechanical -----------------------------------------------------------------------
-	gearMotor = { id = "", volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "exterior" },
-	gearLock = { id = "", volume = 0.8, looped = false, group = "exterior" }, -- clunk when gear locks up/down
-	flapMotor = { id = "", volume = 0.4, pitchMin = 1, pitchMax = 1, looped = true, group = "exterior" },
+	gearMotor = { id = { "9112838396", "9118977972" }, volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "exterior" },
+	gearLock = { id = { "9116673068" }, volume = 0.8, looped = false, group = "exterior" }, -- clunk when gear locks up/down
+	flapMotor = { id = { "9118977972", "9112838396" }, volume = 0.4, pitchMin = 1, pitchMax = 1, looped = true, group = "exterior" },
 
 	-- Touchdown and impacts ------------------------------------------------------------
-	touchdown = { id = "", volume = 1.0, looped = false, group = "exterior" }, -- tyre thump; louder on hard landings
-	tyreSqueal = { id = "", volume = 0.8, looped = false, group = "exterior" },
-	impactLight = { id = "", volume = 0.9, looped = false, group = "exterior" }, -- scrapes, bumps, clipped objects
-	impactHeavy = { id = "", volume = 1.2, looped = false, group = "exterior" }, -- big hits, parts breaking off
-	crash = { id = "", volume = 1.5, looped = false, group = "exterior" }, -- aircraft destroyed
+	touchdown = { id = { "9113471570" }, volume = 1.0, looped = false, group = "exterior" }, -- tyre thump; louder on hard landings
+	tyreSqueal = { id = { "772085046", "444542087" }, volume = 0.8, looped = false, group = "exterior" },
+	impactLight = { id = { "9116523525" }, volume = 0.9, looped = false, group = "exterior" }, -- scrapes, bumps, clipped objects
+	impactHeavy = { id = { "9116546593" }, volume = 1.2, looped = false, group = "exterior" }, -- big hits, parts breaking off
+	crash = { id = { "9114224800", "9114554766" }, volume = 1.5, looped = false, group = "exterior" }, -- aircraft destroyed
 
 	-- Cockpit warnings (not muffled) ----------------------------------------------------
 	-- stallWarning: about to stall (within a couple of degrees of the stall angle) and while stalled
-	stallWarning = { id = "", volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	stallWarning = { id = { "9113083860" }, volume = 0.6, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 	-- stickShaker: rattle while the wing is actually stalled
-	stickShaker = { id = "", volume = 0.7, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
-	gearWarning = { id = "", volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	stickShaker = { id = { "9114890677" }, volume = 0.7, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
+	gearWarning = { id = { "9113086365" }, volume = 0.5, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" },
 
 	-- Voice callouts (one-shots, repeated while the danger lasts) -----------------------
 	-- `text` is spoken with Roblox text-to-speech when the slot has no id (see
@@ -75,14 +80,14 @@ AudioConfig.sounds = {
 	calloutAlt10 = { id = "", volume = 0.8, looped = false, group = "cockpit", text = "Ten." },
 
 	-- Cabin and cockpit ambience ---------------------------------------------------------
-	cabinChime = { id = "", volume = 0.6, looped = false, group = "cockpit" }, -- climbing/descending through 10,000 ft
+	cabinChime = { id = { "154605406", "142301402" }, volume = 0.6, looped = false, group = "cockpit" }, -- climbing/descending through 10,000 ft
 	cockpitAmbience = { id = "", volume = 0.25, pitchMin = 1, pitchMax = 1, looped = true, group = "cockpit" }, -- avionics fans and hum
 
 	-- Background ATC radio chatter. Fill any of these with radio-chatter clips; they're
 	-- picked at random. With none filled, made-up exchanges are spoken with text-to-speech.
 	-- Clips longer than mix.atcMaxSeconds are cut off.
-	atcChatter1 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
-	atcChatter2 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
+	atcChatter1 = { id = { "251668919" }, volume = 0.35, looped = false, group = "cockpit" },
+	atcChatter2 = { id = { "676395133" }, volume = 0.35, looped = false, group = "cockpit" },
 	atcChatter3 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
 	atcChatter4 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
 	atcChatter5 = { id = "", volume = 0.35, looped = false, group = "cockpit" },
@@ -94,6 +99,8 @@ AudioConfig.atcVoiceVolume = 0.35
 -- Speak callouts with Roblox text-to-speech when their slot has no id. Turn off to keep
 -- callouts silent until recorded clips are added.
 AudioConfig.useTextToSpeech = true
+-- Voice for text-to-speech (see the Roblox "list of artificial voices"; "1" and "2" are valid).
+AudioConfig.ttsVoiceId = "1"
 
 -- Which engine sounds each aircraft uses. Unknown aircraft use "jet".
 AudioConfig.profiles = {
@@ -162,6 +169,7 @@ AudioConfig.mix = {
 	atcMaxGap = 55,
 	atcMaxSeconds = 15,
 	atcQuietAfterWarning = 4, -- no chatter for this long after a warning callout
+	ttsWarmInterval = 9, -- s between pre-generating voices (Roblox allows ~7 TTS requests a minute solo)
 }
 
 -- Cockpit muffle: an equaliser on the exterior group while in the cockpit view (dB).

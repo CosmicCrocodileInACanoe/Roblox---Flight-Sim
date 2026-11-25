@@ -14,35 +14,74 @@ local TerrainBuilder = {}
 
 local THICKNESS = 30
 
+-- Natural, slightly muted palette (real ground is far less saturated than "game green").
+-- Every triangle also gets a small deterministic shade/hue jitter (see `jitter`), so
+-- large areas read as mottled fields and hillsides instead of flat-coloured facets.
 local GRASS = {
-	Color3.fromRGB(104, 146, 74),
-	Color3.fromRGB(118, 156, 80),
-	Color3.fromRGB(96, 134, 66),
-	Color3.fromRGB(140, 160, 86), -- dry field
-	Color3.fromRGB(124, 150, 70),
+	Color3.fromRGB(98, 128, 64), -- meadow
+	Color3.fromRGB(110, 136, 68),
+	Color3.fromRGB(88, 118, 58),
+	Color3.fromRGB(122, 132, 72), -- olive pasture
+	Color3.fromRGB(104, 124, 62),
 }
-local FOREST = Color3.fromRGB(70, 104, 56)
-local ROCK = Color3.fromRGB(118, 112, 104)
-local SNOW = Color3.fromRGB(238, 241, 245)
-local SAND = Color3.fromRGB(214, 200, 150)
-local SEABED = Color3.fromRGB(84, 110, 120)
+local FIELDS = {
+	Color3.fromRGB(162, 150, 96), -- ripe crop / hay
+	Color3.fromRGB(138, 132, 82), -- stubble
+	Color3.fromRGB(116, 98, 72), -- ploughed soil
+}
+local FOREST = { Color3.fromRGB(58, 84, 46), Color3.fromRGB(50, 76, 44), Color3.fromRGB(66, 90, 50) }
+local SCRUB = Color3.fromRGB(112, 110, 78) -- dry scrub between the tree line and rock
+local ROCK = Color3.fromRGB(116, 110, 102)
+local ROCK_DARK = Color3.fromRGB(92, 88, 82)
+local SNOW = Color3.fromRGB(236, 240, 246)
+local SAND = Color3.fromRGB(206, 190, 148)
+local WET_SAND = Color3.fromRGB(164, 150, 118)
+local SEABED = Color3.fromRGB(78, 98, 100)
+
+-- Deterministic +-amount brightness wobble with a touch of warm/cool shift.
+local function jitter(c: Color3, x: number, z: number, amount: number): Color3
+	local k = (WorldGen.rand(x, z, 41) - 0.5) * 2 * amount
+	local warm = (WorldGen.rand(x, z, 43) - 0.5) * amount * 0.5
+	return Color3.new(
+		math.clamp(c.R * (1 + k + warm), 0, 1),
+		math.clamp(c.G * (1 + k), 0, 1),
+		math.clamp(c.B * (1 + k - warm), 0, 1)
+	)
+end
+
+local function pick(list: { Color3 }, x: number, z: number, salt: number): Color3
+	local idx = 1 + math.floor(WorldGen.rand(x, z, salt) * #list)
+	return list[math.clamp(idx, 1, #list)]
+end
 
 local function pickColor(h: number, slope: number, x: number, z: number): (Color3, Enum.Material)
 	if h < 6 then
-		return if h < -8 then SEABED else SAND, Enum.Material.Sand
+		if h < -8 then
+			return SEABED, Enum.Material.Sand
+		end
+		-- the strip just above the waterline is darker, damp sand
+		return jitter(if h < 2 then WET_SAND else SAND, x, z, 0.05), Enum.Material.Sand
 	end
 	if h > 3000 + WorldGen.rand(x / 900, z / 900, 7) * 500 then
-		return SNOW, Enum.Material.Snow
+		return jitter(SNOW, x, z, 0.02), if slope > 0.6 then Enum.Material.Glacier else Enum.Material.Snow
 	end
 	if slope > 0.55 or h > 2300 then
-		return ROCK:Lerp(Color3.fromRGB(100, 96, 90), WorldGen.rand(x, z, 3)), Enum.Material.Slate
+		local rock = ROCK:Lerp(ROCK_DARK, WorldGen.rand(x, z, 3))
+		-- the steepest faces are bare cliff; gentler high ground is broken slate
+		return jitter(rock, x, z, 0.06), if slope > 0.7 then Enum.Material.Rock else Enum.Material.Slate
+	end
+	if h > 1700 and slope > 0.3 then
+		return jitter(SCRUB, x, z, 0.07), Enum.Material.Ground
 	end
 	local n = WorldGen.fbm(x / 5000, z / 5000, 2, 77)
 	if n > 0.25 then
-		return FOREST, Enum.Material.Grass
+		return jitter(pick(FOREST, x, z, 45), x, z, 0.08), Enum.Material.Grass
 	end
-	local idx = 1 + math.floor(WorldGen.rand(x / 1500, z / 1500, 11) * #GRASS)
-	return GRASS[math.clamp(idx, 1, #GRASS)], Enum.Material.Grass
+	-- farmland: patches of crop, stubble and bare soil in the lowlands
+	if h < 900 and slope < 0.12 and WorldGen.rand(x / 1200, z / 1200, 13) > 0.72 then
+		return jitter(pick(FIELDS, x / 1200, z / 1200, 17), x, z, 0.05), Enum.Material.Ground
+	end
+	return jitter(pick(GRASS, x / 1500, z / 1500, 11), x, z, 0.07), Enum.Material.Grass
 end
 
 local function terrainProps(color: Color3, mat: Enum.Material, shadow: boolean?): { [string]: any }
@@ -166,9 +205,10 @@ local function buildSea(folder: Instance): number
 				Name = "Water",
 				Size = Vector3.new(SEA_TILE, 1, SEA_TILE),
 				CFrame = CFrame.new(cx, WorldGen.SEA_LEVEL - 0.5, cz),
-				Color = Color3.fromRGB(38, 100, 146),
+				-- deep, slightly green-blue sea that mirrors the sky like real open water
+				Color = Color3.fromRGB(30, 78, 108),
 				Material = Enum.Material.SmoothPlastic,
-				Reflectance = 0.18,
+				Reflectance = 0.32,
 				Parent = folder,
 			})
 			local mesh = Instance.new("SpecialMesh")

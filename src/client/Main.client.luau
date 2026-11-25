@@ -26,6 +26,8 @@ local Minimap = require(Client.Minimap)
 local SoundController = require(Client.SoundController)
 local StuntsHud = require(Client.StuntsHud)
 local Stunts = require(Shared.Stunts)
+local HazardController = require(Client.HazardController)
+local HazardPanel = require(Client.HazardPanel)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -38,6 +40,15 @@ local controlsPopup = ControlsPopup.new()
 local minimap = Minimap.new()
 local sound = SoundController.new()
 local menu: any
+-- Failures and weather events (the HUD's Events button, J)
+local hazards = HazardController.new({
+	notify = function(text: string)
+		hud:notify(text, 5)
+	end,
+})
+local hazardPanel = HazardPanel.new(function(id: string)
+	hud:notify(hazards:trigger(id), 5)
+end)
 local stunts = StuntsHud.new({
 	onRetry = function()
 		(remotes:WaitForChild("RequestReset") :: RemoteEvent):FireServer()
@@ -87,6 +98,9 @@ local input = InputController.new({
 	minimap = function()
 		minimap:toggle()
 	end,
+	events = function()
+		hazardPanel:toggle()
+	end,
 	engines = command("engines"),
 	assist = command("assist"),
 })
@@ -103,6 +117,8 @@ local function stopFlying()
 	camera:detach()
 	hud:setFlying(false)
 	hud:setStuntsMode(false)
+	hazards:attach(nil)
+	hazardPanel:setFlying(false)
 	stunts:stop()
 	flightPanel:setFlying(false)
 	minimap:setFlying(false)
@@ -159,6 +175,7 @@ local function onAssigned(model: Model, options: any, sp: any)
 		fc:destroy()
 		fc = nil
 	end
+	hazards:attach(nil)
 	sound:detach()
 	if not model then
 		return
@@ -175,7 +192,11 @@ local function onAssigned(model: Model, options: any, sp: any)
 	model:WaitForChild("Core", 10)
 	local cfg = Registry.get(model:GetAttribute("AircraftId") :: string)
 	fc = FlightController.new(model, options, sp, remotes, input)
-	fc.windProvider = WorldFx.wind
+	fc.windProvider = function(pos: Vector3, t: number): Vector3
+		return WorldFx.wind(pos, t) + hazards:windAt(pos, t)
+	end
+	hazards:attach(fc)
+	hazardPanel:setFlying(true)
 	sound:attach(fc)
 	destination = options.destination
 	input:bind()
@@ -292,6 +313,8 @@ end)
 
 RunService.Heartbeat:Connect(function(dt)
 	WorldFx.update(dt, if fc then fc.model else nil)
+	hazards:update(dt)
+	hazardPanel:setStatus(hazards:status())
 	if fc then
 		sound:update(dt, camera.mode)
 	end

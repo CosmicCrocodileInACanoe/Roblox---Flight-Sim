@@ -12,12 +12,17 @@ local Geometry = require(script.Parent.Geometry)
 local SPM = Units.STUDS_PER_METER
 local AirportBuilder = {}
 
-local ASPHALT = Color3.fromRGB(52, 54, 58)
-local TAXI = Color3.fromRGB(70, 72, 76)
-local CONCRETE = Color3.fromRGB(150, 150, 146)
-local GRASS = Color3.fromRGB(102, 140, 72)
-local WHITE = Color3.fromRGB(240, 240, 240)
-local YELLOW = Color3.fromRGB(240, 196, 40)
+-- Weathered, real-world surface colours: runway asphalt is a dark warm grey, taxiways
+-- are older and lighter, apron concrete is a pale warm grey, airfield grass is mown and
+-- a little dry, and paint is never pure white.
+local ASPHALT = Color3.fromRGB(48, 49, 52)
+local TAXI = Color3.fromRGB(78, 78, 80)
+local SHOULDER = Color3.fromRGB(92, 90, 86)
+local RUBBER = Color3.fromRGB(26, 26, 28) -- tyre deposits in the touchdown zones
+local CONCRETE = Color3.fromRGB(168, 166, 158)
+local GRASS = Color3.fromRGB(104, 128, 66)
+local WHITE = Color3.fromRGB(232, 232, 226)
+local YELLOW = Color3.fromRGB(226, 182, 46)
 
 function AirportBuilder.build(id: string, parent: Instance): Model
 	local l = Airports.layout(id)
@@ -63,7 +68,7 @@ function AirportBuilder.build(id: string, parent: Instance): Model
 	-- Shoulders
 	for _, s in { -1, 1 } do
 		Geometry.tiledRect(frame, -hl, hl, lat(s * hw), lat(s * (hw + 7.5 * SPM)), -0.15, 1.7, {
-			Name = "Shoulder", Color = TAXI, Material = Enum.Material.Asphalt,
+			Name = "Shoulder", Color = SHOULDER, Material = Enum.Material.Pavement,
 		}, model)
 	end
 
@@ -103,6 +108,28 @@ function AirportBuilder.build(id: string, parent: Instance): Model
 	for k, e in l.ends do
 		local dir = if k == 1 then 1 else -1 -- along-axis direction of landing for this end
 		local th = -dir * hl -- threshold along-position
+		-- Tyre rubber deposits: dark, worn smears where the main wheels touch down, densest
+		-- around the aiming point and fading out down the runway and towards the edges.
+		-- One layer of non-overlapping patches (no z-fighting), darkness = along x across.
+		local bands = { { 0, 0.16, 1 }, { 0.16, 0.34, 0.55 } } -- lateral fraction of half-width, weight
+		for seg = 0, 11 do
+			local d0, d1 = 90 + seg * 62, 90 + (seg + 1) * 62
+			local mid = (d0 + d1) / 2
+			local alongW = math.clamp(1 - math.abs(mid - 330) / 520, 0.15, 1)
+			local k0 = if dir > 0 then 0.37 else 0.71
+			local r0, r1 = th + dir * d0 * SPM, th + dir * d1 * SPM
+			for _, bd in bands do
+				local k = alongW * bd[3] * (0.85 + 0.3 * math.noise(seg * 0.7 + 0.3, bd[1] * 3.1 + 0.2, k0))
+				local color = ASPHALT:Lerp(RUBBER, math.clamp(k, 0, 1))
+				local lanes = if bd[1] == 0 then { { -bd[2], bd[2] } } else { { -bd[2], -bd[1] }, { bd[1], bd[2] } }
+				for _, ln in lanes do
+					Geometry.tiledRect(frame, math.min(r0, r1), math.max(r0, r1), lat(hw * ln[1]), lat(hw * ln[2]), 0.03, 0.05, {
+						Name = "TyreMarks", Color = color, Material = Enum.Material.Asphalt,
+						CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false,
+					}, markings)
+				end
+			end
+		end
 		-- threshold "piano keys"
 		for i = -6, 6 do
 			if i ~= 0 then
@@ -198,7 +225,7 @@ function AirportBuilder.build(id: string, parent: Instance): Model
 
 	-- Apron and gates ------------------------------------------------------------
 	Geometry.tiledRect(frame, -l.apronHalfLen, l.apronHalfLen, lat(math.min(l.apronNear, l.apronFar)), lat(math.max(l.apronNear, l.apronFar)), -0.02, 1.8, {
-		Name = "Apron", Color = CONCRETE, Material = Enum.Material.Concrete,
+		Name = "Apron", Color = CONCRETE, Material = Enum.Material.Pavement,
 	}, model)
 	for i, gt in l.gates do
 		local gateLat = side * 340 * SPM
@@ -234,9 +261,12 @@ function AirportBuilder.build(id: string, parent: Instance): Model
 	for s = 0, segs - 1 do
 		local a0 = -half + s * (2 * half / segs)
 		local a1 = a0 + 2 * half / segs
-		block("Terminal", a0, a1, tNear, tFar, 0, tHeight, Color3.fromRGB(214, 216, 220), Enum.Material.Concrete)
-		block("Facade", a0, a1, tNear - side * 0.6, tNear, 2, tHeight - 6, Color3.fromRGB(90, 130, 160), Enum.Material.Glass, { Reflectance = 0.25, Transparency = 0.1 })
-		block("Roof", a0 - 10, a1 + 10, tNear - side * 12, tFar + side * 4, tHeight, tHeight + 4, Color3.fromRGB(170, 172, 176), Enum.Material.Metal)
+		block("Terminal", a0, a1, tNear, tFar, 0, tHeight, Color3.fromRGB(206, 204, 198), Enum.Material.Concrete)
+		block("Facade", a0, a1, tNear - side * 0.6, tNear, 2, tHeight - 6, Color3.fromRGB(70, 98, 118), Enum.Material.Glass, { Reflectance = 0.35, Transparency = 0.05 })
+		-- curtain-wall mullions: a dark aluminium sill and head along the glass
+		block("FacadeFrame", a0, a1, tNear - side * 0.9, tNear - side * 0.5, 2, 3.2, Color3.fromRGB(64, 66, 70), Enum.Material.Metal)
+		block("FacadeFrame", a0, a1, tNear - side * 0.9, tNear - side * 0.5, tHeight - 7.2, tHeight - 6, Color3.fromRGB(64, 66, 70), Enum.Material.Metal)
+		block("Roof", a0 - 10, a1 + 10, tNear - side * 12, tFar + side * 4, tHeight, tHeight + 4, Color3.fromRGB(176, 178, 180), Enum.Material.CorrodedMetal)
 	end
 	-- Terminal name sign on the roof edge
 	local signPart = block("TerminalSign", -half * 0.4, half * 0.4, tNear - side * 1.2, tNear - side * 0.8, tHeight + 4, tHeight + 24, Color3.fromRGB(30, 60, 110), Enum.Material.SmoothPlastic)
@@ -248,7 +278,7 @@ function AirportBuilder.build(id: string, parent: Instance): Model
 	end
 	-- Landside parking
 	Geometry.tiledRect(frame, -half, half, lat(tFar), lat(tFar + side * 120 * SPM), -0.3, 1, {
-		Name = "Parking", Color = Color3.fromRGB(80, 82, 86), Material = Enum.Material.Asphalt,
+		Name = "Parking", Color = Color3.fromRGB(66, 66, 68), Material = Enum.Material.Asphalt,
 	}, model)
 
 	-- Control tower
@@ -258,14 +288,14 @@ function AirportBuilder.build(id: string, parent: Instance): Model
 		ClassName = "Part", Name = "TowerShaft", Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(45 * SPM, 7 * SPM, 7 * SPM),
 		CFrame = at(towerA, lat(towerL), 22.5 * SPM) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(220, 220, 224), Material = Enum.Material.Concrete, Parent = model,
+		Color = Color3.fromRGB(212, 210, 204), Material = Enum.Material.Concrete, Parent = model,
 	})
 	shaft:SetAttribute("Landmark", "Tower")
 	Geometry.part({
 		ClassName = "Part", Name = "TowerCab", Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(5 * SPM, 13 * SPM, 13 * SPM),
 		CFrame = at(towerA, lat(towerL), 47.5 * SPM) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(70, 120, 140), Material = Enum.Material.Glass, Reflectance = 0.3, Parent = model,
+		Color = Color3.fromRGB(52, 86, 100), Material = Enum.Material.Glass, Reflectance = 0.4, Parent = model,
 	})
 	Geometry.part({
 		ClassName = "Part", Name = "TowerRoof", Shape = Enum.PartType.Cylinder,
@@ -280,8 +310,8 @@ function AirportBuilder.build(id: string, parent: Instance): Model
 
 	-- Hangar
 	local hA = -half - 220 * SPM
-	block("Hangar", hA - 45 * SPM, hA + 45 * SPM, tNear, tNear + side * 70 * SPM, 0, 24 * SPM, Color3.fromRGB(160, 168, 176), Enum.Material.Metal)
-	block("HangarDoor", hA - 40 * SPM, hA + 40 * SPM, tNear - side * 0.5, tNear, 0, 21 * SPM, Color3.fromRGB(120, 128, 136), Enum.Material.DiamondPlate)
+	block("Hangar", hA - 45 * SPM, hA + 45 * SPM, tNear, tNear + side * 70 * SPM, 0, 24 * SPM, Color3.fromRGB(152, 158, 162), Enum.Material.CorrodedMetal)
+	block("HangarDoor", hA - 40 * SPM, hA + 40 * SPM, tNear - side * 0.5, tNear, 0, 21 * SPM, Color3.fromRGB(126, 132, 138), Enum.Material.Metal)
 
 	-- Windsock on the far side of the runway
 	local wsA = -hl * 0.55

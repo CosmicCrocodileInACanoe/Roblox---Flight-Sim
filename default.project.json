@@ -3,10 +3,14 @@
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": {
-      "Shared": { "$path": "src/shared" }
+      "Shared": {
+        "$path": "src/shared"
+      }
     },
     "ServerScriptService": {
-      "Server": { "$path": "src/server" }
+      "Server": {
+        "$path": "src/server"
+      }
     },
     "StarterPlayer": {
       "$properties": {
@@ -15,7 +19,9 @@
         "EnableMouseLockOption": false
       },
       "StarterPlayerScripts": {
-        "Client": { "$path": "src/client" }
+        "Client": {
+          "$path": "src/client"
+        }
       }
     },
     "Workspace": {
@@ -27,7 +33,17 @@
     },
     "Lighting": {
       "$properties": {
-        "ClockTime": 13.5
+        "ClockTime": 13.5,
+        "Technology": "Future",
+        "GlobalShadows": true,
+        "ShadowSoftness": 0.12,
+        "EnvironmentDiffuseScale": 1.0,
+        "EnvironmentSpecularScale": 1.0
+      }
+    },
+    "MaterialService": {
+      "$properties": {
+        "Use2022Materials": true
       }
     }
   }

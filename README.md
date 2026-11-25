@@ -134,9 +134,12 @@ whole course with the Easy assist and check every ring clears the ground.
 
 ## Sound
 
-All audio is set up in `src/shared/AudioConfig.luau`. Each slot has an `id`; paste a Creator
-Store audio asset ID there (just the number) and it plays. Empty slots stay silent and never
-error. What each slot does:
+All audio is set up in `src/shared/AudioConfig.luau`. Every slot ships with starter IDs from
+the Creator Store, and a slot can list several candidates. When you start flying, the game
+checks them and uses the first one that loads. Output then prints
+`[Audio] N sounds loaded`, plus the name of any slot with no working ID. To change a sound,
+paste another Creator Store audio ID (just the number) into that slot's `id`. An empty slot
+stays silent and never errors.
 
 - Engines: `jetWhine` (pitch and volume follow N1) and `jetRumble` (follows thrust and
   reverse). Propeller aircraft use `propDrone` and `propRumble` instead (each config's `soundProfile`,

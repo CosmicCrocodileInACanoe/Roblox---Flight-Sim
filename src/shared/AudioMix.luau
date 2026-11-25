@@ -33,11 +33,33 @@ function AudioMix.assetUrl(id: any): string?
 	end
 	local s = string.gsub(id, "^%s+", "")
 	s = string.gsub(s, "%s+$", "")
+	if string.match(s, "^rbxasset://sounds/[%w%s_%-%.]+$") then
+		return s -- a sound that ships with the Roblox client
+	end
 	local digits = string.match(s, "^rbxassetid://(%d+)$") or string.match(s, "^(%d+)$")
 	if digits and tonumber(digits) and (tonumber(digits) :: number) > 0 then
 		return "rbxassetid://" .. digits
 	end
 	return nil
+end
+
+-- A slot's id can be one ID or a list of candidates (first one that loads wins).
+function AudioMix.assetUrls(id: any): { string }
+	local out = {}
+	if type(id) == "table" then
+		for _, v in id do
+			local u = AudioMix.assetUrl(v)
+			if u and not table.find(out, u) then
+				table.insert(out, u)
+			end
+		end
+	else
+		local u = AudioMix.assetUrl(id)
+		if u then
+			table.insert(out, u)
+		end
+	end
+	return out
 end
 
 function AudioMix.profileFor(audioCfg: any, aircraftId: string?, aircraftCfg: any?): any

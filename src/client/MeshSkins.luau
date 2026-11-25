@@ -94,12 +94,15 @@ local function release(part: BasePart)
 	if s.conn then
 		s.conn:Disconnect()
 	end
+	local ltm = s.meshPart.LocalTransparencyModifier
 	pcall(function()
 		s.meshPart:Destroy()
 		s.em:Destroy()
 	end)
 	if part.Parent then
-		part.LocalTransparencyModifier = 0
+		-- hand visibility back to the part (it stays hidden if the skin was hidden, e.g. a
+		-- nose panel in the cockpit view)
+		part.LocalTransparencyModifier = ltm
 	end
 end
 
@@ -161,6 +164,12 @@ local function create(part: BasePart, shape: string): Skin?
 	w.Part0 = part
 	w.Part1 = meshPart
 	w.Parent = meshPart
+	-- The skin stands in for the part, cockpit view included: a dented nose panel must
+	-- still vanish in the cockpit or it blocks the windscreen.
+	if part:GetAttribute("HideInCockpit") then
+		meshPart:SetAttribute("HideInCockpit", true)
+	end
+	meshPart.LocalTransparencyModifier = part.LocalTransparencyModifier
 	meshPart.Parent = part
 	part.LocalTransparencyModifier = 1
 	local rest = {}

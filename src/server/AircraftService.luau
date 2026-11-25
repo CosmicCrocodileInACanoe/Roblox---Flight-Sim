@@ -22,6 +22,7 @@ local AircraftBuilder = require(script.Parent.AircraftBuilder)
 local CrashService = require(script.Parent.CrashService)
 local CraterService = require(script.Parent.CraterService)
 local Crash = require(Shared.Crash)
+local WorldGen = require(Shared.WorldGen)
 
 local AircraftService = {}
 
@@ -389,6 +390,12 @@ function AircraftService.repair(p: Player)
 	local crashed = sys.Crashed == true or old:GetAttribute("Exploded") == true
 	local forward = v:Dot(look)
 	local gy = groundBelow(cf.Position.X, cf.Position.Z, cf.Position.Y)
+	-- The sea surface doesn't stop rays (only the invisible seabed far below does), so
+	-- over water the surface counts as the ground. Otherwise a ditched or floating
+	-- aircraft is rebuilt on the seabed.
+	if gy and gy < WorldGen.SEA_LEVEL then
+		gy = WorldGen.SEA_LEVEL
+	end
 	local agl = if gy then (cf.Position.Y - gy) * Units.METERS_PER_STUD else math.huge
 	local sp: any
 	if crashed or forward < 25 or agl < 8 then

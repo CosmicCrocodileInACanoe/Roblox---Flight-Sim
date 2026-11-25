@@ -11,6 +11,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Units = require(Shared.Units)
 local MathUtil = require(Shared.MathUtil)
 local Airports = require(Shared.Airports)
+local WorldGen = require(Shared.WorldGen)
 local Effects = require(script.Parent.Effects)
 
 local SPM = Units.STUDS_PER_METER
@@ -110,7 +111,9 @@ function CameraController:applyCockpitVisibility(inCockpit: boolean)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			if d:GetAttribute("HideInCockpit") then
-				d.LocalTransparencyModifier = if inCockpit then 1 else 0
+				-- a part with a dent skin stays hidden: the skin (tagged too) shows instead
+				local skinned = d.Name ~= "DentSkin" and d:FindFirstChild("DentSkin") ~= nil
+				d.LocalTransparencyModifier = if inCockpit or skinned then 1 else 0
 			elseif d:GetAttribute("CockpitOnly") then
 				-- glass keeps some transparency inside (CockpitTransparency attribute)
 				local inside = d:GetAttribute("CockpitTransparency")
@@ -249,8 +252,10 @@ function CameraController:update(dt: number)
 		params.FilterDescendantsInstances = { model, Players.LocalPlayer.Character :: any }
 		params.IgnoreWater = false
 		local hit = Workspace:Raycast(camPos + Vector3.new(0, 400, 0), Vector3.new(0, -800, 0), params)
-		if hit and camPos.Y < hit.Position.Y + 3 * SPM then
-			camPos = Vector3.new(camPos.X, hit.Position.Y + 3 * SPM, camPos.Z)
+		-- (the sea surface can't be hit by rays, so it gets its own floor)
+		local floorY = math.max(if hit then hit.Position.Y else -math.huge, WorldGen.SEA_LEVEL) + 3 * SPM
+		if camPos.Y < floorY then
+			camPos = Vector3.new(camPos.X, floorY, camPos.Z)
 		end
 		cam.CFrame = CFrame.lookAt(camPos, target + lagged.LookVector * 20) * shakeCF
 		cam.FieldOfView = 70

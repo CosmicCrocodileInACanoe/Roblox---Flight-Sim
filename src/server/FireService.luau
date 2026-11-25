@@ -253,7 +253,8 @@ local function onDrop(p: Player, model: any, x: any, z: any, kg: any, heightM: a
 	end
 	-- no more water than the tank can pour out (with slack for network bunching)
 	local now = os.clock()
-	local b = dropBudget[p] or { kg = 0, t = now }
+	-- a new player starts with a full tank's worth, so their first drop counts in full
+	local b = dropBudget[p] or { kg = cfg.waterTank.capacity, t = now }
 	b.kg = math.min(cfg.waterTank.capacity, b.kg + (now - b.t) * cfg.waterTank.dropRate * 1.5)
 	b.t = now
 	dropBudget[p] = b

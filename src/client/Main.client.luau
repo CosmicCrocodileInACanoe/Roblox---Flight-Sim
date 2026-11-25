@@ -187,7 +187,7 @@ local function onAssigned(model: Model, options: any, sp: any, repaired: boolean
 		fc:destroy()
 		fc = nil
 	end
-	hazards:attach(nil)
+	hazards:attach(nil, repaired)
 	sound:detach()
 	if not model then
 		return
@@ -209,7 +209,7 @@ local function onAssigned(model: Model, options: any, sp: any, repaired: boolean
 	fc.windProvider = function(pos: Vector3, t: number): Vector3
 		return WorldFx.wind(pos, t) + hazards:windAt(pos, t)
 	end
-	hazards:attach(fc)
+	hazards:attach(fc, repaired)
 	hazardPanel:setFlying(true)
 	sound:attach(fc)
 	destination = options.destination

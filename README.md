@@ -338,7 +338,7 @@ All of them pass the same offline flight tests.
 | Meridian 200 | Narrow-body twin jet | |
 | Hauler 4 | Cargo freighter | four turboprops, T-tail, upswept tail with a ramp |
 | Atlas 400 | Wide-body twin jet | |
-| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines with afterburners (full throttle, gear up); passes Mach 2 above about 20,000 ft, held near Mach 1 down low. The HUD shows the Mach number |
+| Arrowstar | Supersonic-style airliner | delta wing, needle nose, four engines with afterburners (full throttle, gear up); passes Mach 2 above about 1,200 ft, held near Mach 1 right down low. The HUD shows the Mach number |
 | Celestia 800 | Four-engine jumbo | |
 
 Adding one is a data file in `src/shared/Aircraft/` plus a line in `AircraftRegistry`. The

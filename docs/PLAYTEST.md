@@ -156,8 +156,8 @@ These are the most likely places for first-run bugs, so check them first.
 
 15. **Mach 2 jet.** Fly the Arrowstar from HBR. Full throttle on the runway lights the
     afterburners (orange flames behind the engines, "AB" next to each engine). Climb above
-    20,000 ft with the gear up and full throttle: the HUD shows the Mach number next to GS
-    and it passes M2.00 within a few minutes. Down low it should sit around Mach 1. With the
+    1,200 ft with the gear up and full throttle: the HUD shows the Mach number next to GS
+    and it passes M2.00 within a few minutes. Right down low it should sit around Mach 1. With the
     gear down in the air the flames go out. Note anything that shakes, jitters or tears
     apart at that speed.
 

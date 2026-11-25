@@ -175,10 +175,13 @@ checks them and uses the first one that loads. Output then prints
 paste another Creator Store audio ID (just the number) into that slot's `id`. An empty slot
 stays silent and never errors.
 
-- Engines: `jetWhine` (pitch and volume follow N1) and `jetRumble` (follows thrust and
-  reverse). Propeller aircraft use `propDrone` and `propRumble` instead (each config's `soundProfile`,
-  with `AudioConfig.aircraftProfile` as a fallback).
-  `engineStart` plays once when you start the engines.
+- Engines: every plane has its own engine sound. There are nine types in
+  `AudioConfig.profiles`: airliner turbofan, jumbo (deeper, more rumble), business jet
+  (higher whine), fighter (turbojet roar), supersonic (roar, plus an `afterburner` layer
+  while the afterburners are lit), turboprop (prop drone with a turbine hum), piston,
+  vintage radial and stunt. `AudioConfig.aircraftPitch` gives planes of the same type
+  their own pitch. Each layer's pitch and volume follow N1 and thrust. `engineStart`
+  plays once when you start the engines.
 - `wind` grows with airspeed, louder with gear down or speedbrake out; `runwayRoll` rumbles
   with ground speed while the wheels are down.
 - `gearMotor`, `flapMotor` loop while they move; `gearLock` clunks when the gear locks.

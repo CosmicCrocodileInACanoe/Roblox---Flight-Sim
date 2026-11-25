@@ -445,7 +445,7 @@ end
 local function snapshot(fc: any, aheadSec: number): any
 	local fm = fc.fm
 	local t = fc.telemetry or {}
-	local n1, starting, rev = 0, false, 0
+	local n1, starting, rev, ab = 0, false, 0, 0
 	local count = math.max(1, #fm.engines)
 	for i, e in fm.engines do
 		local comp = fc.cfg.engines[i] and fc.cfg.engines[i].component
@@ -453,6 +453,7 @@ local function snapshot(fc: any, aheadSec: number): any
 			n1 += e.n1
 			starting = starting or e.starting
 			rev = math.max(rev, e.reverser)
+			ab = math.max(ab, e.afterburner or 0)
 		end
 	end
 	local detached, failedParts, degraded = 0, 0, 0
@@ -492,6 +493,7 @@ local function snapshot(fc: any, aheadSec: number): any
 		n1 = n1 / count,
 		anyStarting = starting,
 		reverser = rev,
+		afterburner = ab,
 		throttle = t.throttle or 0,
 		ias = t.ias or 0,
 		gs = t.gs or 0,
@@ -594,7 +596,8 @@ function SoundController:_update(dt: number, cameraMode: string?)
 		local effect = if tgt then tgt.effect else 0
 		local wantVol = level * l.cfg.volume * master
 		l.volume += (wantVol - l.volume) * k
-		l.pitch += (AudioMix.pitch(l.cfg, effect) - l.pitch) * k
+		local pitchMul = if tgt and tgt.pitchMul then tgt.pitchMul else 1
+		l.pitch += (AudioMix.pitch(l.cfg, effect) * pitchMul - l.pitch) * k
 		local s = l.sound
 		if l.volume < SILENT and wantVol < SILENT then
 			if s.IsPlaying then

@@ -27,11 +27,18 @@ AudioConfig.masterVolume = 1.0
 
 AudioConfig.sounds = {
 	-- Engines: jets (turbofan) -------------------------------------------------------
-	jetWhine = { id = { "183339994", "123172515633498", "9116932100" }, volume = 0.7, pitchMin = 0.55, pitchMax = 1.35, looped = true, group = "exterior" },
+	jetWhine = { id = { "183339994", "11124180820", "123172515633498", "9116932100" }, volume = 0.7, pitchMin = 0.55, pitchMax = 1.35, looped = true, group = "exterior" },
 	jetRumble = { id = { "169572883", "9113060656" }, volume = 0.9, pitchMin = 0.8, pitchMax = 1.1, looped = true, group = "exterior" },
 	-- Engines: propellers (turboprop) --------------------------------------------------
 	propDrone = { id = { "8907185231", "142317661", "117380424798601" }, volume = 0.8, pitchMin = 0.6, pitchMax = 1.25, looped = true, group = "exterior" },
 	propRumble = { id = { "117380424798601", "142317661" }, volume = 0.6, pitchMin = 0.85, pitchMax = 1.1, looped = true, group = "exterior" },
+	-- Engines: fighters and supersonic (turbojet roar, afterburner) ----------------------
+	jetRoar = { id = { "169572883", "9113060656" }, volume = 0.9, pitchMin = 0.75, pitchMax = 1.2, looped = true, group = "exterior" },
+	afterburner = { id = { "169572883" }, volume = 1.0, pitchMin = 0.7, pitchMax = 0.85, looped = true, group = "exterior" },
+	-- Engines: pistons and turbine hum --------------------------------------------------
+	pistonEngine = { id = { "141268701", "6596052671", "8907185231" }, volume = 0.8, pitchMin = 0.55, pitchMax = 1.3, looped = true, group = "exterior" },
+	stuntEngine = { id = { "117380424798601", "8907185231", "141268701" }, volume = 0.8, pitchMin = 0.6, pitchMax = 1.45, looped = true, group = "exterior" },
+	turbineHum = { id = { "11124180820", "183339994" }, volume = 0.5, pitchMin = 0.7, pitchMax = 1.3, looped = true, group = "exterior" },
 	-- Engine start (one-shot, plays once when you press the start key)
 	engineStart = { id = { "4686865643" }, volume = 0.7, looped = false, group = "exterior" },
 
@@ -121,32 +128,67 @@ AudioConfig.atcControllerVoices = { "4", "3" }
 AudioConfig.atcPilotVoices = { "1", "2", "6", "7", "8" }
 AudioConfig.atcPilotPitch = 2.5 -- +/- semitones
 
--- Which engine sounds each aircraft uses. Unknown aircraft use "jet".
+-- Engine sound types. Each has a main "whine" layer (pitch and level follow N1) and a
+-- "rumble" layer (follows thrust), plus optional extra layers:
+--   follow = "n1" | "thrust" | "afterburner" (lit afterburners only)
+-- pitch scales every layer; whineGain / rumbleGain scale their volume.
 AudioConfig.profiles = {
-	jet = { whine = "jetWhine", rumble = "jetRumble" },
-	prop = { whine = "propDrone", rumble = "propRumble" },
+	turbofan = { whine = "jetWhine", rumble = "jetRumble" }, -- airliners
+	heavy = { whine = "jetWhine", rumble = "jetRumble", pitch = 0.82, rumbleGain = 1.25, whineGain = 0.85 }, -- jumbos
+	bizjet = { whine = "jetWhine", rumble = "jetRumble", pitch = 1.22, rumbleGain = 0.7 }, -- small fast whine
+	fighter = { whine = "jetWhine", rumble = "jetRoar", pitch = 1.1, whineGain = 0.6, rumbleGain = 1.2 }, -- raw turbojet roar
+	supersonic = { -- Concorde-style turbojets: roar, plus afterburners at full throttle
+		whine = "jetWhine", rumble = "jetRoar", pitch = 0.95, whineGain = 0.5, rumbleGain = 1.2,
+		extra = { { slot = "afterburner", follow = "afterburner", gain = 1 } },
+	},
+	turboprop = { -- propeller drone with a turbine whine underneath
+		whine = "propDrone", rumble = "propRumble",
+		extra = { { slot = "turbineHum", follow = "n1", gain = 0.35 } },
+	},
+	piston = { whine = "pistonEngine", rumble = "propRumble", rumbleGain = 0.6 }, -- light planes
+	radial = { whine = "pistonEngine", rumble = "propRumble", pitch = 0.72, rumbleGain = 0.9 }, -- vintage biplane
+	stunt = { whine = "stuntEngine", rumble = "propRumble", pitch = 1.15, rumbleGain = 0.5 }, -- high-revving aerobatic
 }
--- (an aircraft config's own soundProfile wins; this table covers older configs)
+-- Older names some aircraft configs use (their `soundProfile`).
+AudioConfig.profileAliases = { jet = "turbofan", prop = "turboprop" }
+
+-- Which sound type each aircraft uses, and its own pitch so planes of the same type
+-- still sound different. Unknown aircraft use the config's soundProfile, else turbofan.
 AudioConfig.aircraftProfile = {
-	bumble = "prop",
-	meadowlark4 = "prop",
-	sprite = "prop",
-	ridgehopper = "prop",
-	puffin = "prop",
-	breezetwin = "prop",
-	silverline8 = "jet",
-	swiftletj3 = "jet",
-	vectorx1 = "jet",
-	nightjart2 = "jet",
-	kestrel72 = "prop",
-	rainmaker = "prop",
-	meridian200 = "jet",
-	hauler4 = "prop",
-	atlas400 = "jet",
-	arrowstar = "jet",
-	celestia800 = "jet",
+	bumble = "radial",
+	meadowlark4 = "piston",
+	sprite = "stunt",
+	ridgehopper = "piston",
+	puffin = "piston",
+	breezetwin = "turboprop",
+	silverline8 = "bizjet",
+	swiftletj3 = "fighter",
+	vectorx1 = "fighter",
+	nightjart2 = "fighter",
+	kestrel72 = "turboprop",
+	rainmaker = "turboprop",
+	meridian200 = "turbofan",
+	hauler4 = "turboprop",
+	atlas400 = "heavy",
+	arrowstar = "supersonic",
+	celestia800 = "heavy",
 }
-AudioConfig.defaultProfile = "jet"
+AudioConfig.aircraftPitch = {
+	meadowlark4 = 1.08, -- small trainer: a bit higher
+	ridgehopper = 0.92, -- bigger bush-plane engine
+	puffin = 1.0,
+	breezetwin = 1.1,
+	kestrel72 = 1.0,
+	rainmaker = 0.9,
+	hauler4 = 0.82, -- four big props
+	swiftletj3 = 1.12, -- trainer jet
+	vectorx1 = 1.05,
+	nightjart2 = 0.94, -- twin engines, deeper
+	meridian200 = 1.0,
+	atlas400 = 1.0,
+	celestia800 = 0.94,
+}
+AudioConfig.defaultProfile = "turbofan"
 
 -- Mixing ------------------------------------------------------------------------------
 AudioConfig.mix = {

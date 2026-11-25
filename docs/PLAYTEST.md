@@ -212,6 +212,17 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     press Y: the wing is back, you keep your speed and height, and any mission keeps going.
     Pressing Y again within 2 s does nothing.
 
+17. **Autoland.** In a few aircraft (Meadowlark 4, Meridian 200, Celestia 800, Arrowstar),
+    fly 10 to 20 km from an airport at a few thousand feet and press O. Check: the HUD says
+    AUTOLAND and what it is doing, it lines up with a runway, gear and flaps come out, it
+    flares, touches down gently on the centreline, brakes to a stop and says so. Try it from
+    past the runway flying away too. Moving the stick hands control back.
+
+18. **Rainmaker refills and fire distances.** Empty the tank on a fire, press 1: the WATER
+    bar fills at once. Empty it again and press 2: it flies to the sea, lands on the hull
+    (gear up), the bar fills, it takes off and climbs out and hands back. Each WILDFIRE label
+    shows a distance under it that counts down as you fly toward it.
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

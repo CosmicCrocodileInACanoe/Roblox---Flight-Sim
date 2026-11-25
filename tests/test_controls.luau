@@ -5,7 +5,8 @@ local Controls = require("../src/shared/Controls")
 local HOLD = { pitchDown = 1, pitchUp = 1, rollLeft = 1, rollRight = 1, yawLeft = 1, yawRight = 1,
 	throttleUp = 1, throttleDown = 1, trimDown = 1, trimUp = 1, brake = 1, reverse = 1, waterDrop = 1 }
 local PRESS = { gear = 1, flapsDown = 1, flapsUp = 1, parkingBrake = 1, speedbrake = 1, engines = 1,
-	assist = 1, camera = 1, panel = 1, hud = 1, debug = 1, menu = 1, reset = 1, fixAll = 1, controls = 1, minimap = 1, events = 1 }
+	assist = 1, camera = 1, panel = 1, hud = 1, debug = 1, menu = 1, reset = 1, fixAll = 1, controls = 1, minimap = 1, events = 1,
+	autoland = 1, refillWater = 1, autoScoop = 1 }
 -- Keys Roblox reserves or that would fight the default player scripts.
 local RESERVED = { Escape = true, Tab = true, Slash = true, Backquote = true, F9 = true, F11 = true, Space = true }
 

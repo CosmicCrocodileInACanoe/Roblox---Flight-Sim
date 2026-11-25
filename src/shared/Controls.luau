@@ -39,6 +39,7 @@ Controls.KEYMAP = {
 	{ action = "brake", kind = "hold", group = "Aircraft systems", label = "Wheel brakes", keys = { "B", "ButtonB" } },
 	{ action = "parkingBrake", kind = "press", group = "Aircraft systems", label = "Parking brake", keys = { "P", "DPadLeft" } },
 	{ action = "reverse", kind = "hold", group = "Aircraft systems", label = "Reverse thrust (on the ground)", keys = { "Z" } },
+	{ action = "waterDrop", kind = "hold", group = "Aircraft systems", label = "Drop water (water bomber; skim the sea to refill)", keys = { "L" } },
 	-- Camera and game
 	{ action = "camera", kind = "press", group = "Camera and game", label = "Camera: chase / cockpit / tower", keys = { "C", "ButtonSelect" } },
 	{ action = "assist", kind = "press", group = "Camera and game", label = "Easy / Assisted / Simulation mode", keys = { "T" } },

@@ -69,6 +69,7 @@ AudioConfig.aircraftProfile = {
 	vectorx1 = "jet",
 	nightjart2 = "jet",
 	kestrel72 = "prop",
+	rainmaker = "prop",
 	meridian200 = "jet",
 	hauler4 = "prop",
 	atlas400 = "jet",

@@ -167,6 +167,9 @@ local function onReportCrash(p: Player, model: any, pos: any, dv: any)
 	if m:GetAttribute("Exploded") then
 		return -- once per aircraft
 	end
+	if Crash.justRepaired(m:GetAttribute("RepairedAt"), os.clock()) then
+		return -- sent before Fix all put it back together
+	end
 	local core = m.PrimaryPart
 	if not core or dv ~= dv or (pos - core.Position).Magnitude > 250 then
 		return

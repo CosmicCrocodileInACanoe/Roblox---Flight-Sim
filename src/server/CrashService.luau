@@ -579,6 +579,9 @@ local function validAircraft(p: Player, model: any, compName: any): (Model?, any
 	if m:GetAttribute("Dmg_" .. compName) == "detached" then
 		return nil, nil
 	end
+	if Crash.justRepaired(m:GetAttribute("RepairedAt"), os.clock()) then
+		return nil, nil -- about parts that Fix all just replaced
+	end
 	return m, cfg
 end
 

@@ -131,7 +131,9 @@ function FlightModel.new(cfg: any, opts: any?)
 		}
 		self.gLimit = cfg.gLimit * (1 + (tough - 1) * 0.5)
 	end
-	self.damage = Damage.new(comps, { breakApart = o.breakApart == true })
+	self.damageComps = comps
+	self.breakApart = o.breakApart == true
+	self.damage = Damage.new(comps, { breakApart = self.breakApart })
 	self.failures = {} :: { [string]: any }
 	self.mass = cfg.mass
 	self.airborneTime = 0
@@ -190,6 +192,24 @@ function FlightModel:setFailure(kind: string, on: boolean)
 		Damage.hurt(self.damage, "LeftWing", 0.45, false)
 	end
 	f[kind] = true
+end
+
+-- Fix all: every component back to full health and attached, every failure cleared.
+-- Engines that failed (fire, flame-out, torn off) run again at idle; an engine the pilot
+-- shut down stays off. Fuel, water, gear and flaps positions are kept.
+function FlightModel:repairAll()
+	self.damage = Damage.new(self.damageComps, { breakApart = self.breakApart })
+	self.failures = {}
+	for _, e in self.engines do
+		if e.failed then
+			e.failed = false
+			e.fire = false
+			e.starting = false
+			e.running = true
+			e.n1 = math.max(e.n1, e.cfg.idleN1)
+		end
+		e.fire = false
+	end
 end
 
 function FlightModel:startEngines()

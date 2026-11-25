@@ -16,7 +16,8 @@ GameConfig.Remotes = {
 	"ReportImpact", -- (model, component, pointBodyM: Vector3, dirBody: Vector3, dv)
 	"ReportSection", -- (model, component, sectionId, dv, cause: "event"?)
 	"WaterDrop", -- (model, impactX, impactZ (studs), kg, dropHeightM) water bomber drops
-	"RequestRepair", -- () Fix all: rebuild the aircraft where it is, every part back on
+	"RequestRepair", -- () Fix all: every part back on, good as new, right where the aircraft is
+	"AircraftRepaired", -- server -> owner (model): Fix all swapped the parts, reset damage in place
 	"ReportCrash", -- (model, worldPos: Vector3, dv) the airframe was destroyed: explode + crater
 	-- server -> client
 	"AircraftAssigned",

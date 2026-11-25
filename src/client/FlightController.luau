@@ -103,34 +103,7 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 		end
 	end
 
-	-- Collect animated joints and hull parts.
-	self.surfaces = {}
-	self.gearMotors = {}
-	self.fans = {}
-	self.smoke = {}
-	self.hullParts = {}
-	self.afterburners = {}
-	self.landingLight = nil :: SpotLight?
-	for _, d in model:GetDescendants() do
-		if d:IsA("Motor6D") then
-			if d:GetAttribute("Surface") then
-				table.insert(self.surfaces, d)
-			elseif d:GetAttribute("GearName") then
-				self.gearMotors[d:GetAttribute("GearName") :: string] = d
-			elseif d:GetAttribute("EngineIndex") then
-				self.fans[d:GetAttribute("EngineIndex") :: number] = { motor = d, angle = 0 }
-			end
-		elseif d:IsA("ParticleEmitter") and d.Name == "FailureSmoke" then
-			local comp = (d:FindFirstAncestorWhichIsA("Model") :: Model).Name
-			self.smoke[comp] = d
-		elseif d:IsA("BasePart") and d:GetAttribute("AfterburnerIndex") then
-			table.insert(self.afterburners, { part = d, index = d:GetAttribute("AfterburnerIndex") :: number, light = d:FindFirstChild("AfterburnerLight") :: PointLight? })
-		elseif d:IsA("SpotLight") and d.Name == "LandingLight" then
-			self.landingLight = d
-		elseif d:IsA("BasePart") and d.CanTouch and d:GetAttribute("Component") then
-			table.insert(self.hullParts, d)
-		end
-	end
+	self.connections = {}
 	self.gearCfg = {}
 	for i, u in cfg.gear.units do
 		self.gearCfg[u.name] = { index = i, cfg = u }
@@ -141,48 +114,8 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 	self.lastContactPoint = {} :: { [string]: Vector3 } -- body metres
 	self.lastImpactReport = {} :: { [string]: number }
 	self.touchCount = {} :: { [string]: number }
-	self.connections = {}
 	local character = Players.LocalPlayer.Character
-	local function isForeign(hit: BasePart): boolean
-		if hit:IsDescendantOf(model) then
-			return false
-		end
-		if character and hit:IsDescendantOf(character) then
-			return false
-		end
-		if hit:GetAttribute("DebrisOwner") == Players.LocalPlayer.UserId then
-			return false
-		end
-		local fx = Workspace:FindFirstChild("LocalEffects")
-		if fx and hit:IsDescendantOf(fx) then
-			return false
-		end
-		local parentModel = hit:FindFirstAncestorWhichIsA("Model")
-		if parentModel and parentModel:FindFirstChildOfClass("Humanoid") then
-			return false
-		end
-		return true
-	end
-	for _, p in self.hullParts do
-		local comp = p:GetAttribute("Component") :: string
-		table.insert(self.connections, p.Touched:Connect(function(hit)
-			-- Torn-off sections keep this connection; they are debris now, not the aircraft.
-			if isForeign(hit) and p:IsDescendantOf(model) then
-				self.lastTouch[comp] = self.time
-				local core = self.core
-				if core and core.Parent then
-					self.lastContactPoint[comp] = core.CFrame:PointToObjectSpace(p.Position) * MPS
-				end
-				self.touchCount[comp] = (self.touchCount[comp] or 0) + 1
-				self.lastContactPart = p
-			end
-		end))
-		table.insert(self.connections, p.TouchEnded:Connect(function(hit)
-			if isForeign(hit) then
-				self.touchCount[comp] = math.max(0, (self.touchCount[comp] or 0) - 1)
-			end
-		end))
-	end
+	self:collectParts()
 
 	self.rayParams = RaycastParams.new()
 	self.rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -226,6 +159,143 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 
 	remotes.ControllerReady:FireServer(model)
 	return self
+end
+
+-- Find the animated joints, effects and hull parts, and listen for contacts on the hull.
+-- Run again after Fix all, which puts new parts on the aircraft.
+function FlightController:collectParts()
+	for _, c in self.connections do
+		c:Disconnect()
+	end
+	self.connections = {}
+	local model = self.model
+	-- Collect animated joints and hull parts.
+	self.surfaces = {}
+	self.gearMotors = {}
+	self.fans = {}
+	self.smoke = {}
+	self.hullParts = {}
+	self.afterburners = {}
+	self.landingLight = nil :: SpotLight?
+	for _, d in model:GetDescendants() do
+		if d:IsA("Motor6D") then
+			if d:GetAttribute("Surface") then
+				table.insert(self.surfaces, d)
+			elseif d:GetAttribute("GearName") then
+				self.gearMotors[d:GetAttribute("GearName") :: string] = d
+			elseif d:GetAttribute("EngineIndex") then
+				self.fans[d:GetAttribute("EngineIndex") :: number] = { motor = d, angle = 0 }
+			end
+		elseif d:IsA("ParticleEmitter") and d.Name == "FailureSmoke" then
+			local comp = (d:FindFirstAncestorWhichIsA("Model") :: Model).Name
+			self.smoke[comp] = d
+		elseif d:IsA("BasePart") and d:GetAttribute("AfterburnerIndex") then
+			table.insert(self.afterburners, { part = d, index = d:GetAttribute("AfterburnerIndex") :: number, light = d:FindFirstChild("AfterburnerLight") :: PointLight? })
+		elseif d:IsA("SpotLight") and d.Name == "LandingLight" then
+			self.landingLight = d
+		elseif d:IsA("BasePart") and d.CanTouch and d:GetAttribute("Component") then
+			table.insert(self.hullParts, d)
+		end
+	end
+
+	local character = Players.LocalPlayer.Character
+	local function isForeign(hit: BasePart): boolean
+		if hit:IsDescendantOf(model) then
+			return false
+		end
+		if character and hit:IsDescendantOf(character) then
+			return false
+		end
+		if hit:GetAttribute("DebrisOwner") == Players.LocalPlayer.UserId then
+			return false
+		end
+		local fx = Workspace:FindFirstChild("LocalEffects")
+		if fx and hit:IsDescendantOf(fx) then
+			return false
+		end
+		local parentModel = hit:FindFirstAncestorWhichIsA("Model")
+		if parentModel and parentModel:FindFirstChildOfClass("Humanoid") then
+			return false
+		end
+		return true
+	end
+	for _, p in self.hullParts do
+		local comp = p:GetAttribute("Component") :: string
+		table.insert(self.connections, p.Touched:Connect(function(hit)
+			-- Torn-off sections keep this connection; they are debris now, not the aircraft.
+			if isForeign(hit) and p:IsDescendantOf(model) then
+				self.lastTouch[comp] = self.time
+				local core = self.core
+				if core and core.Parent then
+					self.lastContactPoint[comp] = core.CFrame:PointToObjectSpace(p.Position) * MPS
+				end
+				self.touchCount[comp] = (self.touchCount[comp] or 0) + 1
+				self.lastContactPart = p
+			end
+		end))
+		table.insert(self.connections, p.TouchEnded:Connect(function(hit)
+			if isForeign(hit) then
+				self.touchCount[comp] = math.max(0, (self.touchCount[comp] or 0) - 1)
+			end
+		end))
+	end
+end
+
+-- CoM height above the ground when resting on the main gear (metres).
+local function restHeight(cfg: any): number
+	local u = cfg.gear.units[2]
+	for _, g in cfg.gear.units do
+		if g.brakes then
+			u = g
+			break
+		end
+	end
+	return -(u.pos[2] - u.strutLength - u.wheelRadius) - u.staticCompression * u.travel
+end
+
+-- Fix all (the server has already put new parts on the aircraft): everything back to
+-- 100% here too, keeping position, speed, engines, fuel and the pilot's controls. A
+-- wreck that is lying still on its side or roof is stood back up on its wheels.
+function FlightController:repairInPlace()
+	self.fm:repairAll()
+	self.crashed = false
+	self.peakDv, self.peakDvTime = 0, nil
+	self.eventUntil = nil
+	table.clear(self.lastImpact)
+	table.clear(self.lastTouch)
+	table.clear(self.lastContactPoint)
+	table.clear(self.lastImpactReport)
+	table.clear(self.touchCount)
+	self.lastContactPart = nil
+	self.prevV, self.prevW = nil, nil
+	self.prevAccel = Vector3.zero
+	self:collectParts()
+	local core = self.core
+	if not core.Parent or core.Anchored then
+		return
+	end
+	local cf = core.CFrame
+	local slow = core.AssemblyLinearVelocity.Magnitude * MPS < 15
+	if slow and cf.UpVector.Y < 0.8 then
+		local look = cf.LookVector
+		local flat = Vector3.new(look.X, 0, look.Z)
+		if flat.Magnitude < 1e-3 then
+			flat = Vector3.new(-cf.UpVector.X, 0, -cf.UpVector.Z)
+		end
+		if flat.Magnitude < 1e-3 then
+			flat = Vector3.new(0, 0, -1)
+		end
+		local pos = cf.Position
+		local hit = Workspace:Raycast(pos + Vector3.new(0, 60, 0), Vector3.new(0, -400, 0), self.rayParams)
+		local gy = if hit then hit.Position.Y else pos.Y
+		if gy < WorldGen.SEA_LEVEL then
+			gy = WorldGen.SEA_LEVEL
+		end
+		local y = gy + restHeight(self.cfg) * SPM + 0.3
+		core.CFrame = CFrame.lookAt(Vector3.new(pos.X, y, pos.Z), Vector3.new(pos.X, y, pos.Z) + flat.Unit)
+		core.AssemblyLinearVelocity = Vector3.zero
+		core.AssemblyAngularVelocity = Vector3.zero
+	end
 end
 
 function FlightController:destroy()

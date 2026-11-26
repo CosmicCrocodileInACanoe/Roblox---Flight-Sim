@@ -239,9 +239,11 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
 
 20. **Emergency services on land.** Crash the Meridian 200 into open ground near Harbor
     City. Check: the message says fire trucks, ambulances and police are coming; within
-    about 20 s police cars, then fire trucks, then ambulances drive in (not through the
+    about 10 s police cars, then fire trucks, then ambulances drive in (not through the
     wreck), park round it facing it with red/blue/white lights flashing, and the fire trucks
-    spray water onto it. A second player sees them too. Press Y: they disappear.
+    spray water onto it. In the chase view you see them drive in from the far side of
+    the wreck, not from behind the camera. A second player sees them too. Press Y: they
+    disappear.
 
 21. **Crash into the sea.** Dive the Meridian into the sea off Harbor City. Check: the wreck
     floats (it does not drop to the seabed at once), the HUD says SINKING with a countdown,

@@ -52,6 +52,14 @@ return { name = "Emergency response and sinking", run = function(T)
 		T.check(ditch.rescueBoat >= 1 and ditch.ferry >= 1, "rescue boats and a ferry for the passengers")
 	end)
 
+	T.test("the crews get there quickly (within 10 s of the call)", function()
+		for _, sit in { "land_crash", "water_crash", "ditch" } do
+			for _, u in Rescue.plan(sit) do
+				T.check(Rescue.arrivalTime(u) <= 10, string.format("%s %s: %.1f s", sit, u.role, Rescue.arrivalTime(u)))
+			end
+		end
+	end)
+
 	T.test("every passenger is off a ditched aircraft before it goes under", function()
 		local t = Rescue.allAboardTime(Rescue.plan(Rescue.DITCH))
 		T.check(t < Rescue.SINK.ditchFullS - 5, string.format("all aboard at %.0f s", t))

@@ -134,6 +134,35 @@ local function homeAngle(x: number, z: number, airportsOnly: boolean?): (number,
 	return math.atan2(bz - z, bx - x), bestD
 end
 
+-- Turn `default` (an angle from the scene, as homeAngle) until a start point `dist`
+-- studs out at height y is inside the local camera's view, so the crews can be seen
+-- coming in. In the chase view that is mostly the far side of the wreck. Points nearer
+-- the middle of the screen win; if none is on screen, `default` stands.
+local function viewAngle(x: number, y: number, z: number, dist: number, default: number): number
+	local cam = Workspace.CurrentCamera
+	if not cam then
+		return default
+	end
+	local vp = cam.ViewportSize
+	local best, bestScore = default, math.huge
+	for k = 0, 23 do
+		local a = default + k * math.rad(15)
+		local p = Vector3.new(x + math.cos(a) * dist, y, z + math.sin(a) * dist)
+		local sp, on = cam:WorldToViewportPoint(p)
+		if on and sp.Z > 0 then
+			local dx = (sp.X - vp.X / 2) / math.max(vp.X, 1)
+			local dy = (sp.Y - vp.Y / 2) / math.max(vp.Y, 1)
+			-- off-centre costs, and so does turning far from the way home
+			local turn = math.abs(((k * 15 + 180) % 360) - 180) / 180
+			local score = dx * dx + dy * dy + turn * 0.05
+			if score < bestScore then
+				best, bestScore = a, score
+			end
+		end
+	end
+	return best
+end
+
 local function buildPath(pts: { Vector3 }): ({ number }, number)
 	local cum = { 0 }
 	for i = 2, #pts do
@@ -301,13 +330,14 @@ function EmergencyController:start(data: any)
 	local plan = Rescue.plan(data.situation)
 
 	if data.situation == Rescue.LAND_CRASH then
-		local angle, homeDist = homeAngle(x, z)
+		local home, homeDist = homeAngle(x, z)
 		local radius = (spanM * 0.5 + 14) * SPM
 		local nGround = 0
 		for _, u in plan do
 			nGround += u.count
 		end
-		local startDist = math.clamp(homeDist, radius + 200, 500 * SPM)
+		local startDist = math.clamp(homeDist, radius + 120, plan[1].distM * SPM)
+		local angle = viewAngle(x, pos.Y + 5, z, startDist, home)
 		local sx, sz, a = Rescue.findStart(isLand, x, z, startDist, angle, radius)
 		if not sx or not sz or not a then
 			a = angle
@@ -333,8 +363,14 @@ function EmergencyController:start(data: any)
 			end
 		end
 	else
-		local angle = homeAngle(x, z)
-		local airAngle = homeAngle(x, z, true)
+		local boatDist = 150 * SPM
+		for _, u in plan do
+			if u.role == "rescueBoat" then
+				boatDist = u.distM * SPM
+			end
+		end
+		local angle = viewAngle(x, SEA + 3, z, boatDist, (homeAngle(x, z)))
+		local airAngle = viewAngle(x, SEA + 60, z, 350 * SPM, (homeAngle(x, z, true)))
 		local boatRadius = (spanM * 0.5 + 16) * SPM
 		local nBoats = 0
 		for _, u in plan do
@@ -360,7 +396,8 @@ function EmergencyController:start(data: any)
 					self:addVehicle(inc, u.role, "boat", pts, u.speed, u.delay + (k - 1) * 1.5)
 				elseif u.role == "ferry" then
 					local r = (spanM * 0.5 + 40) * SPM
-					local sx, sz, a = Rescue.findStart(isSea, x, z, u.distM * SPM, angle + math.rad(70), r)
+					local fa = viewAngle(x, SEA + 10, z, u.distM * SPM, angle + math.rad(35))
+					local sx, sz, a = Rescue.findStart(isSea, x, z, u.distM * SPM, fa, r)
 					if not sx or not sz or not a then
 						a = angle + math.rad(70)
 						sx, sz = x + math.cos(a :: number) * (r + 200), z + math.sin(a :: number) * (r + 200)
@@ -370,9 +407,10 @@ function EmergencyController:start(data: any)
 				else -- helicopter
 					local a = airAngle + (k - 1) * 0.6
 					local d = u.distM * SPM
-					local hoverH = SEA + 85 + (k - 1) * 30
-					local from = Vector3.new(x + math.cos(a) * d, SEA + 320, z + math.sin(a) * d)
-					local to = Vector3.new(x + math.cos(a) * 70, hoverH, z + math.sin(a) * 70)
+					-- low enough to stay in the chase view over the wreck
+					local hoverH = SEA + 45 + (k - 1) * 18
+					local from = Vector3.new(x + math.cos(a) * d, SEA + 140, z + math.sin(a) * d)
+					local to = Vector3.new(x + math.cos(a) * 60, hoverH, z + math.sin(a) * 60)
 					local pts = {}
 					for i = 0, 20 do
 						local f = i / 20
@@ -474,9 +512,11 @@ function EmergencyController:stepVehicle(inc: any, v: Vehicle, dt: number)
 		local p = v.pts[#v.pts]
 		if v.kind == "air" then
 			-- circle the scene slowly, nose toward it
-			v.orbit += dt * 0.12
-			local r = 70
-			p = Vector3.new(inc.pos.X + math.cos(v.orbit) * r, p.Y + math.sin(t * 0.7 + v.phase) * 1.5, inc.pos.Z + math.sin(v.orbit) * r)
+			-- sway to and fro on the side it came in from (the side the camera sees)
+			local arrivedFor = t - (v.arrivedAt or t)
+			local swing = math.sin(arrivedFor * 0.15) * 0.5
+			local r = 60
+			p = Vector3.new(inc.pos.X + math.cos(v.orbit + swing) * r, p.Y + math.sin(t * 0.7 + v.phase) * 1.5, inc.pos.Z + math.sin(v.orbit + swing) * r)
 			cf = faceFlat(p, inc.pos) * CFrame.Angles(math.rad(-4), 0, math.rad(6))
 		else
 			local want = faceFlat(p, v.target)

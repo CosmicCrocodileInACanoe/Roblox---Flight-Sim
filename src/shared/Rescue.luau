@@ -203,20 +203,20 @@ export type Unit = { role: string, count: number, speed: number, delay: number, 
 function Rescue.plan(situation: string): { Unit }
 	if situation == Rescue.LAND_CRASH then
 		return {
-			{ role = "police", count = 2, speed = 30, delay = 0, distM = 500 },
-			{ role = "fireTruck", count = 2, speed = 24, delay = 1.5, distM = 500 },
-			{ role = "ambulance", count = 2, speed = 26, delay = 3, distM = 500 },
+			{ role = "police", count = 2, speed = 40, delay = 0, distM = 160 },
+			{ role = "fireTruck", count = 2, speed = 34, delay = 0.5, distM = 160 },
+			{ role = "ambulance", count = 2, speed = 36, delay = 1, distM = 160 },
 		}
 	elseif situation == Rescue.WATER_CRASH then
 		return {
-			{ role = "rescueBoat", count = 2, speed = 20, delay = 0, distM = 420 },
-			{ role = "helicopter", count = 2, speed = 55, delay = 1, distM = 1100 },
+			{ role = "rescueBoat", count = 2, speed = 28, delay = 0, distM = 150 },
+			{ role = "helicopter", count = 2, speed = 70, delay = 0, distM = 350 },
 		}
 	elseif situation == Rescue.DITCH then
 		return {
-			{ role = "rescueBoat", count = 2, speed = 20, delay = 0, distM = 380 },
-			{ role = "ferry", count = 1, speed = 14, delay = 0, distM = 380 },
-			{ role = "helicopter", count = 1, speed = 55, delay = 1, distM = 1100 },
+			{ role = "rescueBoat", count = 2, speed = 28, delay = 0, distM = 140 },
+			{ role = "ferry", count = 1, speed = 20, delay = 0, distM = 160 },
+			{ role = "helicopter", count = 1, speed = 70, delay = 0, distM = 350 },
 		}
 	end
 	return {}

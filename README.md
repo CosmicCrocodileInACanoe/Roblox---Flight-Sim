@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 649 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 650 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `649 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `650 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -158,7 +158,9 @@ is.
 
 ## Emergency services and sinking
 
-After a crash the emergency services come, and everyone in the server sees them:
+After a crash the emergency services come within about 10 seconds, and everyone in the
+server sees them. They start close by, on the side your camera is looking at, so you see
+them arrive (helicopters hover low over the scene):
 
 | What happened | Who comes | What happens to the aircraft |
 | --- | --- | --- |

@@ -4,7 +4,8 @@
 --
 -- Rules:
 --   * The departure airport decides which ground spawns are offered.
---   * Every "Start at" list puts runways first, so the default is always a runway.
+--   * Every "Start at" list puts runways first, so the default is a runway, except for
+--     seaplanes and amphibians, which start on the water by default.
 --   * An aircraft is only offered runways long enough and gates wide enough for it.
 --   * Airline mode only offers routes that leave from the chosen airport.
 --   * Stunts mode has one start: in the air, lined up with the first ring.
@@ -194,10 +195,11 @@ function Selection.spawnList(airportId: string, cfg: any, mode: string, destinat
 			table.insert(out, s)
 		end
 	end
+	-- Seaplanes and amphibians start on the water by default (first in the list).
 	if cfg.water then
 		local w = Selection.waterSpawn(airportId)
 		if w then
-			table.insert(out, w)
+			table.insert(out, 1, w)
 		end
 	end
 	local approachInto = airportId

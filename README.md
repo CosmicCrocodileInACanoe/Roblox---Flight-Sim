@@ -182,8 +182,8 @@ flight leaves them there. Only **Fix all** clears your debris (or leaving the ga
 the server running smoothly there is a cap (60 pieces per player, 200 in all); past it the
 oldest pieces go first.
 
-Seaplanes and amphibians can also **start on the water**: pick "On the water" in the menu's
-Start at row (one per airport, on the nearest open sea). You float there with the engines
+Seaplanes and amphibians **start on the water by default** (one start per airport, on the
+nearest open sea); their runways and gates are still in the menu's Start at row. You float there with the engines
 running and the flaps set, ready to take off.
 
 ## Autoland

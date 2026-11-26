@@ -258,8 +258,8 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     60 s; then the boats sail away. Do the same in the Puffin and the Rainmaker: they float,
     no message, no boats.
 
-23. **Water start.** Pick the Puffin, then the Rainmaker, and in Start at choose "On the
-    water". Check: you start floating level on the sea (not under it, not in the air),
+23. **Water start.** Pick the Puffin, then the Rainmaker: Start at already shows "On the
+    water" (the default), and the runways are still there if you cycle it. Check: you start floating level on the sea (not under it, not in the air),
     engines running; full throttle takes off. Landplanes don't get this option.
 
 24. **Debris stays until Fix all.** Crash the Meridian 200 hard on open ground so it

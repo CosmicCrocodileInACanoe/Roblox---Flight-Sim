@@ -22,7 +22,7 @@ return { name = "Aircraft and airport selection", run = function(T)
 	end)
 
 	T.test("every Start at list begins with a runway, then gates, then approaches", function()
-		local rank = { runway = 1, gate = 2, water = 2.5, approach = 3, air = 4 }
+		local rank = { water = 0, runway = 1, gate = 2, approach = 3, air = 4 }
 		for _, id in Registry.order do
 			local cfg = Registry.get(id)
 			for _, ap in Airports.order do
@@ -30,7 +30,8 @@ return { name = "Aircraft and airport selection", run = function(T)
 					for _, dest in { false, "HBR", "RDV" } do
 						local list = Selection.spawnList(ap, cfg, mode, dest or nil)
 						T.check(#list > 0, "never empty")
-						T.check(list[1].kind == "runway", `{id} {ap} {mode}: first start is a runway`)
+						local firstKind = if cfg.water then "water" else "runway"
+						T.check(list[1].kind == firstKind, `{id} {ap} {mode}: first start is {firstKind}`)
 						T.check(Selection.defaultSpawn(ap, cfg, mode, dest or nil).id == list[1].id)
 						local last = 0
 						local seen = {}
@@ -152,7 +153,8 @@ return { name = "Aircraft and airport selection", run = function(T)
 						T.check(Selection.resolveSpawn(s.id, ap, cfg, mode, dest).id == s.id, "accepts " .. s.id)
 					end
 					local first = Selection.resolveSpawn("nope", ap, cfg, mode, dest)
-					T.check(first.kind == "runway" and first.airport == ap, "invalid id -> first runway")
+					local firstKind = if cfg.water then "water" else "runway"
+					T.check(first.kind == firstKind and first.airport == ap, "invalid id -> the default start")
 					T.check(Selection.resolveSpawn(nil, ap, cfg, mode, dest).id == first.id, "missing id -> first runway")
 				end
 			end

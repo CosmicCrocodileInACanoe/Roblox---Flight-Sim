@@ -207,12 +207,19 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
 18. **Craters and Fix all.** Fly the Meridian 200 into open ground at speed. There is a
     fireball (nothing is thrown about by it) and a crater: dark pit, earth rim, smoke. A
     second player sees the same crater. Crash into the sea: splash, no crater. Press Y (or
-    the green Fix all button): the aircraft comes back whole, upright on the ground next to
-    the wreck, and the debris is gone. In flight, use the Events menu to snap a wing, then
-    press Y: the wing is back, you keep your speed and height, and any mission keeps going.
+    the green Fix all button): the aircraft is whole again where it lies (stood up on its
+    wheels if it was on its side), the debris is gone, and there is no respawn: no camera
+    jump, no menu. In flight, use the Events menu to snap a wing and set an engine on fire,
+    then press Y: the wing is back, the fire is out, the engine runs, and you keep flying
+    at the same speed, height, throttle and camera view. Any mission keeps going.
     Pressing Y again within 2 s does nothing. Ditch a Puffin or the Meridian in the sea and
     press Y: it comes back on the surface, not on the seabed. Start Strong winds, press Y:
     the wind keeps blowing after the fix.
+
+19. **Reset (R).** Fly off from a runway, press R in the air: you are back at the start,
+    seated, and the aircraft moves when you add throttle (it must not stay frozen). Crash,
+    press R: same. Fly out over the sea and dive until "Aircraft lost": press R and you get
+    a new aircraft (before, R did nothing then).
 
 19. **Arrowstar at Mach 2.** Take the Arrowstar up past 20,000 ft at full throttle, gear
     up. The HUD passes M2.00 and the aircraft is never reset for "impossible speed". After

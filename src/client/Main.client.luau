@@ -233,6 +233,21 @@ end
 	end
 end)
 
+-- Fix all: the server put new parts on this same aircraft. Keep flying, just repaired.
+;(remotes:WaitForChild("AircraftRepaired") :: RemoteEvent).OnClientEvent:Connect(function(model: any)
+	if not fc or fc.model ~= model then
+		return
+	end
+	local ok, err = xpcall(function()
+		fc:repairInPlace()
+		hazards:attach(fc, true) -- engine fires out, weather stays
+		camera:setMode(camera.mode) -- cockpit view hides the new outside parts
+	end, debug.traceback)
+	if not ok then
+		warn("[Flight] Fix all: " .. tostring(err))
+	end
+end)
+
 ;(remotes:WaitForChild("MissionUpdate") :: RemoteEvent).OnClientEvent:Connect(function(data: any)
 	hud:setMission(data)
 	if data and data.destination then
@@ -298,6 +313,7 @@ local function keysFor(action: string): { [Enum.KeyCode]: boolean }
 	return set
 end
 local menuKeys, controlsKeys, musicKeys = keysFor("menu"), keysFor("controls"), keysFor("music")
+local resetKeys = keysFor("reset")
 UserInputService.InputBegan:Connect(function(io, processed)
 	if processed or fc then
 		return
@@ -312,6 +328,10 @@ UserInputService.InputBegan:Connect(function(io, processed)
 		controlsPopup:toggle()
 	elseif musicKeys[io.KeyCode] then
 		sound:toggleMusic()
+	elseif resetKeys[io.KeyCode] then
+		-- R also works once the aircraft is gone (lost at sea, wrecked and cleared away):
+		-- the flight keys are unbound then, so without this it did nothing.
+		(remotes:WaitForChild("RequestReset") :: RemoteEvent):FireServer()
 	end
 end)
 

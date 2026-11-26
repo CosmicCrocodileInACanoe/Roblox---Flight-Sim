@@ -28,6 +28,7 @@ local StuntsHud = require(Client.StuntsHud)
 local Stunts = require(Shared.Stunts)
 local HazardController = require(Client.HazardController)
 local HazardPanel = require(Client.HazardPanel)
+local EmergencyController = require(Client.EmergencyController)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -52,6 +53,10 @@ local hazardPanel = HazardPanel.new(function(id: string)
 		return
 	end
 	hud:notify(hazards:trigger(id), 5)
+end)
+-- Fire trucks, ambulances, police, rescue boats, helicopters and ferries (everyone sees them)
+local emergency = EmergencyController.new(remotes, function(text: string)
+	hud:notify(text, 5)
 end)
 local stunts = StuntsHud.new({
 	onRetry = function()
@@ -387,6 +392,7 @@ end
 
 RunService.Heartbeat:Connect(function(dt)
 	updateFireDistances(dt)
+	emergency:update(dt)
 	WorldFx.update(dt, if fc then fc.model else nil)
 	hazards:update(dt)
 	hazardPanel:setStatus(hazards:status())

@@ -21,6 +21,8 @@ local Stunts = require(Shared.Stunts)
 local AircraftBuilder = require(script.Parent.AircraftBuilder)
 local CrashService = require(script.Parent.CrashService)
 local CraterService = require(script.Parent.CraterService)
+local EmergencyService = require(script.Parent.EmergencyService)
+local Rescue = require(Shared.Rescue)
 local Crash = require(Shared.Crash)
 local WorldGen = require(Shared.WorldGen)
 
@@ -102,6 +104,7 @@ end
 
 local function destroyAircraft(p: Player)
 	local s = getState(p)
+	EmergencyService.clear(p) -- the responders go home
 	if s.aircraft then
 		s.aircraft:Destroy()
 		s.aircraft = nil
@@ -235,7 +238,7 @@ end
 -- runway start tries the other runway end before falling back to a free gate; only
 -- spots that fit this aircraft (Selection.spawnList) are considered.
 local function resolveSpawn(p: Player, options: any, cfg: any): any
-	local sp = (Airports.getSpawn(options.spawnId) or Stunts.getSpawn(options.spawnId)) :: any
+	local sp = (Airports.getSpawn(options.spawnId) or Stunts.getSpawn(options.spawnId) or Selection.findWaterSpawn(options.spawnId)) :: any
 	if sp.kind ~= "gate" and sp.kind ~= "runway" then
 		return sp
 	end
@@ -339,6 +342,9 @@ function AircraftService.spawn(p: Player, rawOptions: any)
 	if sp.kind == "gate" or sp.kind == "runway" then
 		local gy = groundBelow(sp.x, sp.z, sp.y)
 		y = (gy or sp.y) + restHeight(cfg) * Units.STUDS_PER_METER + 0.3
+	elseif sp.kind == "water" then
+		-- seaplanes and amphibians: floating level on the floats or hull
+		y = WorldGen.SEA_LEVEL + Rescue.waterRestHeight(cfg) * Units.STUDS_PER_METER + 0.2
 	end
 	local cf = CFrame.new(sp.x, y, sp.z) * CFrame.Angles(0, -math.rad(sp.heading), 0) * CFrame.Angles(math.rad(sp.pitchDeg or 0), 0, 0)
 	placeAircraft(p, s, options, cfg, sp, cf, false)
@@ -549,6 +555,7 @@ function AircraftService.repair(p: Player)
 	options.failures = {}
 	s.options = options
 	s.exited = false
+	EmergencyService.clear(p)
 	if not repairInPlace(p, s, old, cfg) then
 		rebuildHere(p, s, old, options, cfg)
 	end
@@ -937,6 +944,13 @@ function AircraftService.init(remoteFolder: Folder)
 			end
 			return list
 		end,
+	})
+	EmergencyService.init({
+		remotes = remotes,
+		getAircraft = function(p: Player): Model?
+			return getState(p).aircraft
+		end,
+		notify = notify,
 	})
 	CrashService.init({
 		remotes = remotes,

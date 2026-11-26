@@ -109,7 +109,7 @@ function MissionService.onSpawned(p: Player, options: any, sp: any)
 			dest = if origin == "HBR" then "RDV" else "HBR"
 		end
 		local start = "preflight"
-		if sp.kind == "runway" then
+		if sp.kind == "runway" or sp.kind == "water" then
 			start = "takeoff"
 		elseif sp.kind == "approach" then
 			start = "landing"

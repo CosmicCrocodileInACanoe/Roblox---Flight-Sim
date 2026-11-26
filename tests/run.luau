@@ -60,6 +60,8 @@ local suites = {
 	require("./test_stunts"),
 	require("./test_firefighting"),
 	require("./test_autopilot"),
+	require("./test_rescue"),
+	require("./test_responders"),
 	require("./test_hazards"),
 }
 

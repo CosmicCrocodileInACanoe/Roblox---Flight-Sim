@@ -7,6 +7,7 @@
 
 local FlightModel = require("../src/shared/FlightModel")
 local Units = require("../src/shared/Units")
+local Rescue = require("../src/shared/Rescue")
 
 local Sim = {}
 Sim.__index = Sim
@@ -121,7 +122,9 @@ function Sim:prepareEnv()
 	if self.water then
 		for i, hp in cfg.hullPoints do
 			local _, oy = mulMV(R, hp[1], hp[2], hp[3])
-			env.hullDepth[i] = -(self.py + oy)
+			-- sinkOffset (Shared/Rescue): the surface the aircraft sees is that much lower
+			local d = -(self.py + oy) - (self.sinkOffset or 0)
+			env.hullDepth[i] = if d > 0 then d else -1
 		end
 		for _, h in env.gearHits do
 			h.hit = false
@@ -154,9 +157,15 @@ function Sim:frame()
 	self:prepareEnv()
 	local r = self.model:step(self.env, self.ctl, dtFrame)
 	local mass = self.model:currentMass()
+	local rfx, rfy, rfz, rmx, rmy, rmz = r.fx, r.fy, r.fz, r.mx, r.my, r.mz
+	if self.wreck then
+		-- a destroyed aircraft: no flight model forces, only the wreck's buoyancy (as the
+		-- game's FlightController does)
+		rfx, rfy, rfz, rmx, rmy, rmz = Rescue.waterForces(self.cfg, mass, self.env)
+	end
 	-- body forces -> world
-	local fwx, fwy, fwz = mulMV(self.R, r.fx, r.fy, r.fz)
-	local mbx, mby, mbz = r.mx, r.my, r.mz
+	local fwx, fwy, fwz = mulMV(self.R, rfx, rfy, rfz)
+	local mbx, mby, mbz = rmx, rmy, rmz
 	local sub = 4
 	local h = dtFrame / sub
 	for _ = 1, sub do

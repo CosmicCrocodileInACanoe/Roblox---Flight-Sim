@@ -22,7 +22,7 @@ return { name = "Aircraft and airport selection", run = function(T)
 	end)
 
 	T.test("every Start at list begins with a runway, then gates, then approaches", function()
-		local rank = { runway = 1, gate = 2, approach = 3, air = 4 }
+		local rank = { runway = 1, gate = 2, water = 2.5, approach = 3, air = 4 }
 		for _, id in Registry.order do
 			local cfg = Registry.get(id)
 			for _, ap in Airports.order do

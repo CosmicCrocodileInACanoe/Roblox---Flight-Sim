@@ -103,6 +103,13 @@ return { name = "World, airports, missions", run = function(T)
 		tel.x, tel.z, tel.groundSpeed, tel.parkingBrake, tel.time = g.x, g.z, 0, true, 600
 		T.check(Mission.update(m, tel) == "complete")
 	end)
+	T.test("mission: leaving the ground from taxi still counts as a takeoff", function()
+		local m = Mission.new("HBR", "RDV", Airports, "taxi")
+		local tel = { x = 0, z = 0, altitudeM = 40, aglM = 30, groundSpeed = 50, verticalSpeed = 5, onGround = false, headingDeg = 90, enginesRunning = true, parkingBrake = false, crashed = false, time = 10 }
+		T.check(Mission.update(m, tel) == "takeoff")
+		T.check(m.phase == "climb", m.phase)
+		T.check(m.airborneAt == 10, "airborneAt must be set so a touchdown can be detected")
+	end)
 	T.test("mission fails on a crash and on an off-airport landing", function()
 		local m = Mission.new("HBR", "RDV", Airports, "cruise")
 		m.airborneAt = 0

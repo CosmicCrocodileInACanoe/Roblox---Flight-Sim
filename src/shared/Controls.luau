@@ -5,6 +5,8 @@
 -- kind = "hold": the action is active while any of its keys is held.
 -- kind = "press": the action fires once when one of its keys goes down.
 -- keys: Enum.KeyCode names. Gamepad names (Button*, DPad*) are listed separately in the popup.
+-- Start and Select belong to Roblox (its menu and gamepad UI navigation), so nothing
+-- here uses them.
 
 local Controls = {}
 
@@ -44,7 +46,7 @@ Controls.KEYMAP = {
 	{ action = "autoScoop", kind = "press", group = "Aircraft systems", label = "Auto refill: fly to the sea, scoop and climb out (water bomber)", keys = { "Two" } },
 	{ action = "waterDrop", kind = "hold", group = "Aircraft systems", label = "Drop water (water bomber; skim the sea to refill)", keys = { "L" } },
 	-- Camera and game
-	{ action = "camera", kind = "press", group = "Camera and game", label = "Camera: chase / cockpit / tower", keys = { "C", "ButtonSelect" } },
+	{ action = "camera", kind = "press", group = "Camera and game", label = "Camera: chase / cockpit / tower", keys = { "C", "ButtonR3" } },
 	{ action = "assist", kind = "press", group = "Camera and game", label = "Easy / Free / Assisted / Simulation mode", keys = { "T" } },
 	{ action = "controls", kind = "press", group = "Camera and game", label = "Show / hide this controls list", keys = { "K" } },
 	{ action = "panel", kind = "press", group = "Camera and game", label = "Show / hide on-screen buttons", keys = { "U" } },
@@ -53,7 +55,7 @@ Controls.KEYMAP = {
 	{ action = "hud", kind = "press", group = "Camera and game", label = "Hide / show HUD", keys = { "H" } },
 	{ action = "music", kind = "press", group = "Camera and game", label = "Background music on / off", keys = { "O" } },
 	{ action = "debug", kind = "press", group = "Camera and game", label = "Debug panel", keys = { "F3" } },
-	{ action = "menu", kind = "press", group = "Camera and game", label = "Menu", keys = { "M", "ButtonStart" } },
+	{ action = "menu", kind = "press", group = "Camera and game", label = "Menu", keys = { "M", "ButtonL3" } },
 	{ action = "reset", kind = "press", group = "Camera and game", label = "Reset / respawn", keys = { "R" } },
 	{ action = "fixAll", kind = "press", group = "Camera and game", label = "Fix all damage (puts broken parts back)", keys = { "Y" } },
 } :: { Binding }
@@ -73,7 +75,7 @@ local DISPLAY = {
 	Comma = ",", Period = ".", Slash = "/", Semicolon = ";", Quote = "'", Minus = "-", Equals = "=",
 	One = "1", Two = "2", Three = "3", Four = "4", Five = "5", Six = "6", Seven = "7", Eight = "8", Nine = "9", Zero = "0",
 	ButtonL1 = "LB", ButtonR1 = "RB", ButtonX = "X button", ButtonY = "Y button", ButtonB = "B button",
-	ButtonA = "A button", ButtonSelect = "Select", ButtonStart = "Start",
+	ButtonA = "A button", ButtonL3 = "Left stick click", ButtonR3 = "Right stick click",
 	DPadUp = "D-pad up", DPadDown = "D-pad down", DPadLeft = "D-pad left", DPadRight = "D-pad right",
 }
 

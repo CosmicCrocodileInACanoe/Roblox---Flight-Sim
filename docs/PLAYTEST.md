@@ -239,9 +239,11 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
 
 20. **Emergency services on land.** Crash the Meridian 200 into open ground near Harbor
     City. Check: the message says fire trucks, ambulances and police are coming; within
-    about 20 s police cars, then fire trucks, then ambulances drive in (not through the
+    about 10 s police cars, then fire trucks, then ambulances drive in (not through the
     wreck), park round it facing it with red/blue/white lights flashing, and the fire trucks
-    spray water onto it. A second player sees them too. Press Y: they disappear.
+    spray water onto it. In the chase view you see them drive in from the far side of
+    the wreck, not from behind the camera. A second player sees them too. Press Y: they
+    disappear.
 
 21. **Crash into the sea.** Dive the Meridian into the sea off Harbor City. Check: the wreck
     floats (it does not drop to the seabed at once), the HUD says SINKING with a countdown,
@@ -256,8 +258,8 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     60 s; then the boats sail away. Do the same in the Puffin and the Rainmaker: they float,
     no message, no boats.
 
-23. **Water start.** Pick the Puffin, then the Rainmaker, and in Start at choose "On the
-    water". Check: you start floating level on the sea (not under it, not in the air),
+23. **Water start.** Pick the Puffin, then the Rainmaker: Start at already shows "On the
+    water" (the default), and the runways are still there if you cycle it. Check: you start floating level on the sea (not under it, not in the air),
     engines running; full throttle takes off. Landplanes don't get this option.
 
 24. **Debris stays until Fix all.** Crash the Meridian 200 hard on open ground so it

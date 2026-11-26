@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 649 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 651 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `649 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `651 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -158,7 +158,9 @@ is.
 
 ## Emergency services and sinking
 
-After a crash the emergency services come, and everyone in the server sees them:
+After a crash the emergency services come within about 10 seconds, and everyone in the
+server sees them. They start close by, on the side your camera is looking at, so you see
+them arrive (helicopters hover low over the scene):
 
 | What happened | Who comes | What happens to the aircraft |
 | --- | --- | --- |
@@ -180,8 +182,8 @@ flight leaves them there. Only **Fix all** clears your debris (or leaving the ga
 the server running smoothly there is a cap (60 pieces per player, 200 in all); past it the
 oldest pieces go first.
 
-Seaplanes and amphibians can also **start on the water**: pick "On the water" in the menu's
-Start at row (one per airport, on the nearest open sea). You float there with the engines
+Seaplanes and amphibians **start on the water by default** (one start per airport, on the
+nearest open sea); their runways and gates are still in the menu's Start at row. You float there with the engines
 running and the flaps set, ready to take off.
 
 ## Autoland

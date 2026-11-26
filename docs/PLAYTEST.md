@@ -268,6 +268,16 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     them). Crash again, then press Y: your new aircraft is fixed and all your debris and
     old wrecks are gone. A second player's debris is not touched.
 
+25. **Fire and explosions.** In the Meridian 200, Easy mode:
+    - Clip a wingtip on the ground at speed: the outer wing tears off.
+    - Belly-land hard at about 150 kt: parts break off and catch fire, with flames, black
+      smoke and a glow, and the fire stays on the pieces.
+    - Dive into open ground: the plane breaks apart, burns and explodes, and leaves a crater.
+    - Hit the ground at a gentle angle but fast enough to wreck it: it burns without
+      exploding.
+    - A normal landing, even a firm one at about 600 fpm, still breaks nothing.
+    - Press Y: the fires are gone with the damage.
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

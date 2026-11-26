@@ -921,7 +921,7 @@ end
 --   v, w: world velocity (m/s) and angular velocity (rad/s) of the aircraft.
 function FlightController:crashResponse(comp: string, point: Vector3, dvWorld: Vector3, dv: number, cf: CFrame, v: Vector3, w: Vector3, allowSection: boolean)
 	local fm = self.fm
-	local prof = Crash.profiles(self.cfg, self.toughness)[comp]
+	local prof = Crash.profiles(self.cfg, Crash.crashToughness(self.toughness))[comp]
 	if not prof then
 		return
 	end

@@ -24,6 +24,7 @@ local Aero = req("Aero")
 local Engine = req("Engine")
 local Gear = req("Gear")
 local Damage = req("Damage")
+local Crash = req("Crash")
 
 local FlightModel = {}
 FlightModel.__index = FlightModel
@@ -112,18 +113,27 @@ function FlightModel.new(cfg: any, opts: any?)
 	self.elevator = 0
 	self.aileron = 0
 	self.rudder = 0
-	-- toughness > 1 (easy mode) raises every damage limit without touching the shared config
+	-- toughness > 1 (easy mode) raises the landing gear's limits fully, but crash limits
+	-- only a little (Crash.crashToughness); Crash.STRENGTH scales every airframe down.
 	local tough = o.toughness or 1
-	local comps = cfg.components
+	local crashTough = Crash.crashToughness(tough)
+	local strength = Crash.STRENGTH
+	local comps = {}
+	for name, c in cfg.components do
+		local copy = table.clone(c)
+		copy.impactThreshold = c.impactThreshold * crashTough * strength.threshold
+		copy.impactDestroy = c.impactDestroy * (1 + (crashTough - 1) * 0.6) * strength.destroy
+		comps[name] = copy
+	end
+	self.landingLimits = {}
+	for name, c in cfg.components do
+		self.landingLimits[name] = {
+			impactThreshold = c.impactThreshold * tough,
+			impactDestroy = c.impactDestroy * (1 + (tough - 1) * 0.6),
+		}
+	end
 	self.gearLimits, self.gLimit = cfg.gearLimits, cfg.gLimit
 	if tough ~= 1 then
-		comps = {}
-		for name, c in cfg.components do
-			local copy = table.clone(c)
-			copy.impactThreshold = c.impactThreshold * tough
-			copy.impactDestroy = c.impactDestroy * (1 + (tough - 1) * 0.6)
-			comps[name] = copy
-		end
 		local gl = cfg.gearLimits
 		self.gearLimits = {
 			sinkDegrade = gl.sinkDegrade * tough, sinkFail = gl.sinkFail * tough,
@@ -132,8 +142,8 @@ function FlightModel.new(cfg: any, opts: any?)
 		self.gLimit = cfg.gLimit * (1 + (tough - 1) * 0.5)
 	end
 	self.damageComps = comps
-	self.breakApart = o.breakApart == true
-	self.damage = Damage.new(comps, { breakApart = self.breakApart })
+	self.damageOpts = { breakApart = o.breakApart == true, wreckDv = strength.wreckDv * crashTough }
+	self.damage = Damage.new(comps, self.damageOpts)
 	self.failures = {} :: { [string]: any }
 	self.mass = cfg.mass
 	self.airborneTime = 0
@@ -198,7 +208,7 @@ end
 -- Engines that failed (fire, flame-out, torn off) run again at idle; an engine the pilot
 -- shut down stays off. Fuel, water, gear and flaps positions are kept.
 function FlightModel:repairAll()
-	self.damage = Damage.new(self.damageComps, { breakApart = self.breakApart })
+	self.damage = Damage.new(self.damageComps, self.damageOpts)
 	self.failures = {}
 	for _, e in self.engines do
 		if e.failed then
@@ -522,7 +532,12 @@ function FlightModel:step(env: any, ctl: Controls, dt: number)
 					r.lastGearOutcome = outcome
 				end
 			elseif g.bottomed and g.compressionRate > 1.5 then
-				Damage.applyImpact(dmg, u.component, g.compressionRate * 3)
+				-- a bottomed strut is part of the landing: judged by the landing limits
+				-- (full assist toughness), not the harsher crash ones
+				local lc = self.landingLimits[u.component]
+				if lc then
+					Damage.hurt(dmg, u.component, Damage.impactAmount(lc, g.compressionRate * 3))
+				end
 			end
 		end
 	end

@@ -2,9 +2,10 @@
 -- Explosions and ground craters for destroyed aircraft.
 --
 -- When an owning client's airframe is destroyed it sends ReportCrash(model, pos, dv).
--- The server checks it, sets off a cartoon explosion (it pushes nothing and breaks no
--- joints) and, if the wreck is on land, leaves a crater everyone can see: a scorched
--- patch, a dark pit and a ring of thrown-up earth, sized by the impact energy.
+-- The server checks it and sets the wreck on fire. A hard crash (Crash.STRENGTH
+-- hardCrashDv) also sets off a cartoon explosion (it pushes nothing and breaks no joints)
+-- and, on land, leaves a crater everyone can see: a scorched patch, a dark pit and a
+-- ring of thrown-up earth, sized by the impact energy.
 --
 -- The ground is made of large anchored parts, which can't be dug into, so the crater
 -- is built on top: a raised rim around a dark centre reads as a hole. Craters are
@@ -31,6 +32,7 @@ export type Hooks = {
 	getAircraft: (Player) -> Model?,
 	maxRecentSpeed: (Player, number) -> number, -- m/s
 	ignore: () -> { Instance }, -- aircraft, debris, characters...
+	ignite: ((Player, Model, string, number?) -> boolean)?, -- set a part on fire
 }
 
 local hooks: Hooks
@@ -179,6 +181,24 @@ local function onReportCrash(p: Player, model: any, pos: any, dv: any)
 	local mass = if cfg then cfg.mass else 30000
 	local seen = hooks.maxRecentSpeed(p, 3)
 	local d = math.clamp(dv, 0, seen * 1.3 + 10)
+	-- Every wreck burns: the body, the wings (fuel) and the engines.
+	if hooks.ignite and cfg then
+		local burning = 0
+		for _, name in { "Fuselage", "LeftWing", "RightWing" } do
+			if cfg.components[name] and hooks.ignite(p, m, name, 1.3) then
+				burning += 1
+			end
+		end
+		for _, e in cfg.engines or {} do
+			if burning < 5 and e.component and hooks.ignite(p, m, e.component, 1.1) then
+				burning += 1
+			end
+		end
+	end
+	-- A hard crash also explodes and digs a crater; a softer one just burns.
+	if d < Crash.STRENGTH.hardCrashDv then
+		return
+	end
 	local radiusM, rimM = Crash.craterSize(mass, d, CC.minDv)
 	CraterService.explode(pos, (radiusM or 6) * S * 0.8)
 	if not radiusM or not rimM then

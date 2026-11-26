@@ -418,7 +418,7 @@ end
 -- massive part: forces, velocity, network owner) and the pilot's seat stay, and a fresh
 -- copy of every component is welded back onto the Core. Dents, bends, collapses and torn
 -- off parts (debris) are gone, and the flight just carries on.
-local DAMAGE_ATTRS = { "Dmg_", "Health_", "BendDeg_", "CrushM_", "Collapsed_", "Section_" }
+local DAMAGE_ATTRS = { "Dmg_", "Health_", "BendDeg_", "CrushM_", "Collapsed_", "Section_", "OnFire_", "FireCount" }
 
 local function clearDamageAttributes(model: Model)
 	for name in model:GetAttributes() do
@@ -816,6 +816,12 @@ local function onReportDamage(p: Player, model: any, compName: any, state: any, 
 	end
 	;(model :: Model):SetAttribute("Dmg_" .. compName, state)
 	;(model :: Model):SetAttribute("Health_" .. compName, math.clamp(health, 0, 1))
+	-- A part broken by a hard hit catches fire (and keeps burning if it comes off).
+	if (state == "failed" or state == "detached") and impactSpeed >= Crash.STRENGTH.fireDv and CrashService.burns(compName) then
+		if impactSpeed <= maxRecentSpeed(s, 3) * 1.6 + 12 then
+			CrashService.ignite(model :: Model, compName)
+		end
+	end
 	if state == "detached" and withParent ~= true then
 		detachComponent(p, model :: Model, compName, cfg)
 	end
@@ -996,6 +1002,18 @@ function AircraftService.init(remoteFolder: Folder)
 	end
 	CraterService.init({
 		remotes = remotes,
+		-- set a component on fire, on the aircraft or on the piece it broke off as
+		ignite = function(p: Player, model: Model, compName: string, intensity: number?): boolean
+			if model:FindFirstChild(compName) then
+				return CrashService.ignite(model, compName, intensity)
+			end
+			for _, d in getState(p).debris do
+				if d.model.Parent and d.model:FindFirstChild(compName) then
+					return CrashService.ignite(d.model, compName, intensity)
+				end
+			end
+			return false
+		end,
 		getAircraft = function(p: Player): Model?
 			return getState(p).aircraft
 		end,

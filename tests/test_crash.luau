@@ -333,6 +333,66 @@ return { name = "Crash physics (dents, break points, breakup)", run = function(T
 		T.check(not Crash.justRepaired(100, 99), "clock before the repair")
 	end)
 
+	T.test("crash strength: lower break limits, easy mode only a little tougher in crashes", function()
+		local sim = FlightModel.new(cfg, { toughness = 1 })
+		local easy = FlightModel.new(cfg, { toughness = 1.6 })
+		local raw = cfg.components.LeftWing
+		local w = sim.damage.components.LeftWing.cfg
+		T.check(w.impactDestroy < raw.impactDestroy * 0.7, "a wing breaks well below its file value")
+		T.check(w.impactThreshold < raw.impactThreshold and w.impactThreshold > raw.impactThreshold * 0.7, "small bumps still do nothing")
+		local we = easy.damage.components.LeftWing.cfg
+		T.check(we.impactDestroy > w.impactDestroy and we.impactDestroy < raw.impactDestroy, "easy is tougher, but not much")
+		T.check(easy.gearLimits.sinkFail > sim.gearLimits.sinkFail, "easy landings keep their full help")
+		T.check(Crash.crashToughness(1) == 1 and Crash.crashToughness(1.6) < 1.3, "crash toughness")
+		T.check(Crash.profiles(cfg).LeftWing.sectionBreakDv < 13, "outer wings tear off sooner")
+	end)
+
+	T.test("a hit as hard as wreckDv wrecks the airframe; a firm one doesn't", function()
+		local fm = FlightModel.new(cfg, { toughness = 1, breakApart = true })
+		Damage.applyImpact(fm.damage, "LeftMainGear", 12)
+		T.check(not fm.damage.destroyed, "a 12 m/s gear hit is not a wreck")
+		Damage.applyImpact(fm.damage, "ForwardFuselage", Crash.STRENGTH.wreckDv + 1)
+		T.check(fm.damage.destroyed, "a nose-in at wreck speed destroys the plane")
+		T.check(Damage.state(fm.damage, "LeftWing") == "detached", "and breaks it apart")
+		T.check(fm.damage.hardestDv > Crash.STRENGTH.wreckDv, "hardest hit recorded")
+		local easy = FlightModel.new(cfg, { toughness = 1.6, breakApart = true })
+		Damage.applyImpact(easy.damage, "ForwardFuselage", Crash.STRENGTH.wreckDv * 1.3)
+		T.check(easy.damage.destroyed, "easy mode: a very hard hit still wrecks it")
+		T.check(Crash.STRENGTH.fireDv < Crash.STRENGTH.hardCrashDv and Crash.STRENGTH.hardCrashDv < Crash.STRENGTH.wreckDv, "fire, then explosion, then wreck")
+	end)
+
+	T.test("crash fire (mock Roblox): once per part, capped per aircraft", function()
+		local hasB, bsrc = pcall(require, "./generated/AircraftBuilder_src")
+		local hasC, csrc = pcall(require, "./generated/CrashService_src")
+		T.check(hasB and hasC, "run tests/run.sh")
+		local req = function(path)
+			return require(path)
+		end
+		local okB, Builder = pcall(Mock.loadModule, bsrc, "AircraftBuilder", "../src/shared/", req)
+		local okC, CS = pcall(Mock.loadModule, csrc, "CrashService", "../src/shared/", req)
+		T.check(okB and okC, tostring(Builder) .. " " .. tostring(CS))
+		local model = Builder.build(cfg, Mock.CFrame.new(0, 100, 0))
+		T.check(CS.ignite(model, "LeftWing"), "wing catches fire")
+		T.check(not CS.ignite(model, "LeftWing"), "only once")
+		local fires = 0
+		for _, d in model:GetDescendants() do
+			if d.ClassName == "Fire" then
+				fires += 1
+				T.check(d.Parent and d.Parent:IsA("BasePart") and d.Parent.Name ~= "Root", "on a visible part")
+			end
+		end
+		T.check(fires == 1, "one fire: " .. fires)
+		local n = 1
+		for name in cfg.components do
+			if CS.ignite(model, name) then
+				n += 1
+			end
+		end
+		T.check(n <= 6, "capped per aircraft: " .. n)
+		T.check(CS.burns("LeftEngine") and CS.burns("RightWing") and CS.burns("Fuselage"), "fuel and body parts burn")
+		T.check(not CS.burns("NoseGear") and not CS.burns("VerticalStab"), "gear and tail don't")
+	end)
+
 	T.test("crater model builds (mock Roblox): pit, rim and clods, all visual-only", function()
 		local hasSrc, src = pcall(require, "./generated/CraterService_src")
 		T.check(hasSrc, "run tests/run.sh")

@@ -239,10 +239,31 @@ end
 -- spots that fit this aircraft (Selection.spawnList) are considered.
 local function resolveSpawn(p: Player, options: any, cfg: any): any
 	local sp = (Airports.getSpawn(options.spawnId) or Stunts.getSpawn(options.spawnId) or Selection.findWaterSpawn(options.spawnId)) :: any
+	local spanM = (Selection.dimensions(cfg))
+	if sp.kind == "water" then
+		-- Everyone's water start is the same spot. Once spawn protection ends, two
+		-- seaplanes floating inside each other would collide, so move along the line
+		-- abreast to the first clear stretch of open sea.
+		if not spotOccupied(sp.x, sp.z, spanM, p) then
+			return sp
+		end
+		local h = math.rad(sp.heading)
+		local rx, rz = math.cos(h), math.sin(h) -- perpendicular to the take-off heading
+		local step = math.max(160, (spanM + 25) * Units.STUDS_PER_METER)
+		for i = 1, 12 do
+			local off = math.ceil(i / 2) * step * (if i % 2 == 1 then 1 else -1)
+			local x, z = sp.x + rx * off, sp.z + rz * off
+			if WorldGen.meshHeight(x, z) < WorldGen.SEA_LEVEL - 25 and not spotOccupied(x, z, spanM, p) then
+				local alt = table.clone(sp)
+				alt.x, alt.z = x, z
+				return alt
+			end
+		end
+		return sp
+	end
 	if sp.kind ~= "gate" and sp.kind ~= "runway" then
 		return sp
 	end
-	local spanM = (Selection.dimensions(cfg))
 	if not spotOccupied(sp.x, sp.z, spanM, p) then
 		return sp
 	end

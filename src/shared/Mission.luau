@@ -107,7 +107,10 @@ function Mission.update(m: any, tel: Telemetry): string?
 		if A.isOnRunway(originL, tel.x, tel.z) and tel.groundSpeed > 25 then
 			setPhase(m, "takeoff", tel.time)
 		elseif not tel.onGround and tel.aglM > 15 then
+			-- took off from somewhere other than the runway (a taxiway, the water)
+			m.airborneAt = tel.time
 			setPhase(m, "climb", tel.time)
+			event = "takeoff"
 		end
 	elseif p == "takeoff" then
 		if not tel.onGround and tel.aglM > 15 then

@@ -64,6 +64,13 @@ GameConfig.crash = {
 		lifetime = 900, -- s
 	},
 	repairCooldown = 2, -- s between Fix all presses
+	-- Fires on crashed aircraft and torn-off parts (server, everyone sees them). How hard a
+	-- hit has to be is in Crash.STRENGTH (fireDv, hardCrashDv).
+	fire = {
+		maxPerAircraft = 6, -- burning spots on one aircraft and its pieces
+		maxTotal = 40, -- across the game; the oldest goes out first
+		burnTime = 45, -- s before a fire dies down
+	},
 	extremeSectionFactor = 2.0, -- break-apart off: tearing a section needs this x the dv
 	impactReportMinInterval = 0.12, -- s between dent reports for one component
 	maxCrumplesPerSecond = 12, -- server, per player

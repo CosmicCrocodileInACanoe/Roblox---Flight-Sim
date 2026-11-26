@@ -611,7 +611,7 @@ local function onReportImpact(p: Player, model: any, compName: any, point: any, 
 	end
 	crumpleBudget[p] = budget - 1
 	local unitDir = if dir.Magnitude > 1e-6 then dir.Unit else Vector3.zero
-	local tough = (m:GetAttribute("Toughness") :: number?) or 1
+	local tough = Crash.crashToughness((m:GetAttribute("Toughness") :: number?) or 1)
 	local moved = CrashService.crumple(m, cfg, compName, point, unitDir, d)
 	moved += CrashService.bend(m, cfg, compName, point, unitDir, d, tough)
 	if compName == "Fuselage" and math.abs(unitDir.Y) > 0.4 then
@@ -689,6 +689,95 @@ function CrashService.init(h: Hooks)
 			end
 		end
 	end)
+end
+
+-- Fire -----------------------------------------------------------------------------------
+-- A crashed part burns: flames, black smoke and an orange glow on its biggest visible
+-- part, so the fire stays on the piece if it breaks off. Once per component, capped per
+-- aircraft and across the game, and it dies down after a while. Fix all removes the
+-- burnt parts, so their fires go with them.
+local fires: { { t: number, items: { Instance } } } = {}
+
+function CrashService.ignite(model: Model, compName: string, intensity: number?): boolean
+	local FC = CC.fire
+	local key = "OnFire_" .. compName
+	local count = (model:GetAttribute("FireCount") :: number?) or 0
+	if model:GetAttribute(key) or count >= FC.maxPerAircraft then
+		return false
+	end
+	local comp = model:FindFirstChild(compName)
+	if not comp then
+		return false
+	end
+	local best: BasePart? = nil
+	local bestVol = 0
+	for _, d in comp:GetDescendants() do
+		if d:IsA("BasePart") and d.Name ~= "Root" and d.Transparency < 0.9 and not d:IsA("Seat") then
+			local vol = d.Size.X * d.Size.Y * d.Size.Z
+			if vol > bestVol then
+				best, bestVol = d, vol
+			end
+		end
+	end
+	if not best then
+		return false
+	end
+	model:SetAttribute(key, true)
+	model:SetAttribute("FireCount", count + 1)
+	local size = math.clamp(bestVol ^ (1 / 3) * 0.9 * (intensity or 1), 4, 24)
+	local fire = Instance.new("Fire")
+	fire.Name = "CrashFire"
+	fire.Size = size
+	fire.Heat = math.clamp(size * 0.8, 6, 25)
+	fire.Color = Color3.fromRGB(255, 150, 40)
+	fire.SecondaryColor = Color3.fromRGB(255, 70, 15)
+	fire.Parent = best
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Name = "CrashSmoke"
+	smoke.Color = ColorSequence.new(Color3.fromRGB(45, 42, 40), Color3.fromRGB(110, 106, 100))
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, size * 0.4), NumberSequenceKeypoint.new(1, size * 1.6) })
+	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 1) })
+	smoke.Lifetime = NumberRange.new(4, 7)
+	smoke.Speed = NumberRange.new(6, 12)
+	smoke.Rate = 10
+	smoke.SpreadAngle = Vector2.new(15, 15)
+	smoke.Acceleration = Vector3.new(1, 4, 0)
+	smoke.Parent = best
+	local glow = Instance.new("PointLight")
+	glow.Name = "CrashGlow"
+	glow.Color = Color3.fromRGB(255, 140, 50)
+	glow.Range = math.clamp(size * 2, 10, 50)
+	glow.Brightness = 3
+	glow.Parent = best
+	local rec = { t = os.clock(), items = { fire, smoke, glow } :: { Instance } }
+	table.insert(fires, rec)
+	while #fires > FC.maxTotal do
+		local old = table.remove(fires, 1) :: any
+		for _, it in old.items do
+			it:Destroy()
+		end
+	end
+	task.delay(FC.burnTime, function()
+		fire.Enabled = false
+		smoke.Enabled = false
+		glow.Enabled = false
+		task.delay(8, function()
+			for _, it in rec.items do
+				it:Destroy()
+			end
+			local i = table.find(fires, rec)
+			if i then
+				table.remove(fires, i)
+			end
+		end)
+	end)
+	return true
+end
+
+-- Does a part of this kind burn when it breaks? Engines, wings (fuel tanks) and the body.
+function CrashService.burns(compName: string): boolean
+	local kind = Crash.kind(compName)
+	return kind == "engine" or kind == "wing" or kind == "fuselage"
 end
 
 -- Exposed for AircraftService when a whole component detaches.

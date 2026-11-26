@@ -170,7 +170,7 @@ local BASE = {
 	Model = { "PVInstance" }, Motor6D = { "JointInstance" }, Weld = { "JointInstance" },
 	WeldConstraint = {}, SurfaceGui = { "LayerCollector", "GuiBase" }, TextLabel = { "GuiObject" }, Frame = { "GuiObject" },
 	UICorner = {}, UIStroke = {}, Attachment = {}, VectorForce = { "Constraint" }, Torque = { "Constraint" },
-	SpecialMesh = {}, ParticleEmitter = {}, SpotLight = { "Light" }, PointLight = { "Light" },
+	SpecialMesh = {}, ParticleEmitter = {}, SpotLight = { "Light" }, PointLight = { "Light" }, Fire = {},
 }
 local Inst = {}
 local instMeta = {}

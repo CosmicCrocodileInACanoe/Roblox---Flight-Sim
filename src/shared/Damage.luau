@@ -36,6 +36,8 @@ export type DamageModel = {
 	breakApart: boolean,
 	extremeFactor: number,
 	extremeNow: { [string]: boolean },
+	wreckDv: number?, -- one hit this hard (m/s) wrecks the airframe; nil: never
+	hardestDv: number, -- hardest single hit so far (m/s)
 }
 
 local STATE_RANK = { normal = 0, degraded = 1, failed = 2, detached = 3 }
@@ -45,7 +47,7 @@ local PROPAGATE_TO_PARENT = 0.25
 
 Damage.EXTREME_FACTOR = 2.2
 
-export type DamageOptions = { breakApart: boolean?, extremeFactor: number? }
+export type DamageOptions = { breakApart: boolean?, extremeFactor: number?, wreckDv: number? }
 
 function Damage.new(componentsCfg: { [string]: any }, opts: DamageOptions?): DamageModel
 	local o = opts or {}
@@ -62,7 +64,7 @@ function Damage.new(componentsCfg: { [string]: any }, opts: DamageOptions?): Dam
 	return {
 		components = comps, order = order, events = {}, destroyed = false, totalImpact = 0,
 		breakApart = o.breakApart == true, extremeFactor = o.extremeFactor or Damage.EXTREME_FACTOR,
-		extremeNow = {},
+		extremeNow = {}, wreckDv = o.wreckDv, hardestDv = 0,
 	}
 end
 
@@ -175,6 +177,14 @@ function Damage.applyImpact(d: DamageModel, name: string, dv: number): number
 	end
 	local r = Damage.hurt(d, name, amount)
 	d.extremeNow[name] = nil
+	if dv > d.hardestDv then
+		d.hardestDv = dv
+	end
+	-- One hit this hard wrecks the whole airframe, wherever it lands.
+	local f = d.components.Fuselage
+	if d.wreckDv and dv >= d.wreckDv and f and f.state ~= "failed" and f.state ~= "detached" then
+		Damage.hurt(d, "Fuselage", 1, false)
+	end
 	return r
 end
 

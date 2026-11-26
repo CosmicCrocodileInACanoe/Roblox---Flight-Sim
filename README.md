@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 651 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 654 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `651 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `654 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -323,6 +323,21 @@ LeftWing = { ..., crash = { sections = false } }, -- no break point
 ```
 
 Tunables shared by all aircraft are in `GameConfig.crash`.
+
+### How strong planes are
+
+`Crash.STRENGTH` (in `src/shared/Crash.luau`) sets this for every aircraft. Parts break at
+60% of the destroy speed in their aircraft file and start getting hurt at 85% of its
+threshold, and outer wings tear off at 80% of their usual speed. A single hit of 40 m/s or
+more anywhere wrecks the whole airframe. Easy and Free modes keep their full help for
+landings, but only about a third of that toughness counts in a crash.
+
+- **Fire.** A hit of 15 m/s or more that breaks an engine, a wing or the body sets it on
+  fire: flames, black smoke and an orange glow that stay on the piece if it breaks off
+  (server side, so everyone sees them). Every wreck burns. There are at most 6 fires per
+  aircraft and 40 in the game, and each dies down after 45 s (`GameConfig.crash.fire`).
+- **Explosion.** A wreck at 28 m/s or more also explodes and leaves a crater. A softer
+  wreck just burns.
 
 ### Breaking apart
 

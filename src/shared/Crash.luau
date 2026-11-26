@@ -148,6 +148,26 @@ local function normalized(v: Vec): Vec
 	return { v[1] / m, v[2] / m, v[3] / m }
 end
 
+-- How strong airframes are in a crash, for every aircraft. The aircraft files give each
+-- component the impact speeds (m/s of local velocity change) where it starts to get hurt
+-- and where one hit destroys it; these scale them down so crashes break planes the way
+-- they should.
+Crash.STRENGTH = {
+	threshold = 0.85, -- x impactThreshold: bumps below this still do nothing
+	destroy = 0.6, -- x impactDestroy: parts break much sooner
+	sectionBreak = 0.8, -- x the speed that tears off an outer wing, stabiliser tip or fin top
+	assistWeight = 0.35, -- share of an assist mode's extra toughness kept in crashes
+	wreckDv = 40, -- m/s: one hit this hard anywhere wrecks the whole airframe
+	fireDv = 15, -- m/s: a hit this hard that breaks a part sets it on fire
+	hardCrashDv = 28, -- m/s: a wreck this hard explodes (and digs a crater); softer ones burn
+}
+
+-- Easy and Free modes (Assist.toughness > 1) forgive hard landings fully, but only a
+-- little of that applies to crashes: a real crash still breaks the plane.
+function Crash.crashToughness(toughness: number?): number
+	return 1 + math.max(0, (toughness or 1) - 1) * Crash.STRENGTH.assistWeight
+end
+
 -- Profile for one component. `cfg.components[name].crash` overrides any field;
 -- `crash.sections = false` disables break points, a list replaces the derived ones.
 function Crash.profile(cfg: any, name: string, toughness: number?): Profile
@@ -199,6 +219,10 @@ function Crash.profile(cfg: any, name: string, toughness: number?): Profile
 			end
 			table.insert(p.sections, { id = sec.id, normal = sec.normal, offset = sec.offset, lost = sec.lost })
 		end
+	end
+	-- Tear-offs come sooner (Crash.STRENGTH), unless the aircraft file sets its own.
+	if over.sectionBreakDv == nil then
+		p.sectionBreakDv *= Crash.STRENGTH.sectionBreak
 	end
 	-- Easy mode (toughness > 1) makes dents and tears need harder hits.
 	local tough = toughness or 1

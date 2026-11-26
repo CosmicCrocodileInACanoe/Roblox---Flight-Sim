@@ -532,7 +532,11 @@ function Hud:update(t: any, destId: string?)
 	-- warnings
 	local warn = ""
 	local caution = ""
-	if t.crashed then
+	if t.sinking then
+		warn = if t.sinking.left > 0
+			then string.format("SINKING: UNDER WATER IN %d S  ·  Y TO FIX ALL  ·  R TO RESET", t.sinking.left)
+			else "SUNK  ·  Y TO FIX ALL  ·  R TO RESET"
+	elseif t.crashed then
 		warn = "AIRCRAFT DESTROYED  ·  Y TO FIX ALL  ·  R TO RESET"
 	elseif t.stall then
 		warn = "STALL  ·  NOSE DOWN, ADD POWER"

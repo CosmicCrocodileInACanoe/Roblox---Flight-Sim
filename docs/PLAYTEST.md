@@ -237,6 +237,35 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     (gear up), the bar fills, it takes off and climbs out and hands back. Each WILDFIRE label
     shows a distance under it that counts down as you fly toward it.
 
+20. **Emergency services on land.** Crash the Meridian 200 into open ground near Harbor
+    City. Check: the message says fire trucks, ambulances and police are coming; within
+    about 20 s police cars, then fire trucks, then ambulances drive in (not through the
+    wreck), park round it facing it with red/blue/white lights flashing, and the fire trucks
+    spray water onto it. A second player sees them too. Press Y: they disappear.
+
+21. **Crash into the sea.** Dive the Meridian into the sea off Harbor City. Check: the wreck
+    floats (it does not drop to the seabed at once), the HUD says SINKING with a countdown,
+    boats sail out and two helicopters circle overhead, and by 60 s the wreck is under the
+    water. Press Y while it is sinking, and again after it is gone: it comes back whole on the
+    surface each time. Press R: new aircraft, crews gone.
+
+22. **Ditching.** Land the Meridian 200 (or Kestrel 72, or Meadowlark 4) gently on the sea.
+    Check: "Ditched!" message; about 4 s later orange life rafts appear beside the fuselage;
+    rescue boats and a ferry arrive; each raft moves to a boat and the HUD counts rescued
+    passengers until "all rescued"; the aircraft is half under at about 20 s and gone at
+    60 s; then the boats sail away. Do the same in the Puffin and the Rainmaker: they float,
+    no message, no boats.
+
+23. **Water start.** Pick the Puffin, then the Rainmaker, and in Start at choose "On the
+    water". Check: you start floating level on the sea (not under it, not in the air),
+    engines running; full throttle takes off. Landplanes don't get this option.
+
+24. **Debris stays until Fix all.** Crash the Meridian 200 hard on open ground so it
+    breaks up. Wait two minutes: the pieces are still there. Press R: you get a new
+    aircraft and the old wreck and pieces are still lying there (nobody is sitting in
+    them). Crash again, then press Y: your new aircraft is fixed and all your debris and
+    old wrecks are gone. A second player's debris is not touched.
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

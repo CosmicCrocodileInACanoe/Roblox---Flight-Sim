@@ -19,6 +19,7 @@ GameConfig.Remotes = {
 	"RequestRepair", -- () Fix all: every part back on, good as new, right where the aircraft is
 	"AircraftRepaired", -- server -> owner (model): Fix all swapped the parts, reset damage in place
 	"ReportCrash", -- (model, worldPos: Vector3, dv) the airframe was destroyed: explode + crater
+	"ReportEmergency", -- (model, situation: "land_crash"|"water_crash"|"ditch") call the rescue services
 	-- server -> client
 	"AircraftAssigned",
 	"MissionUpdate",
@@ -27,6 +28,8 @@ GameConfig.Remotes = {
 	"CrashFx", -- (kind: "sparks"|"shards"|"dust", worldPos: Vector3, intensity, velocity: Vector3?)
 	"DentFx", -- (model, component, pointBodyM: Vector3, dirBody: Vector3, depthM, dv) -> mesh skins
 	"StuntsUpdate", -- (data) Stunts race state: next ring, times, events, results
+	"Emergency", -- (incident) fire trucks, ambulances, police, boats, helicopters, ferries set off
+	"EmergencyClear", -- (incidentId) Fix all / Reset / left: the responders go home
 }
 
 GameConfig.CollisionGroups = {
@@ -41,9 +44,10 @@ GameConfig.aircraftCollide = true
 GameConfig.spawnProtectionSeconds = 8
 
 GameConfig.debris = {
-	maxPiecesPerPlayer = 24,
-	maxPiecesTotal = 80,
-	lifetime = 75, -- seconds
+	-- Debris has no timer: it stays until its owner presses Fix all (or leaves). These
+	-- caps remove the oldest pieces first so the server can't fill up.
+	maxPiecesPerPlayer = 60,
+	maxPiecesTotal = 200,
 }
 
 -- BeamNG-style crash feel (see shared/Crash.luau for per-component profiles).

@@ -30,6 +30,7 @@ local Wildfire = require(Shared.Wildfire)
 local Autopilot = require(Shared.Autopilot)
 local Controls = require(Shared.Controls)
 local Hazards = require(Shared.Hazards)
+local Rescue = require(Shared.Rescue)
 local Effects = require(script.Parent.Effects)
 
 local MPS = Units.METERS_PER_STUD
@@ -62,6 +63,11 @@ function FlightController.new(model: Model, options: any, spawnPoint: any, remot
 	self.alive = true
 	self.time = 0
 	self.crashed = false
+	-- Sinking (Shared/Rescue): nil, or { kind = "ditch" | "water_crash", t, half, full }
+	self.sink = nil :: any
+	self.wetTime = 0 -- seconds a landplane has been sitting in the water
+	self.dryTime = 0 -- seconds a sinking aircraft has been out of the water
+	self.landCrashReported = false
 
 	local enginesRunning = model:GetAttribute("EnginesRunning") == true
 	local gearDown = model:GetAttribute("GearDown") ~= false
@@ -259,6 +265,10 @@ end
 function FlightController:repairInPlace()
 	self.fm:repairAll()
 	self.crashed = false
+	local wasSinking = self.sink ~= nil
+	self.sink = nil
+	self.wetTime, self.dryTime = 0, 0
+	self.landCrashReported = false
 	self.peakDv, self.peakDvTime = 0, nil
 	self.eventUntil = nil
 	table.clear(self.lastImpact)
@@ -275,6 +285,22 @@ function FlightController:repairInPlace()
 		return
 	end
 	local cf = core.CFrame
+	-- Sinking (or sunk): back up to the surface, level, floating as it would on arrival.
+	local pos0 = cf.Position
+	if wasSinking or (pos0.Y < WorldGen.SEA_LEVEL + 4 and WorldGen.meshHeight(pos0.X, pos0.Z) < WorldGen.SEA_LEVEL - 1) then
+		local look = cf.LookVector
+		local flat = Vector3.new(look.X, 0, look.Z)
+		if flat.Magnitude < 1e-3 then
+			flat = Vector3.new(0, 0, -1)
+		end
+		local h = if Rescue.isWaterCapable(self.cfg) then Rescue.waterRestHeight(self.cfg) else Rescue.floatHeight(self.cfg)
+		local y = WorldGen.SEA_LEVEL + math.max(h, 0) * SPM + 0.5
+		local p = Vector3.new(pos0.X, y, pos0.Z)
+		core.CFrame = CFrame.lookAt(p, p + flat.Unit)
+		core.AssemblyLinearVelocity = Vector3.zero
+		core.AssemblyAngularVelocity = Vector3.zero
+		return
+	end
 	local slow = core.AssemblyLinearVelocity.Magnitude * MPS < 15
 	if slow and cf.UpVector.Y < 0.8 then
 		local look = cf.LookVector
@@ -533,6 +559,9 @@ function FlightController:step(dt: number)
 		self:destroy()
 		return
 	end
+	if self.model:GetAttribute("OwnerUserId") == nil then
+		return -- left behind as a wreck when the pilot respawned; the new aircraft takes over
+	end
 	dt = math.clamp(dt, 1 / 240, 1 / 20)
 	self.time += dt
 	local raw = self.input:update(dt)
@@ -595,13 +624,19 @@ function FlightController:step(dt: number)
 	end
 
 	-- Water depth at hull points (only near sea level, only over the sea).
+	-- A sinking aircraft sees the surface lowered by the sink offset, so it settles lower.
 	local nearWater = cf.Position.Y < 120
+	local sink = self.sink
+	local offsetM = if sink then Rescue.sinkOffset(sink.kind, sink.t, sink.half, sink.full) else 0
 	for i, hp in cfg.hullPoints do
 		local d = -1
 		if nearWater then
 			local wp = cf:PointToWorldSpace(Vector3.new(hp[1], hp[2], hp[3]) * SPM)
 			if wp.Y < WorldGen.SEA_LEVEL and WorldGen.meshHeight(wp.X, wp.Z) < WorldGen.SEA_LEVEL - 1 then
-				d = (WorldGen.SEA_LEVEL - wp.Y) * MPS
+				d = (WorldGen.SEA_LEVEL - wp.Y) * MPS - offsetM
+				if d <= 0 then
+					d = -1
+				end
 			end
 		end
 		env.hullDepth[i] = d
@@ -641,6 +676,19 @@ function FlightController:step(dt: number)
 	local mWorld = cf:VectorToWorldSpace(Vector3.new(r.mx, r.my, r.mz))
 	if self.crashed then
 		fWorld, mWorld = Vector3.zero, Vector3.zero
+		local wet = false
+		for i in cfg.hullPoints do
+			if (env.hullDepth[i] or -1) > 0 then
+				wet = true
+				break
+			end
+		end
+		if wet then
+			-- a wreck in the sea still floats (and sinks with the offset above)
+			local bx, by, bz, bmx, bmy, bmz = Rescue.waterForces(cfg, mass, env)
+			fWorld = cf:VectorToWorldSpace(Vector3.new(bx, by, bz))
+			mWorld = cf:VectorToWorldSpace(Vector3.new(bmx, bmy, bmz))
+		end
 	end
 	if finite(fWorld) and finite(mWorld) then
 		self.force.Force = fWorld * kF
@@ -693,6 +741,8 @@ function FlightController:step(dt: number)
 		self.remotes.ReportCrash:FireServer(self.model, cf.Position, math.max(dv, 0))
 	end
 
+	self:updateSinking(dt, cf, vWorld, r)
+
 	-- Touchdown report
 	if fm.touchdownCount > self.lastTouchdownIndex then
 		self.lastTouchdownIndex = fm.touchdownCount
@@ -715,6 +765,62 @@ function FlightController:step(dt: number)
 	self:updateVisuals(dt)
 	self.prevV = vWorld
 	self.prevW = wWorld
+end
+
+-- Sinking and calling the emergency services (Shared/Rescue). A wreck in the sea, or a
+-- landplane sitting in the water, starts to sink; a wreck on land calls fire trucks,
+-- ambulances and police. Seaplanes and amphibians on the water in one piece are fine.
+function FlightController:updateSinking(dt: number, cf: CFrame, vWorld: Vector3, r: any)
+	local cfg = self.cfg
+	local wet = false
+	for i in cfg.hullPoints do
+		if (self.env.hullDepth[i] or -1) > 0 then
+			wet = true
+			break
+		end
+	end
+	local landplaneWet = r.inWater and not Rescue.isWaterCapable(cfg)
+	local sink = self.sink
+	if sink then
+		sink.t += dt
+		if wet then
+			self.dryTime = 0
+		else
+			self.dryTime += dt
+			-- skipped off the water and flew away (not: sunk so deep it sits on the bottom)
+			if self.dryTime > 5 and not self.crashed and cf.Position.Y > WorldGen.SEA_LEVEL + 10 then
+				self.sink = nil
+				self.wetTime = 0
+			end
+		end
+		return
+	end
+	local kind: string? = nil
+	if self.crashed and wet then
+		kind = Rescue.WATER_CRASH
+	elseif not self.crashed and landplaneWet then
+		self.wetTime += dt
+		if self.wetTime >= Rescue.SINK.wetToStartS then
+			kind = Rescue.DITCH
+		end
+	else
+		self.wetTime = math.max(0, self.wetTime - dt * 2)
+	end
+	if kind then
+		local half, full = Rescue.sinkDepths(cfg)
+		self.sink = { kind = kind, t = 0, half = half, full = full }
+		self.dryTime = 0
+		self.remotes.ReportEmergency:FireServer(self.model, kind)
+		return
+	end
+	if self.crashed and not self.landCrashReported then
+		local pos = cf.Position
+		local overSea = WorldGen.meshHeight(pos.X, pos.Z) < WorldGen.SEA_LEVEL - 1
+		if not overSea and vWorld.Magnitude < 20 and self.env.agl < 40 then
+			self.landCrashReported = true
+			self.remotes.ReportEmergency:FireServer(self.model, Rescue.LAND_CRASH)
+		end
+	end
 end
 
 -- Impacts: velocity changes the aerodynamic/gear forces cannot explain came from a
@@ -957,6 +1063,7 @@ function FlightController:updateTelemetry(cf: CFrame, v: Vector3, r: any, raw: a
 	t.water = fm.water
 	t.scooping, t.dropping, t.refilling = r.scooping, r.dropping, r.refilling
 	t.crashed = self.crashed
+	t.sinking = if self.sink then { kind = self.sink.kind, left = Rescue.secondsLeft(self.sink.kind, self.sink.t) } else nil
 	t.fault = r.fault
 	t.ownership = if self.core.ReceiveAge == 0 then "client (local)" else "server/other"
 	t.wheels = r.wheelsOnGround

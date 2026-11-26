@@ -10,7 +10,7 @@ or any other game (see `CREDITS.md`).
 ## Status in one paragraph
 
 The project builds with Rojo, and every source file compiles with `luau-compile`. The
-engine-independent logic has 632 automated tests, all passing: aero, engines, gear, damage,
+engine-independent logic has 649 automated tests, all passing: aero, engines, gear, damage,
 grading, missions, audio mixing, airport geometry, terrain and offline 6-DOF flights for every aircraft (take-off, landing, stall, cruise, Easy and Free modes, rudder handling) through the same
 `FlightModel` the game runs. **None of it has been run in Roblox Studio yet.** Anything that
 touches the engine (parts, welds, Motor6Ds, network ownership, GUIs, cameras, DataStores,
@@ -56,7 +56,7 @@ From the repo root:
 sh tests/run.sh
 ```
 
-Expected: `632 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
+Expected: `649 passed, 0 failed`. These tests do not start Roblox. (`run.sh` embeds the builder source for the builder tests, then runs `luau tests/run.luau`.)
 
 ## Controls
 
@@ -155,6 +155,34 @@ Parked at an airport, a hose refills the tank too, more slowly. In a hurry, pres
 autopilot flies to the nearest open sea, lands on the hull, scoops a full tank, takes off and
 climbs to about 800 ft, then hands back to you. Each wildfire's label shows how far away it
 is.
+
+## Emergency services and sinking
+
+After a crash the emergency services come, and everyone in the server sees them:
+
+| What happened | Who comes | What happens to the aircraft |
+| --- | --- | --- |
+| Crash on land | Police cars, fire trucks and ambulances drive in from the nearest airport or town, park round the wreck with their lights flashing, and the fire trucks spray it | It stays where it is |
+| Crash into the sea | Rescue boats sail out, two helicopters circle with searchlights | The wreck floats for about 8 s, then sinks: completely under by 60 s |
+| A landplane puts down on the water in one piece | Rescue boats and a ferry; life rafts take the passengers across, and the HUD counts them ("Rescued 120 of 180 passengers"); a helicopter circles | Half under after 20 s, completely under after 60 s; the HUD counts down |
+
+Seaplanes and amphibians (Puffin, Rainmaker) on the water in one piece are fine: nothing
+sinks and nobody is called. Wrecked, they sink like anything else.
+
+**Y (Fix all)** works while sinking or sunk: the aircraft comes back up, whole, floating on
+the surface, and the crews go home. A landplane fixed out on the sea is still on the sea,
+so after a moment it starts to sink again (and the boats come back): fly off or press R.
+**R** respawns as usual and the crews go home.
+
+**Debris stays.** Parts torn off in a crash, and the wreck of an aircraft that was
+destroyed, stay where they fell: they don't time out, and pressing R or starting a new
+flight leaves them there. Only **Fix all** clears your debris (or leaving the game). To keep
+the server running smoothly there is a cap (60 pieces per player, 200 in all); past it the
+oldest pieces go first.
+
+Seaplanes and amphibians can also **start on the water**: pick "On the water" in the menu's
+Start at row (one per airport, on the nearest open sea). You float there with the engines
+running and the flaps set, ready to take off.
 
 ## Autoland
 

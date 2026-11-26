@@ -580,6 +580,8 @@ function Menu:refresh()
 		tip = "Parked at the gate: press I for engines, P to let the brake off, then taxi to the runway."
 	elseif sp.kind == "approach" then
 		tip = "Already flying: line up with the runway lights and land."
+	elseif sp.kind == "water" then
+		tip = "Floating on the sea, engines running. Flaps are set: full throttle and lift off from the water."
 	else
 		tip = "Starting in the air."
 	end

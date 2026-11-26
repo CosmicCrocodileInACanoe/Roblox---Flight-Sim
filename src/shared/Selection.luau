@@ -18,6 +18,8 @@ end
 local Airports = req("Airports")
 local Units = req("Units")
 local Stunts = req("Stunts")
+local WorldGen = req("WorldGen")
+local Autopilot = req("Autopilot")
 
 local Selection = {}
 
@@ -120,6 +122,48 @@ function Selection.destinations(airportId: string, mode: string): { any }
 	return out
 end
 
+-- Water starts for seaplanes and amphibians (cfg.water): floating on the nearest open
+-- sea to each airport, with a long clear run ahead for the take-off. Found once per
+-- airport (studs; the search works in metres like the auto refill's).
+local SPM = Units.STUDS_PER_METER
+local waterCache: { [string]: any } = {}
+function Selection.waterSpawn(airportId: string): any?
+	local cached = waterCache[airportId]
+	if cached ~= nil then
+		return if cached == false then nil else cached
+	end
+	local ap = Airports.list[airportId]
+	if not ap then
+		return nil
+	end
+	local l = Airports.layout(airportId)
+	local function isSea(xm: number, zm: number): boolean
+		return WorldGen.meshHeight(xm * SPM, zm * SPM) < WorldGen.SEA_LEVEL - 25
+	end
+	local strip = Autopilot.findScoopStrip(isSea, l.cx / SPM, l.cz / SPM, 0, 25000)
+	if not strip then
+		waterCache[airportId] = false
+		return nil
+	end
+	local distKm = math.sqrt((strip.x - l.cx / SPM) ^ 2 + (strip.z - l.cz / SPM) ^ 2) / 1000
+	local sp = {
+		id = `{airportId}-water`, label = `{ap.name}: on the water`, airport = airportId, kind = "water",
+		x = strip.x * SPM, y = WorldGen.SEA_LEVEL, z = strip.z * SPM, heading = strip.heading, speed = 0,
+		enginesRunning = true, gearDown = false, flaps = 2, throttle = 0, pitchDeg = 0,
+		distKm = distKm,
+	}
+	waterCache[airportId] = sp
+	return sp
+end
+
+function Selection.findWaterSpawn(spawnId: any): any?
+	if type(spawnId) ~= "string" then
+		return nil
+	end
+	local id = string.match(spawnId, "^(%w+)%-water$")
+	return if id then Selection.waterSpawn(id) else nil
+end
+
 -- The spawn points offered for this airport, aircraft and mode, runways first, then
 -- gates, then approaches, then (outside airline mode) the in-flight sandbox starts.
 -- In airline mode the approach start skips to the end of the route, so it is the
@@ -148,6 +192,12 @@ function Selection.spawnList(airportId: string, cfg: any, mode: string, destinat
 	if runwayOk and Selection.gateFits(cfg, airportId) then
 		for _, s in gates do
 			table.insert(out, s)
+		end
+	end
+	if cfg.water then
+		local w = Selection.waterSpawn(airportId)
+		if w then
+			table.insert(out, w)
 		end
 	end
 	local approachInto = airportId
@@ -212,6 +262,8 @@ function Selection.spawnLabel(sp: any): string
 	elseif sp.kind == "approach" then
 		local ident = string.match(sp.id, "final(%w+)$") or "?"
 		return `In the air: landing at {city}, runway {ident}`
+	elseif sp.kind == "water" then
+		return string.format("On the water: floating off %s (%.0f km)", city, sp.distKm or 0)
 	end
 	return sp.label
 end

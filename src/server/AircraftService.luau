@@ -21,6 +21,8 @@ local Stunts = require(Shared.Stunts)
 local AircraftBuilder = require(script.Parent.AircraftBuilder)
 local CrashService = require(script.Parent.CrashService)
 local CraterService = require(script.Parent.CraterService)
+local EmergencyService = require(script.Parent.EmergencyService)
+local Rescue = require(Shared.Rescue)
 local Crash = require(Shared.Crash)
 local WorldGen = require(Shared.WorldGen)
 
@@ -102,6 +104,7 @@ end
 
 local function destroyAircraft(p: Player)
 	local s = getState(p)
+	EmergencyService.clear(p) -- the responders go home
 	if s.aircraft then
 		s.aircraft:Destroy()
 		s.aircraft = nil
@@ -235,7 +238,7 @@ end
 -- runway start tries the other runway end before falling back to a free gate; only
 -- spots that fit this aircraft (Selection.spawnList) are considered.
 local function resolveSpawn(p: Player, options: any, cfg: any): any
-	local sp = (Airports.getSpawn(options.spawnId) or Stunts.getSpawn(options.spawnId)) :: any
+	local sp = (Airports.getSpawn(options.spawnId) or Stunts.getSpawn(options.spawnId) or Selection.findWaterSpawn(options.spawnId)) :: any
 	if sp.kind ~= "gate" and sp.kind ~= "runway" then
 		return sp
 	end
@@ -259,6 +262,7 @@ local function resolveSpawn(p: Player, options: any, cfg: any): any
 end
 
 local placeAircraft: (Player, PlayerState, any, any, any, CFrame, boolean) -> ()
+local retireWreck: (Player) -> ()
 
 -- Seat the pilot. A humanoid still marked as sitting (its last seat was just destroyed,
 -- as on a reset) can ignore Seat:Sit, so stand it up first and retry for a moment.
@@ -330,8 +334,9 @@ function AircraftService.spawn(p: Player, rawOptions: any)
 	s.options = options
 	s.exited = false
 
+	-- A crashed aircraft stays where it fell, with its debris, until Fix all.
+	retireWreck(p)
 	destroyAircraft(p)
-	destroyDebrisOf(p)
 
 	local cfg = Registry.get(options.aircraftId)
 	local sp = resolveSpawn(p, options, cfg)
@@ -339,6 +344,9 @@ function AircraftService.spawn(p: Player, rawOptions: any)
 	if sp.kind == "gate" or sp.kind == "runway" then
 		local gy = groundBelow(sp.x, sp.z, sp.y)
 		y = (gy or sp.y) + restHeight(cfg) * Units.STUDS_PER_METER + 0.3
+	elseif sp.kind == "water" then
+		-- seaplanes and amphibians: floating level on the floats or hull
+		y = WorldGen.SEA_LEVEL + Rescue.waterRestHeight(cfg) * Units.STUDS_PER_METER + 0.2
 	end
 	local cf = CFrame.new(sp.x, y, sp.z) * CFrame.Angles(0, -math.rad(sp.heading), 0) * CFrame.Angles(math.rad(sp.pitchDeg or 0), 0, 0)
 	placeAircraft(p, s, options, cfg, sp, cf, false)
@@ -549,6 +557,7 @@ function AircraftService.repair(p: Player)
 	options.failures = {}
 	s.options = options
 	s.exited = false
+	EmergencyService.clear(p)
 	if not repairInPlace(p, s, old, cfg) then
 		rebuildHere(p, s, old, options, cfg)
 	end
@@ -610,11 +619,57 @@ local function registerDebris(p: Player, debris: Model)
 		end
 	end
 	trimDebris()
-	task.delay(GameConfig.debris.lifetime, function()
-		if debris.Parent and not debris:FindFirstChild("PilotSeat", true) then
-			debris:Destroy()
+	-- No timer: debris from a crash stays in the world until the owner presses Fix all
+	-- (or leaves the game). Only the caps above remove the oldest pieces.
+end
+
+-- After a hard crash the wreck itself stays too when the pilot respawns (R, a new
+-- flight, or a new character): it becomes debris, still and owned by the server, and the
+-- pilot's seat is removed so nobody is left sitting in it. Fix all clears it with the rest.
+retireWreck = function(p: Player)
+	local s = getState(p)
+	for _, d in s.debris do
+		local seat = d.model.Parent and d.model:FindFirstChild("PilotSeat", true)
+		if seat then
+			seat:Destroy() -- a torn-off cockpit stays, without the pilot in it
 		end
-	end)
+	end
+	local model = s.aircraft
+	if not model or not model.Parent then
+		return
+	end
+	local crashed = model:GetAttribute("Exploded") == true or (s.systems and s.systems.Crashed == true)
+	if not crashed then
+		return
+	end
+	s.aircraft = nil
+	local seat = model:FindFirstChild("PilotSeat", true)
+	if seat then
+		seat:Destroy()
+	end
+	local core = model.PrimaryPart
+	if core then
+		for _, name in { "AeroForce", "AeroTorque" } do
+			local f = core:FindFirstChild(name)
+			if f then
+				f:Destroy()
+			end
+		end
+		pcall(function()
+			core:SetNetworkOwner(nil)
+		end)
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CollisionGroup = GameConfig.CollisionGroups.Debris
+			d:SetAttribute("DebrisOwner", p.UserId)
+		end
+	end
+	model.Name = `Wreck_{p.UserId}`
+	model:SetAttribute("DebrisOwner", p.UserId)
+	model:SetAttribute("OwnerUserId", nil)
+	model.Parent = debrisFolder
+	registerDebris(p, model)
 end
 
 local function detachComponent(p: Player, model: Model, compName: string, cfg: any)
@@ -908,11 +963,13 @@ function AircraftService.init(remoteFolder: Folder)
 	end)
 	Players.PlayerAdded:Connect(function(p)
 		p.CharacterRemoving:Connect(function()
+			retireWreck(p)
 			destroyAircraft(p)
 		end)
 	end)
 	for _, p in Players:GetPlayers() do
 		p.CharacterRemoving:Connect(function()
+			retireWreck(p)
 			destroyAircraft(p)
 		end)
 	end
@@ -937,6 +994,13 @@ function AircraftService.init(remoteFolder: Folder)
 			end
 			return list
 		end,
+	})
+	EmergencyService.init({
+		remotes = remotes,
+		getAircraft = function(p: Player): Model?
+			return getState(p).aircraft
+		end,
+		notify = notify,
 	})
 	CrashService.init({
 		remotes = remotes,

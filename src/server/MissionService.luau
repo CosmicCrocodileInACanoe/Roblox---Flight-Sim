@@ -13,6 +13,8 @@ local Mission = require(Shared.Mission)
 local Grading = require(Shared.Grading)
 local Units = require(Shared.Units)
 local Registry = require(Shared.AircraftRegistry)
+local WorldGen = require(Shared.WorldGen)
+local Rescue = require(Shared.Rescue)
 local Stunts = require(Shared.Stunts)
 
 local MissionService = {}
@@ -180,6 +182,14 @@ function MissionService.onTelemetry(p: Player, s: any, model: Model)
 	local hit = Workspace:Raycast(pos, Vector3.new(0, -3000, 0), rayParams)
 	local aglM = if hit then (pos.Y - hit.Position.Y) * Units.METERS_PER_STUD - restH else 1e4
 	local onGround = aglM < 0.45
+	-- Over the sea, rays pass through the surface and hit the seabed, so measure the
+	-- height above the water too. A seaplane floating at its water start is not "15 m
+	-- up" (that skipped straight to the climb phase), and nothing over the sea is
+	-- "airborne" until it has really left the surface.
+	if WorldGen.meshHeight(pos.X, pos.Z) < WorldGen.SEA_LEVEL - 1 then
+		local rest = if Rescue.isWaterCapable(cfg) then Rescue.waterRestHeight(cfg) else restH
+		aglM = math.min(aglM, (pos.Y - WorldGen.SEA_LEVEL) * Units.METERS_PER_STUD - rest)
+	end
 	local vy = vel.Y * Units.METERS_PER_STUD
 	table.insert(t.vyHistory, { t = now, vy = vy })
 	while #t.vyHistory > 20 do

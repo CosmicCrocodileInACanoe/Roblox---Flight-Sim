@@ -414,9 +414,6 @@ function Crash.inheritVelocity(v: Vec, w: Vec, r: Vec, away: Vec, push: number):
 	return { v[1] + cx + a[1] * push, v[2] + cy + a[2] * push, v[3] + cz + a[3] * push }
 end
 
--- Crater for a destroyed aircraft hitting the ground at `dv` (m/s): radius and rim
--- height in metres, scaled by the cube root of the impact energy so a small plane
--- leaves a small crater and a jumbo a big one. Returns nil for gentle wrecks.
 -- Fix all swaps every part of the aircraft for a new one. Damage reports already on
 -- their way about the old parts are dropped for this long (seconds) afterwards.
 Crash.REPAIR_GRACE = 0.75
@@ -424,6 +421,9 @@ function Crash.justRepaired(repairedAt: any, now: number): boolean
 	return type(repairedAt) == "number" and now - repairedAt >= 0 and now - repairedAt < Crash.REPAIR_GRACE
 end
 
+-- Crater for a destroyed aircraft hitting the ground at `dv` (m/s): radius and rim
+-- height in metres, scaled by the cube root of the impact energy so a small plane
+-- leaves a small crater and a jumbo a big one. Returns nil for gentle wrecks.
 function Crash.craterSize(massKg: number, dv: number, minDv: number?): (number?, number?)
 	if dv ~= dv or massKg ~= massKg or dv < (minDv or 10) or massKg <= 0 then
 		return nil, nil

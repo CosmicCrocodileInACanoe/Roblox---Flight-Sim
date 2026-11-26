@@ -559,6 +559,9 @@ function FlightController:step(dt: number)
 		self:destroy()
 		return
 	end
+	if self.model:GetAttribute("OwnerUserId") == nil then
+		return -- left behind as a wreck when the pilot respawned; the new aircraft takes over
+	end
 	dt = math.clamp(dt, 1 / 240, 1 / 20)
 	self.time += dt
 	local raw = self.input:update(dt)

@@ -260,6 +260,12 @@ Note any Output errors from HazardController, HazardPanel or FlightController.
     water". Check: you start floating level on the sea (not under it, not in the air),
     engines running; full throttle takes off. Landplanes don't get this option.
 
+24. **Debris stays until Fix all.** Crash the Meridian 200 hard on open ground so it
+    breaks up. Wait two minutes: the pieces are still there. Press R: you get a new
+    aircraft and the old wreck and pieces are still lying there (nobody is sitting in
+    them). Crash again, then press Y: your new aircraft is fixed and all your debris and
+    old wrecks are gone. A second player's debris is not touched.
+
 ## C. Report back
 
 For each failing item, note the item number, what you did, what happened, the Output text,

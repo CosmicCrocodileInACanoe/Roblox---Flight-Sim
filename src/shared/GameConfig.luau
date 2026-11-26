@@ -44,9 +44,10 @@ GameConfig.aircraftCollide = true
 GameConfig.spawnProtectionSeconds = 8
 
 GameConfig.debris = {
-	maxPiecesPerPlayer = 24,
-	maxPiecesTotal = 80,
-	lifetime = 75, -- seconds
+	-- Debris has no timer: it stays until its owner presses Fix all (or leaves). These
+	-- caps remove the oldest pieces first so the server can't fill up.
+	maxPiecesPerPlayer = 60,
+	maxPiecesTotal = 200,
 }
 
 -- BeamNG-style crash feel (see shared/Crash.luau for per-component profiles).

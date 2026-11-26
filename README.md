@@ -174,6 +174,12 @@ the surface, and the crews go home. A landplane fixed out on the sea is still on
 so after a moment it starts to sink again (and the boats come back): fly off or press R.
 **R** respawns as usual and the crews go home.
 
+**Debris stays.** Parts torn off in a crash, and the wreck of an aircraft that was
+destroyed, stay where they fell: they don't time out, and pressing R or starting a new
+flight leaves them there. Only **Fix all** clears your debris (or leaving the game). To keep
+the server running smoothly there is a cap (60 pieces per player, 200 in all); past it the
+oldest pieces go first.
+
 Seaplanes and amphibians can also **start on the water**: pick "On the water" in the menu's
 Start at row (one per airport, on the nearest open sea). You float there with the engines
 running and the flaps set, ready to take off.
